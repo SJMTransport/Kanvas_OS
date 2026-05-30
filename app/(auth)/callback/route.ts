@@ -7,8 +7,19 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient()
-    await supabase.auth.exchangeCodeForSession(code)
+    const { data: { user }, error } = await supabase.auth.exchangeCodeForSession(code)
+
+    if (!error && user) {
+      const { data: members } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', user.id)
+        .limit(1)
+
+      const hasWorkspace = members && members.length > 0
+      return NextResponse.redirect(`${origin}${hasWorkspace ? '/dashboard' : '/onboarding'}`)
+    }
   }
 
-  return NextResponse.redirect(`${origin}/dashboard`)
+  return NextResponse.redirect(`${origin}/login?error=callback`)
 }
