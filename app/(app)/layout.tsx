@@ -7,16 +7,28 @@ import { AppMain } from '@/components/layout/app-main'
 import { Toaster } from 'sonner'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  let user = null
+  let profile = null
+
+  try {
+    const supabase = await createClient()
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+
+    if (user) {
+      const { data: p } = await supabase
+        .from('users')
+        .select('full_name, avatar_url, email')
+        .eq('id', user.id)
+        .single()
+      profile = p
+    }
+  } catch {
+    // Supabase init failed — redirect to login
+    redirect('/login')
+  }
 
   if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('full_name, avatar_url, email')
-    .eq('id', user.id)
-    .single()
 
   const userData = {
     email: user.email ?? '',

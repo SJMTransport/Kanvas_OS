@@ -42,14 +42,18 @@ export async function proxy(request: NextRequest) {
 
   // Logged in + app route → check workspace
   if (user && isAppRoute && pathname !== '/onboarding') {
-    const { data: members } = await supabase
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('user_id', user.id)
-      .limit(1)
+    try {
+      const { data: members } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', user.id)
+        .limit(1)
 
-    if (!members || members.length === 0) {
-      return NextResponse.redirect(new URL('/onboarding', request.url))
+      if (!members || members.length === 0) {
+        return NextResponse.redirect(new URL('/onboarding', request.url))
+      }
+    } catch {
+      // DB unreachable — let the page handle it
     }
   }
 
