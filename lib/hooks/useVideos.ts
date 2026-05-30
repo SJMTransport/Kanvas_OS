@@ -1,0 +1,70 @@
+'use client'
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { createClient } from '@/lib/supabase/client'
+import { useWorkspace } from './useWorkspace'
+import type { VideoStatus, Video } from '@/lib/types'
+
+export interface VideoWithSchedules extends Video {
+  video_platform_schedules: { platform: string; tanggal_tayang: string; status: string }[]
+  brands: { nama_brand: string } | null
+  users: { full_name: string | null; avatar_url: string | null } | null
+}
+
+interface UseVideosOptions {
+  status?: VideoStatus | VideoStatus[] | null
+  search?: string
+  sortBy?: string
+  sortDir?: 'asc' | 'desc'
+  page?: number
+  pageSize?: number
+}
+
+export function useVideos(opts: UseVideosOptions = {}) {
+  const { workspaceId } = useWorkspace()
+  const { status, search, sortBy = 'updated_at', sortDir = 'desc', page = 0, pageSize = 25 } = opts
+
+  return useQuery<VideoWithSchedules[]>({
+    queryKey: ['videos', workspaceId, status, search, sortBy, sortDir, page],
+    queryFn: async () => {
+      if (!workspaceId) return []
+      const supabase = createClient()
+      let q = supabase
+        .from('videos')
+        .select(`
+          *,
+          video_platform_schedules(platform, tanggal_tayang, status),
+          brands(nama_brand),
+          users:assigned_to(full_name, avatar_url)
+        `)
+        .eq('workspace_id', workspaceId)
+
+      if (status) {
+        if (Array.isArray(status)) q = q.in('status', status)
+        else q = q.eq('status', status)
+      }
+      if (search) q = q.ilike('judul', `%${search}%`)
+
+      q = q.order(sortBy, { ascending: sortDir === 'asc' })
+        .range(page * pageSize, (page + 1) * pageSize - 1)
+
+      const { data } = await q
+      return (data ?? []) as unknown as VideoWithSchedules[]
+    },
+    enabled: !!workspaceId,
+  })
+}
+
+export function useUpdateVideoStatus() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: VideoStatus }) => {
+      const supabase = createClient()
+      const { error } = await supabase.from('videos').update({ status }).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['videos'] })
+    },
+  })
+}
