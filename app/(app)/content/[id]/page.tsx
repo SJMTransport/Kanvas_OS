@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -677,17 +677,20 @@ function ProductionSheetTab({ videoId }: { videoId: string }) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function ContentDetailPage({ params }: { params: { id: string } }) {
+export default function ContentDetailPage() {
   const router = useRouter()
+  const params = useParams<{ id: string }>()
+  const id = params?.id ?? ''
 
   const { data: video, isLoading } = useQuery<VideoWithSchedules>({
-    queryKey: ['video-detail', params.id],
+    queryKey: ['video-detail', id],
+    enabled: !!id,
     queryFn: async () => {
       const supabase = createClient()
       const { data, error } = await supabase
         .from('videos')
         .select('*')
-        .eq('id', params.id)
+        .eq('id', id)
         .single()
       if (error) throw error
       return data as unknown as VideoWithSchedules
