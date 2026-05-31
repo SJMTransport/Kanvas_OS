@@ -11,10 +11,7 @@ export async function proxy(request: NextRequest) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-    // If env vars are missing, let the request through — pages will handle auth
-    if (!url || !key) {
-      return NextResponse.next({ request })
-    }
+    if (!url || !key) return NextResponse.next({ request })
 
     const supabase = createServerClient(url, key, {
       cookies: {
@@ -29,6 +26,7 @@ export async function proxy(request: NextRequest) {
       },
     })
 
+    // Only check auth — no DB calls to keep proxy fast
     const { data } = await supabase.auth.getUser()
     const user = data?.user ?? null
     const { pathname } = request.nextUrl
@@ -44,25 +42,8 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
-    if (user && isAppRoute && pathname !== '/onboarding') {
-      try {
-        const { data: members } = await supabase
-          .from('workspace_members')
-          .select('workspace_id')
-          .eq('user_id', user.id)
-          .limit(1)
-
-        if (!members || members.length === 0) {
-          return NextResponse.redirect(new URL('/onboarding', request.url))
-        }
-      } catch {
-        // DB unreachable — let the page handle auth
-      }
-    }
-
     return supabaseResponse
   } catch {
-    // Proxy crashed — pass through to avoid blank 500
     return NextResponse.next({ request })
   }
 }

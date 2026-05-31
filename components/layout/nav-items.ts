@@ -17,10 +17,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Content',
     icon: Video,
     children: [
-      { label: 'Video', href: '/content' },
-      { label: 'Kanban', href: '/content/kanban' },
-      { label: 'Ideas', href: '/content/ideas' },
-      { label: 'Research', href: '/content/research' },
+      { label: 'Video Banking', href: '/content' },
     ],
   },
   { label: 'Performa', href: '/performance', icon: BarChart2 },
@@ -29,9 +26,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Handshake,
     children: [
       { label: 'Pipeline', href: '/brand' },
-      { label: 'Quotation', href: '/brand/quotation' },
-      { label: 'Deals', href: '/brand/deals' },
-      { label: 'Invoice', href: '/brand/invoice' },
+      { label: 'Quotation Baru', href: '/brand/quotations/new' },
     ],
   },
   { label: 'Aset', href: '/aset', icon: Image },
