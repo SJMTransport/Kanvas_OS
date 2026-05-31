@@ -1,20 +1,16 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useVideos } from '@/lib/hooks/useVideos'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
-import { createClient } from '@/lib/supabase/client'
-import { useQuery } from '@tanstack/react-query'
 import { TableView } from './table-view'
 import { KanbanView } from './kanban-view'
-import { VideoDetailPanel } from './video-detail-panel'
 import { AddVideoSheet } from './add-video-sheet'
 import { ImportExcelDialog } from './import-excel-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { LayoutList, Columns, Search, Upload, Plus, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { STATUS_ORDER } from '@/lib/utils/status'
@@ -35,8 +31,6 @@ export default function ContentPage() {
   const [sortBy, setSortBy] = useState('updated_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(0)
-  const [selectedVideo, setSelectedVideo] = useState<VideoWithSchedules | null>(null)
-  const [panelOpen, setPanelOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
 
@@ -82,8 +76,7 @@ export default function ContentPage() {
   const total = videosQuery.data?.length === PAGE_SIZE ? (page + 2) * PAGE_SIZE : (page * PAGE_SIZE) + (videosQuery.data?.length ?? 0)
 
   function handleRowClick(video: VideoWithSchedules) {
-    setSelectedVideo(video)
-    setPanelOpen(true)
+    router.push('/content/' + video.id)
   }
 
   // Debounce search → reset page
@@ -143,7 +136,7 @@ export default function ContentPage() {
       </div>
 
       {/* Content area */}
-      <div className={cn('flex-1 overflow-hidden relative', panelOpen && viewMode === 'table' && 'lg:pr-80')}>
+      <div className="flex-1 overflow-hidden relative">
         {viewMode === 'table' ? (
           <TableView
             videos={videosQuery.data ?? []}
@@ -163,21 +156,7 @@ export default function ContentPage() {
             onCardClick={handleRowClick}
           />
         )}
-
-        {/* Desktop side panel */}
-        {panelOpen && selectedVideo && (
-          <div className="hidden lg:flex fixed right-0 top-14 bottom-0 w-80 border-l border-border bg-white z-20 flex-col">
-            <VideoDetailPanel video={selectedVideo} onClose={() => { setPanelOpen(false); setSelectedVideo(null) }} />
-          </div>
-        )}
       </div>
-
-      {/* Mobile: full sheet for video detail */}
-      <Sheet open={panelOpen && typeof window !== 'undefined' && window.innerWidth < 1024} onOpenChange={(v) => { if (!v) { setPanelOpen(false); setSelectedVideo(null) } }}>
-        <SheetContent side="bottom" className="h-[92vh] p-0">
-          <VideoDetailPanel video={selectedVideo} onClose={() => { setPanelOpen(false); setSelectedVideo(null) }} />
-        </SheetContent>
-      </Sheet>
 
       <AddVideoSheet open={addOpen} onOpenChange={setAddOpen} />
       <ImportExcelDialog open={importOpen} onOpenChange={setImportOpen} />
