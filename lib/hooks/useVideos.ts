@@ -7,8 +7,8 @@ import type { VideoStatus, Video } from '@/lib/types'
 
 export interface VideoWithSchedules extends Video {
   video_platform_schedules: { platform: string; tanggal_tayang: string; status: string }[]
-  brands: { nama_brand: string } | null
-  users: { full_name: string | null; avatar_url: string | null } | null
+  brands?: { nama_brand: string } | null
+  users?: { full_name: string | null; avatar_url: string | null } | null
 }
 
 interface UseVideosOptions {
@@ -33,9 +33,7 @@ export function useVideos(opts: UseVideosOptions = {}) {
         .from('videos')
         .select(`
           *,
-          video_platform_schedules(platform, tanggal_tayang, status),
-          brands(nama_brand),
-          users:assigned_to(full_name, avatar_url)
+          video_platform_schedules(platform, tanggal_tayang, status)
         `)
         .eq('workspace_id', workspaceId)
 
