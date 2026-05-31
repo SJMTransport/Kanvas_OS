@@ -686,7 +686,7 @@ export default function ContentDetailPage({ params }: { params: { id: string } }
       const supabase = createClient()
       const { data, error } = await supabase
         .from('videos')
-        .select('*, video_platform_schedules(platform, tanggal_tayang, status)')
+        .select('*')
         .eq('id', params.id)
         .single()
       if (error) throw error
