@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { format, parseISO } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import { Video, CalendarDays } from 'lucide-react'
+import { Video, CalendarDays, ClipboardList } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getStatusBadgeClass, STATUS_CONFIG, STATUS_ORDER } from '@/lib/utils/status'
 import { getPlatformDot } from '@/lib/utils/platform'
@@ -65,6 +66,14 @@ function KanbanCard({ video, onClick, overlay }: KanbanCardProps) {
             </AvatarFallback>
           </Avatar>
         )}
+        <Link
+          href={`/content/${video.id}/production`}
+          onClick={(e) => e.stopPropagation()}
+          className="p-0.5 rounded hover:bg-accent-light text-text-muted hover:text-accent transition-colors"
+          title="Production Sheet"
+        >
+          <ClipboardList className="w-3.5 h-3.5" />
+        </Link>
       </div>
     </div>
   )

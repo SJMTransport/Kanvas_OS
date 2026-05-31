@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { format, isPast, parseISO } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import { ChevronUp, ChevronDown, Video, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronUp, ChevronDown, Video, ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -69,6 +69,7 @@ export function TableView({ videos, loading, sortBy, sortDir, page, onSort, onPa
               <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Brand</Th>
               <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Assigned</Th>
               <Th col="updated_at" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Update</Th>
+              <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-10">{''}</Th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -148,6 +149,15 @@ export function TableView({ videos, loading, sortBy, sortDir, page, onSort, onPa
                       </td>
                       <td className="px-3 py-2.5 text-xs text-text-muted whitespace-nowrap">
                         {format(new Date(v.updated_at), 'd MMM', { locale: localeId })}
+                      </td>
+                      <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                        <Link
+                          href={`/content/${v.id}/production`}
+                          className="p-1 rounded hover:bg-accent-light text-text-muted hover:text-accent transition-colors inline-flex"
+                          title="Production Sheet"
+                        >
+                          <ClipboardList className="w-3.5 h-3.5" />
+                        </Link>
                       </td>
                     </tr>
                   )
