@@ -387,6 +387,18 @@ function ScriptSegmentEditor({ video }: { video: VideoWithSchedules }) {
     return `${label}\n${s.narasi}`
   }).join('\n\n')
 
+  // Estimasi durasi: 130 kata/menit (rata-rata bicara Indonesia)
+  const WPM = 130
+  function estDur(text: string) {
+    const words = text.trim().split(/\s+/).filter(Boolean).length
+    const secs = Math.round((words / WPM) * 60)
+    if (secs < 60) return `${secs}d`
+    return `${Math.floor(secs / 60)}m ${secs % 60}d`
+  }
+  const totalWords = segments.reduce((acc, s) => acc + s.narasi.trim().split(/\s+/).filter(Boolean).length, 0)
+  const totalSecs = Math.round((totalWords / WPM) * 60)
+  const totalDurStr = totalSecs < 60 ? `${totalSecs} detik` : `${Math.floor(totalSecs / 60)} menit ${totalSecs % 60} detik`
+
   if (isLoading || !loaded) return <div className="space-y-3"><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></div>
 
   return (
@@ -407,11 +419,19 @@ function ScriptSegmentEditor({ video }: { video: VideoWithSchedules }) {
             Script Utuh
           </button>
         </div>
-        {saving && (
-          <div className="flex items-center gap-1 text-xs text-text-muted">
-            <Loader2 className="w-3 h-3 animate-spin" />Menyimpan...
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {totalWords > 0 && (
+            <span className="text-xs text-text-muted">
+              ⏱ Est. <span className="font-semibold text-text-primary">{totalDurStr}</span>
+              <span className="ml-1 text-text-muted">({totalWords} kata)</span>
+            </span>
+          )}
+          {saving && (
+            <div className="flex items-center gap-1 text-xs text-text-muted">
+              <Loader2 className="w-3 h-3 animate-spin" />Menyimpan...
+            </div>
+          )}
+        </div>
       </div>
 
       {view === 'segments' ? (
@@ -451,6 +471,11 @@ function ScriptSegmentEditor({ video }: { video: VideoWithSchedules }) {
                     </select>
                   )}
                   <div className="flex-1" />
+                  {seg.narasi.trim() && (
+                    <span className="text-[11px] text-text-muted bg-white border border-border px-1.5 py-0.5 rounded">
+                      {estDur(seg.narasi)}
+                    </span>
+                  )}
                   <button
                     onClick={() => deleteSegment(seg.id)}
                     className="text-text-muted hover:text-error transition-colors"
@@ -504,6 +529,13 @@ function ScriptSegmentEditor({ video }: { video: VideoWithSchedules }) {
               <Copy className="w-3.5 h-3.5" />Salin Script
             </Button>
           </div>
+          {totalWords > 0 && (
+            <div className="flex gap-4 text-xs text-text-muted bg-surface border border-border rounded-lg px-4 py-2.5">
+              <span>📝 <strong className="text-text-primary">{totalWords}</strong> kata</span>
+              <span>⏱ Est. <strong className="text-text-primary">{totalDurStr}</strong></span>
+              <span>🎬 <strong className="text-text-primary">{segments.length}</strong> segmen</span>
+            </div>
+          )}
           <div className="border border-border rounded-lg p-4 bg-surface">
             <pre className="text-sm text-text-primary whitespace-pre-wrap font-sans leading-relaxed">
               {fullScript || <span className="text-text-muted">Belum ada script.</span>}
