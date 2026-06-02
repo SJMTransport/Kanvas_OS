@@ -28,7 +28,7 @@ export function WorkspaceSwitcher({ collapsed = false }: { collapsed?: boolean }
         .not('accepted_at', 'is', null)
 
       if (!data) return
-      const wsList = data.map((m) => m.workspaces as unknown as Workspace)
+      const wsList = data.map((m: { role: string; workspaces: unknown }) => m.workspaces as unknown as Workspace)
       setWorkspaces(wsList)
       if (!currentWorkspace && wsList.length > 0) {
         setCurrentWorkspace(wsList[0])

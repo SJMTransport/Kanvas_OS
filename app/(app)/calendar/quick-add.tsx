@@ -86,7 +86,7 @@ export function QuickAdd({ defaultDate, onSuccess, onCancel }: Props) {
         />
         {videos && videos.length > 0 && !videoId && (
           <div className="border border-border rounded-md bg-white shadow-sm max-h-40 overflow-y-auto">
-            {videos.map((v) => (
+            {videos.map((v: { id: string; judul: string; status: string }) => (
               <button
                 key={v.id}
                 className="w-full text-left px-3 py-2 text-sm hover:bg-subtle transition-colors"

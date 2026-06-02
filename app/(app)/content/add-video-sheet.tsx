@@ -211,7 +211,7 @@ export function AddVideoSheet({ open, onOpenChange }: Props) {
                 <Select value={field.value} onValueChange={field.onChange}>
                   <SelectTrigger><SelectValue placeholder="Pilih brand" /></SelectTrigger>
                   <SelectContent>
-                    {(brands ?? []).map((b) => (
+                    {(brands ?? []).map((b: { id: string; nama_brand: string }) => (
                       <SelectItem key={b.id} value={b.id}>{b.nama_brand}</SelectItem>
                     ))}
                   </SelectContent>

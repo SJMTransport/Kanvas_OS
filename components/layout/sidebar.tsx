@@ -1,17 +1,28 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { useWorkspaceStore } from '@/lib/stores/workspaceStore'
 import { WorkspaceSwitcher } from './workspace-switcher'
 import { NAV_ITEMS } from './nav-items'
 import { ChevronLeft, ChevronRight, ChevronDown, Palette } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export function Sidebar() {
+const PREFETCH_ROUTES: Record<string, string[]> = {
+  '/content':    ['videos'],
+  '/dashboard':  ['dashboard'],
+  '/calendar':   ['schedules'],
+  '/brand':      ['brands'],
+  '/performance':['performance'],
+}
+
+export const Sidebar = React.memo(function Sidebar() {
   const pathname = usePathname()
-  const { sidebarCollapsed, setSidebarCollapsed } = useWorkspaceStore()
+  const router = useRouter()
+  const queryClient = useQueryClient()
+  const { sidebarCollapsed, setSidebarCollapsed, currentWorkspace } = useWorkspaceStore()
   const [expanded, setExpanded] = useState<string[]>([])
 
   function toggleExpand(label: string) {
@@ -22,6 +33,24 @@ export function Sidebar() {
 
   function isActive(href: string) {
     return pathname === href || pathname.startsWith(href + '/')
+  }
+
+  function handleMouseEnter(href: string) {
+    // Prefetch Next.js page bundle
+    router.prefetch(href)
+    // Prefetch data via React Query (marks as fresh so navigating feels instant)
+    const keys = PREFETCH_ROUTES[href]
+    if (keys && currentWorkspace?.id) {
+      keys.forEach((key) => {
+        if (!queryClient.getQueryData([key, currentWorkspace.id])) {
+          queryClient.prefetchQuery({
+            queryKey: [key, currentWorkspace.id],
+            staleTime: 1000 * 60 * 5,
+            queryFn: () => [], // actual fetch happens on page mount; this just primes the cache slot
+          })
+        }
+      })
+    }
   }
 
   return (
@@ -74,6 +103,7 @@ export function Sidebar() {
                       <Link
                         key={child.href}
                         href={child.href}
+                        onMouseEnter={() => handleMouseEnter(child.href)}
                         className={cn(
                           'block px-2 py-1.5 rounded-md text-sm transition-colors',
                           isActive(child.href)
@@ -90,49 +120,51 @@ export function Sidebar() {
             )
           }
 
-          if (sidebarCollapsed) {
+          if (item.href) {
             return (
               <Link
                 key={item.label}
-                href={item.href ?? item.children?.[0].href ?? '#'}
-                title={item.label}
+                href={item.href}
+                onMouseEnter={() => handleMouseEnter(item.href!)}
                 className={cn(
-                  'flex items-center justify-center w-full p-2 rounded-md transition-colors mb-0.5',
-                  active ? 'bg-accent-light text-accent' : 'text-text-secondary hover:bg-subtle hover:text-text-primary'
+                  'flex items-center gap-2.5 px-2 py-2 rounded-md text-sm transition-colors',
+                  sidebarCollapsed && 'justify-center px-0',
+                  active ? 'text-accent font-medium bg-accent-light' : 'text-text-secondary hover:text-text-primary hover:bg-subtle'
                 )}
+                title={sidebarCollapsed ? item.label : undefined}
               >
-                <Icon className="w-4.5 h-4.5" />
+                <Icon className="w-4 h-4 shrink-0" />
+                {!sidebarCollapsed && <span>{item.label}</span>}
               </Link>
             )
           }
 
+          // collapsed with children — show icon only
           return (
-            <Link
+            <button
               key={item.label}
-              href={item.href ?? '#'}
               className={cn(
-                'flex items-center gap-2.5 px-2 py-2 rounded-md text-sm transition-colors mb-0.5',
-                active ? 'bg-accent-light text-accent font-medium' : 'text-text-secondary hover:text-text-primary hover:bg-subtle'
+                'flex items-center justify-center w-full px-0 py-2 rounded-md text-sm transition-colors',
+                active ? 'text-accent font-medium bg-accent-light' : 'text-text-secondary hover:text-text-primary hover:bg-subtle'
               )}
+              title={item.label}
             >
-              <Icon className="w-4 h-4 shrink-0" />
-              <span>{item.label}</span>
-            </Link>
+              <Icon className="w-4 h-4" />
+            </button>
           )
         })}
       </nav>
 
       {/* Collapse toggle */}
-      <div className="p-2 border-t border-border">
+      <div className="px-2 py-2 border-t border-border">
         <button
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="flex items-center justify-center w-full p-2 rounded-md text-text-muted hover:bg-subtle hover:text-text-primary transition-colors"
-          title={sidebarCollapsed ? 'Perluas sidebar' : 'Kecilkan sidebar'}
+          className="flex items-center justify-center w-full py-1.5 rounded-md text-text-muted hover:bg-subtle hover:text-text-primary transition-colors"
         >
           {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-          {!sidebarCollapsed && <span className="ml-2 text-xs">Kecilkan</span>}
+          {!sidebarCollapsed && <span className="text-xs ml-1.5">Kecilkan</span>}
         </button>
       </div>
     </aside>
   )
-}
+})

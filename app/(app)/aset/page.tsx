@@ -59,7 +59,7 @@ export default function AsetPage() {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {assets.map((file) => (
+          {assets.map((file: { name: string }) => (
             <div key={file.name} className="aspect-square rounded-xl bg-subtle border border-border flex items-center justify-center overflow-hidden">
               <p className="text-xs text-text-muted text-center px-2 truncate">{file.name}</p>
             </div>

@@ -11,6 +11,13 @@ export interface VideoWithSchedules extends Video {
   users?: { full_name: string | null; avatar_url: string | null } | null
 }
 
+const VIDEO_LIST_COLUMNS = `
+  id, judul, status, format, tema, no_upload, no_video,
+  deadline_posting, thumbnail_url, assigned_to, brand_id,
+  is_endorsement, updated_at,
+  video_platform_schedules(platform, tanggal_tayang, status)
+`
+
 interface UseVideosOptions {
   status?: VideoStatus | VideoStatus[] | null
   search?: string
@@ -31,10 +38,7 @@ export function useVideos(opts: UseVideosOptions = {}) {
       const supabase = createClient()
       let q = supabase
         .from('videos')
-        .select(`
-          *,
-          video_platform_schedules(platform, tanggal_tayang, status)
-        `)
+        .select(VIDEO_LIST_COLUMNS)
         .eq('workspace_id', workspaceId)
 
       if (status) {
