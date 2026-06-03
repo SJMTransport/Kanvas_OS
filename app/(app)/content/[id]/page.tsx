@@ -99,42 +99,124 @@ function InlineField({ label, value, onSave, type = 'text', options }: {
 
 function InfoTab({ video }: { video: VideoWithSchedules }) {
   const queryClient = useQueryClient()
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({
+    judul: video.judul ?? '',
+    status: video.status ?? '',
+    format: video.format ?? '',
+    tema: video.tema ?? '',
+    tanggal_shooting: video.tanggal_shooting ?? '',
+    deadline_posting: video.deadline_posting ?? '',
+    storage_bahan: video.storage_bahan ?? '',
+    storage_video: video.storage_video ?? '',
+    google_drive_link: video.google_drive_link ?? '',
+    caption_default: video.caption_default ?? '',
+  })
 
-  async function save(field: string, value: string) {
-    const supabase = createClient()
-    const parsed: Record<string, unknown> = {}
-    if (field === 'no_upload') parsed[field] = value ? Number(value) : null
-    else if (field === 'is_endorsement' || field === 'is_video_request') parsed[field] = value === 'true'
-    else parsed[field] = value || null
-
-    const { error } = await supabase.from('videos').update(parsed).eq('id', video.id)
-    if (error) toast.error(error.message)
-    else queryClient.invalidateQueries({ queryKey: ['videos'] })
+  function set(field: string, value: string) {
+    setForm((f) => ({ ...f, [field]: value }))
   }
 
-  const STATUS_OPTIONS = ['ide', 'scripting', 'produksi', 'editing', 'scheduled', 'live', 'archived'].map((s) => ({
-    value: s, label: STATUS_CONFIG[s as VideoStatus]?.label ?? s,
-  }))
-  const FORMAT_OPTIONS = ['Short Video', 'Long Video', 'Reels', 'Live'].map((f) => ({ value: f, label: f }))
+  async function handleSave() {
+    setSaving(true)
+    const supabase = createClient()
+    const payload: Record<string, unknown> = {
+      judul: form.judul || null,
+      status: form.status || null,
+      format: form.format || null,
+      tema: form.tema || null,
+      tanggal_shooting: form.tanggal_shooting || null,
+      deadline_posting: form.deadline_posting || null,
+      storage_bahan: form.storage_bahan || null,
+      storage_video: form.storage_video || null,
+      google_drive_link: form.google_drive_link || null,
+      caption_default: form.caption_default || null,
+    }
+    const { error } = await supabase.from('videos').update(payload).eq('id', video.id)
+    setSaving(false)
+    if (error) {
+      toast.error(error.message)
+    } else {
+      toast.success('Perubahan tersimpan!')
+      queryClient.invalidateQueries({ queryKey: ['videos'] })
+      queryClient.invalidateQueries({ queryKey: ['video-detail', video.id] })
+    }
+  }
+
+  const STATUS_OPTIONS = ['ide', 'scripting', 'produksi', 'editing', 'scheduled', 'live', 'archived']
+  const FORMAT_OPTIONS = ['Short Video', 'Long Video', 'Reels', 'Live']
 
   return (
     <div className="space-y-4">
-      <InlineField label="Judul" value={video.judul} onSave={(v) => save('judul', v)} />
-      <div className="grid grid-cols-2 gap-4">
-        <InlineField label="Status" value={video.status} type="select" options={STATUS_OPTIONS} onSave={(v) => save('status', v)} />
-        <InlineField label="Format" value={video.format} type="select" options={FORMAT_OPTIONS} onSave={(v) => save('format', v)} />
+      <div className="space-y-1.5">
+        <Label className="text-xs text-text-muted">Judul</Label>
+        <Input value={form.judul} onChange={(e) => set('judul', e.target.value)} className="text-sm" />
       </div>
-      <InlineField label="Tema" value={video.tema} onSave={(v) => save('tema', v)} />
+
       <div className="grid grid-cols-2 gap-4">
-        <InlineField label="Tanggal Shooting" value={video.tanggal_shooting} type="date" onSave={(v) => save('tanggal_shooting', v)} />
-        <InlineField label="Deadline Posting" value={video.deadline_posting} type="date" onSave={(v) => save('deadline_posting', v)} />
+        <div className="space-y-1.5">
+          <Label className="text-xs text-text-muted">Status</Label>
+          <Select value={form.status} onValueChange={(v) => set('status', v)}>
+            <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map((s) => (
+                <SelectItem key={s} value={s}>{STATUS_CONFIG[s as VideoStatus]?.label ?? s}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-text-muted">Format</Label>
+          <Select value={form.format} onValueChange={(v) => set('format', v)}>
+            <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {FORMAT_OPTIONS.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs text-text-muted">Tema</Label>
+        <Input value={form.tema} onChange={(e) => set('tema', e.target.value)} className="text-sm" />
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
-        <InlineField label="Storage Bahan" value={video.storage_bahan} onSave={(v) => save('storage_bahan', v)} />
-        <InlineField label="Storage Video" value={video.storage_video} onSave={(v) => save('storage_video', v)} />
+        <div className="space-y-1.5">
+          <Label className="text-xs text-text-muted">Tanggal Shooting</Label>
+          <Input type="date" value={form.tanggal_shooting} onChange={(e) => set('tanggal_shooting', e.target.value)} className="text-sm" />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-text-muted">Deadline Posting</Label>
+          <Input type="date" value={form.deadline_posting} onChange={(e) => set('deadline_posting', e.target.value)} className="text-sm" />
+        </div>
       </div>
-      <InlineField label="Google Drive" value={video.google_drive_link} onSave={(v) => save('google_drive_link', v)} />
-      <InlineField label="Caption Default" value={video.caption_default} type="textarea" onSave={(v) => save('caption_default', v)} />
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label className="text-xs text-text-muted">Storage Bahan</Label>
+          <Input value={form.storage_bahan} onChange={(e) => set('storage_bahan', e.target.value)} placeholder="Link folder..." className="text-sm" />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-text-muted">Storage Video</Label>
+          <Input value={form.storage_video} onChange={(e) => set('storage_video', e.target.value)} placeholder="Link folder..." className="text-sm" />
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs text-text-muted">Google Drive</Label>
+        <Input value={form.google_drive_link} onChange={(e) => set('google_drive_link', e.target.value)} placeholder="https://drive.google.com/..." className="text-sm" />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs text-text-muted">Caption Default</Label>
+        <Textarea value={form.caption_default} onChange={(e) => set('caption_default', e.target.value)} rows={3} className="text-sm" />
+      </div>
+
+      <Button onClick={handleSave} disabled={saving} className="w-full gap-2">
+        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+        {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
+      </Button>
     </div>
   )
 }
