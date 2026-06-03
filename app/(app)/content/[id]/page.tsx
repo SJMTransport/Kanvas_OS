@@ -1,6 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import {
+  DndContext, DragEndEvent, PointerSensor, useSensor, useSensors, closestCenter,
+} from '@dnd-kit/core'
+import {
+  SortableContext, useSortable, verticalListSortingStrategy, arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
@@ -14,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
-  ArrowLeft, Plus, Trash2, Check, ExternalLink, Loader2, FileText, Copy, ChevronRight,
+  ArrowLeft, Plus, Trash2, Check, ExternalLink, Loader2, FileText, Copy, ChevronRight, GripVertical,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -392,6 +399,85 @@ const NARASI_PLACEHOLDER: Record<SegmentType, string> = {
 
 const ISI_SUB_TYPES = ['Context', 'Discovery', 'Problem', 'Solution']
 
+function SortableSegmentCard({ seg, estDur, onUpdate, onDelete, onBlur }: {
+  seg: Segment
+  estDur: (text: string) => string
+  onUpdate: (id: string, field: keyof Segment, value: string) => void
+  onDelete: (id: string) => void
+  onBlur: () => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: seg.id })
+  const style = { transform: CSS.Transform.toString(transform), transition }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn('border border-border rounded-lg overflow-hidden bg-white shadow-sm', isDragging && 'opacity-50 shadow-lg')}
+    >
+      {/* Card header */}
+      <div className="flex items-center gap-2 px-3 py-2 bg-surface border-b border-border">
+        <button
+          {...attributes}
+          {...listeners}
+          className="text-text-muted hover:text-text-primary cursor-grab active:cursor-grabbing touch-none"
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
+        <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', SEGMENT_BADGE[seg.type])}>
+          {seg.type}
+        </span>
+        {seg.type === 'ISI' && (
+          <select
+            className="text-xs border border-border rounded px-1.5 py-0.5 bg-white"
+            value={seg.sub_type}
+            onChange={(e) => onUpdate(seg.id, 'sub_type', e.target.value)}
+            onBlur={onBlur}
+          >
+            <option value="">-- sub type --</option>
+            {ISI_SUB_TYPES.map((st) => <option key={st} value={st}>{st}</option>)}
+          </select>
+        )}
+        <div className="flex-1" />
+        {seg.narasi.trim() && (
+          <span className="text-[11px] text-text-muted bg-white border border-border px-1.5 py-0.5 rounded">
+            {estDur(seg.narasi)}
+          </span>
+        )}
+        <button onClick={() => onDelete(seg.id)} className="text-text-muted hover:text-error transition-colors">
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Card body */}
+      <div className="p-3 space-y-2">
+        <div className="space-y-1">
+          <Label className="text-xs text-text-muted">B-Roll</Label>
+          <Textarea
+            rows={2}
+            placeholder="Deskripsi visual yang perlu diambil..."
+            value={seg.broll}
+            onChange={(e) => onUpdate(seg.id, 'broll', e.target.value)}
+            onBlur={onBlur}
+            className="text-xs resize-none"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-text-muted">Narasi</Label>
+          <Textarea
+            rows={3}
+            placeholder={NARASI_PLACEHOLDER[seg.type]}
+            value={seg.narasi}
+            onChange={(e) => onUpdate(seg.id, 'narasi', e.target.value)}
+            onBlur={onBlur}
+            className="text-sm resize-none"
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ScriptSegmentEditor({ video }: { video: VideoWithSchedules }) {
   const [segments, setSegments] = useState<Segment[]>([])
   const [scriptId, setScriptId] = useState<string | null>(null)
@@ -450,6 +536,22 @@ function ScriptSegmentEditor({ video }: { video: VideoWithSchedules }) {
     setSegments(updated)
   }
 
+  // use ref to always have latest segments in handleBlur closure
+  const segmentsRef = useRef(segments)
+  useEffect(() => { segmentsRef.current = segments }, [segments])
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIdx = segments.findIndex((s) => s.id === active.id)
+    const newIdx = segments.findIndex((s) => s.id === over.id)
+    const reordered = arrayMove(segments, oldIdx, newIdx)
+    setSegments(reordered)
+    saveSegments(reordered)
+  }
+
   function updateSegment(id: string, field: keyof Segment, value: string) {
     setSegments((prev) => prev.map((s) => s.id === id ? { ...s, [field]: value } : s))
   }
@@ -461,7 +563,7 @@ function ScriptSegmentEditor({ video }: { video: VideoWithSchedules }) {
   }
 
   function handleBlur() {
-    saveSegments(segments)
+    saveSegments(segmentsRef.current)
   }
 
   const fullScript = segments.map((s) => {
@@ -528,72 +630,27 @@ function ScriptSegmentEditor({ video }: { video: VideoWithSchedules }) {
           </div>
 
           {/* Segment cards */}
-          <div className="space-y-3">
-            {segments.length === 0 && (
-              <div className="text-center py-8 text-text-muted text-sm border-2 border-dashed border-border rounded-lg">
-                Belum ada segmen. Klik tombol di atas untuk menambah.
-              </div>
-            )}
-            {segments.map((seg) => (
-              <div key={seg.id} className="border border-border rounded-lg overflow-hidden bg-white shadow-sm">
-                {/* Card header */}
-                <div className="flex items-center gap-2 px-3 py-2 bg-surface border-b border-border">
-                  <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', SEGMENT_BADGE[seg.type])}>
-                    {seg.type}
-                  </span>
-                  {seg.type === 'ISI' && (
-                    <select
-                      className="text-xs border border-border rounded px-1.5 py-0.5 bg-white"
-                      value={seg.sub_type}
-                      onChange={(e) => updateSegment(seg.id, 'sub_type', e.target.value)}
-                      onBlur={handleBlur}
-                    >
-                      <option value="">-- sub type --</option>
-                      {ISI_SUB_TYPES.map((st) => <option key={st} value={st}>{st}</option>)}
-                    </select>
-                  )}
-                  <div className="flex-1" />
-                  {seg.narasi.trim() && (
-                    <span className="text-[11px] text-text-muted bg-white border border-border px-1.5 py-0.5 rounded">
-                      {estDur(seg.narasi)}
-                    </span>
-                  )}
-                  <button
-                    onClick={() => deleteSegment(seg.id)}
-                    className="text-text-muted hover:text-error transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* Card body */}
-                <div className="p-3 space-y-2">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-text-muted">B-Roll</Label>
-                    <Textarea
-                      rows={2}
-                      placeholder="Deskripsi visual yang perlu diambil..."
-                      value={seg.broll}
-                      onChange={(e) => updateSegment(seg.id, 'broll', e.target.value)}
-                      onBlur={handleBlur}
-                      className="text-xs resize-none"
-                    />
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={segments.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+              <div className="space-y-3">
+                {segments.length === 0 && (
+                  <div className="text-center py-8 text-text-muted text-sm border-2 border-dashed border-border rounded-lg">
+                    Belum ada segmen. Klik tombol di atas untuk menambah.
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-text-muted">Narasi</Label>
-                    <Textarea
-                      rows={3}
-                      placeholder={NARASI_PLACEHOLDER[seg.type]}
-                      value={seg.narasi}
-                      onChange={(e) => updateSegment(seg.id, 'narasi', e.target.value)}
-                      onBlur={handleBlur}
-                      className="text-sm resize-none"
-                    />
-                  </div>
-                </div>
+                )}
+                {segments.map((seg) => (
+                  <SortableSegmentCard
+                    key={seg.id}
+                    seg={seg}
+                    estDur={estDur}
+                    onUpdate={updateSegment}
+                    onDelete={deleteSegment}
+                    onBlur={handleBlur}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
         </>
       ) : (
         /* Full script view */
