@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { format, isPast, parseISO } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
@@ -164,10 +164,10 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
   const [videos, setVideos] = useState(initialVideos)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
-  // Sync when prop changes (new page/filter)
-  if (initialVideos !== videos && !loading) {
-    setVideos(initialVideos)
-  }
+  // Sync only when initialVideos reference changes (new page/filter/fetch)
+  useEffect(() => {
+    if (!loading) setVideos(initialVideos)
+  }, [initialVideos])
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
