@@ -108,6 +108,8 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
   const queryClient = useQueryClient()
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
+    no_upload: video.no_upload != null ? String(video.no_upload) : '',
+    no_video: video.no_video ?? '',
     judul: video.judul ?? '',
     status: video.status ?? '',
     format: video.format ?? '',
@@ -128,6 +130,8 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
     setSaving(true)
     const supabase = createClient()
     const payload: Record<string, unknown> = {
+      no_upload: form.no_upload ? Number(form.no_upload) : null,
+      no_video: form.no_video || null,
       judul: form.judul || null,
       status: form.status || null,
       format: form.format || null,
@@ -155,6 +159,28 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
 
   return (
     <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label className="text-xs text-text-muted">No. Upload (#)</Label>
+          <Input
+            type="number"
+            value={form.no_upload}
+            onChange={(e) => set('no_upload', e.target.value)}
+            placeholder="1, 2, 3..."
+            className="text-sm"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-text-muted">No. Video</Label>
+          <Input
+            value={form.no_video}
+            onChange={(e) => set('no_video', e.target.value)}
+            placeholder="VID-001..."
+            className="text-sm"
+          />
+        </div>
+      </div>
+
       <div className="space-y-1.5">
         <Label className="text-xs text-text-muted">Judul</Label>
         <Input value={form.judul} onChange={(e) => set('judul', e.target.value)} className="text-sm" />
