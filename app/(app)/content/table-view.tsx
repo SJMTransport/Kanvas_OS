@@ -18,6 +18,7 @@ import { getPlatformBadge } from '@/lib/utils/platform'
 import { getStatusBadgeClass, STATUS_CONFIG } from '@/lib/utils/status'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
 import type { VideoWithSchedules } from '@/lib/hooks/useVideos'
 import type { VideoStatus, Platform } from '@/lib/types'
 
@@ -173,15 +174,17 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
     if (!over || active.id === over.id) return
     const oldIdx = videos.findIndex((v) => v.id === active.id)
     const newIdx = videos.findIndex((v) => v.id === over.id)
+    // Use current page offset so sort_order stays globally consistent across pages
+    const offset = page * pageSize
     const reordered = arrayMove(videos, oldIdx, newIdx)
     setVideos(reordered)
-    // Persist sort_order to DB
     const supabase = createClient()
-    await Promise.all(
+    const { error } = await Promise.all(
       reordered.map((v, i) =>
-        supabase.from('videos').update({ sort_order: i }).eq('id', v.id)
+        supabase.from('videos').update({ sort_order: offset + i }).eq('id', v.id)
       )
-    )
+    ).then(() => ({ error: null })).catch((e) => ({ error: e }))
+    if (error) toast.error('Gagal menyimpan urutan')
   }
 
   return (

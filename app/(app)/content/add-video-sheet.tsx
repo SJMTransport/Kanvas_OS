@@ -86,12 +86,23 @@ export function AddVideoSheet({ open, onOpenChange }: Props) {
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
+      // Assign sort_order = max + 1 so new video appears at bottom
+      const { data: maxRow } = await supabase
+        .from('videos')
+        .select('sort_order')
+        .eq('workspace_id', workspaceId)
+        .order('sort_order', { ascending: false })
+        .limit(1)
+        .single()
+      const nextSortOrder = ((maxRow?.sort_order ?? -1) as number) + 1
+
       const payload = {
         workspace_id: workspaceId,
         created_by: user?.id,
         judul: data.judul,
         format: data.format || null,
         tema: data.tema || null,
+        sort_order: nextSortOrder,
         nama_alat: data.nama_alat || null,
         tanggal_shooting: data.tanggal_shooting || null,
         deadline_posting: data.deadline_posting || null,

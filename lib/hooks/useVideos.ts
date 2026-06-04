@@ -12,9 +12,9 @@ export interface VideoWithSchedules extends Video {
 }
 
 const VIDEO_LIST_COLUMNS = `
-  id, judul, status, format, tema, no_upload, no_video,
+  id, judul, status, format, tema, temas, no_upload, no_video,
   deadline_posting, thumbnail_url, assigned_to, brand_id,
-  is_endorsement, updated_at,
+  is_endorsement, updated_at, sort_order,
   video_platform_schedules(platform, tanggal_tayang, status)
 `
 
@@ -30,7 +30,7 @@ interface UseVideosOptions {
 
 export function useVideos(opts: UseVideosOptions = {}) {
   const { workspaceId } = useWorkspace()
-  const { status, search, tema, sortBy = 'updated_at', sortDir = 'desc', page = 0, pageSize = 25 } = opts
+  const { status, search, tema, sortBy = 'sort_order', sortDir = 'asc', page = 0, pageSize = 25 } = opts
 
   return useQuery<VideoWithSchedules[]>({
     queryKey: ['videos', workspaceId, status, search, tema, sortBy, sortDir, page],
