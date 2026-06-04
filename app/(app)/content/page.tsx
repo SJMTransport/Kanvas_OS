@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
+import { createClient } from '@/lib/supabase/client'
 import { useVideos } from '@/lib/hooks/useVideos'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
 import { TableView } from './table-view'
@@ -31,8 +33,21 @@ export default function ContentPage() {
   const [sortBy, setSortBy] = useState('updated_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(0)
+  const [temaFilter, setTemaFilter] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+
+  const { data: workspaceTemas = [] } = useQuery<string[]>({
+    queryKey: ['workspace-temas', workspaceId],
+    queryFn: async () => {
+      if (!workspaceId) return []
+      const supabase = createClient()
+      const { data } = await supabase.rpc('get_workspace_temas', { ws_id: workspaceId })
+      return (data ?? []) as string[]
+    },
+    enabled: !!workspaceId,
+    staleTime: 1000 * 60 * 5,
+  })
 
   // Restore view from localStorage
   useEffect(() => {
@@ -56,6 +71,7 @@ export default function ContentPage() {
   const videosQuery = useVideos({
     status: statusFilter === 'all' ? null : statusFilter,
     search: search || undefined,
+    tema: temaFilter,
     sortBy,
     sortDir,
     page,
@@ -79,8 +95,8 @@ export default function ContentPage() {
     router.push('/content/' + video.id)
   }
 
-  // Debounce search → reset page
-  useEffect(() => { setPage(0) }, [search, statusFilter])
+  // Reset page on filter changes
+  useEffect(() => { setPage(0) }, [search, statusFilter, temaFilter])
 
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)]">
@@ -112,6 +128,19 @@ export default function ContentPage() {
             {STATUS_ORDER.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}
           </SelectContent>
         </Select>
+
+        {/* Tema filter */}
+        {workspaceTemas.length > 0 && (
+          <Select value={temaFilter ?? 'all'} onValueChange={(v) => setTemaFilter(v === 'all' ? null : v)}>
+            <SelectTrigger className="h-8 text-sm w-36">
+              <SelectValue placeholder="Tema" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Tema</SelectItem>
+              {workspaceTemas.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
 
         <div className="flex-1" />
 

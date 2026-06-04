@@ -57,6 +57,7 @@ export interface Video {
   judul: string
   format: string | null
   tema: string | null
+  temas: string[] | null
   nama_alat: string | null
   storage_bahan: string | null
   storage_video: string | null

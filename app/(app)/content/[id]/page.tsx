@@ -104,16 +104,94 @@ function InlineField({ label, value, onSave, type = 'text', options }: {
 
 // ─── Info Tab ─────────────────────────────────────────────────────────────────
 
+function TemaSelect({ temas, onChange, workspaceId }: { temas: string[]; onChange: (v: string[]) => void; workspaceId: string | null }) {
+  const [input, setInput] = useState('')
+  const [open, setOpen] = useState(false)
+
+  const { data: suggestions = [] } = useQuery<string[]>({
+    queryKey: ['workspace-temas', workspaceId],
+    queryFn: async () => {
+      if (!workspaceId) return []
+      const supabase = createClient()
+      const { data } = await supabase.rpc('get_workspace_temas', { ws_id: workspaceId })
+      return (data ?? []) as string[]
+    },
+    enabled: !!workspaceId,
+    staleTime: 1000 * 60 * 5,
+  })
+
+  const filtered = suggestions.filter((s) => !temas.includes(s) && s.toLowerCase().includes(input.toLowerCase()))
+
+  function addTema(t: string) {
+    const trimmed = t.trim()
+    if (!trimmed || temas.includes(trimmed)) return
+    onChange([...temas, trimmed])
+    setInput('')
+    setOpen(false)
+  }
+
+  function removeTema(t: string) {
+    onChange(temas.filter((x) => x !== t))
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') { e.preventDefault(); addTema(input) }
+    if (e.key === 'Backspace' && !input && temas.length > 0) removeTema(temas[temas.length - 1])
+    if (e.key === 'Escape') setOpen(false)
+  }
+
+  return (
+    <div className="relative">
+      <div
+        className={cn('min-h-9 flex flex-wrap gap-1.5 px-2 py-1.5 border rounded-md bg-background cursor-text', open && 'ring-1 ring-ring')}
+        onClick={() => { setOpen(true); (document.getElementById('tema-input') as HTMLInputElement)?.focus() }}
+      >
+        {temas.map((t) => (
+          <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent-light text-accent text-xs rounded-full font-medium">
+            {t}
+            <button type="button" onClick={(e) => { e.stopPropagation(); removeTema(t) }} className="hover:text-error leading-none">&times;</button>
+          </span>
+        ))}
+        <input
+          id="tema-input"
+          value={input}
+          onChange={(e) => { setInput(e.target.value); setOpen(true) }}
+          onKeyDown={handleKeyDown}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder={temas.length === 0 ? 'Tambah tema...' : ''}
+          className="flex-1 min-w-[80px] outline-none text-sm bg-transparent placeholder:text-text-muted"
+        />
+      </div>
+      {open && (filtered.length > 0 || (input.trim() && !temas.includes(input.trim()))) && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-border rounded-md shadow-md max-h-40 overflow-y-auto">
+          {filtered.map((s) => (
+            <button key={s} type="button" onMouseDown={() => addTema(s)} className="w-full text-left px-3 py-1.5 text-sm hover:bg-subtle">
+              {s}
+            </button>
+          ))}
+          {input.trim() && !temas.includes(input.trim()) && !suggestions.includes(input.trim()) && (
+            <button type="button" onMouseDown={() => addTema(input)} className="w-full text-left px-3 py-1.5 text-sm hover:bg-subtle text-accent">
+              + Buat &quot;{input.trim()}&quot;
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function InfoTab({ video }: { video: VideoWithSchedules }) {
   const queryClient = useQueryClient()
+  const { workspaceId } = useWorkspace()
   const [saving, setSaving] = useState(false)
+  const [temas, setTemas] = useState<string[]>(video.temas ?? (video.tema ? [video.tema] : []))
   const [form, setForm] = useState({
     no_upload: video.no_upload != null ? String(video.no_upload) : '',
     no_video: video.no_video ?? '',
     judul: video.judul ?? '',
     status: video.status ?? '',
     format: video.format ?? '',
-    tema: video.tema ?? '',
     tanggal_shooting: video.tanggal_shooting ?? '',
     deadline_posting: video.deadline_posting ?? '',
     storage_bahan: video.storage_bahan ?? '',
@@ -135,7 +213,8 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
       judul: form.judul || null,
       status: form.status || null,
       format: form.format || null,
-      tema: form.tema || null,
+      temas,
+      tema: temas[0] ?? null,
       tanggal_shooting: form.tanggal_shooting || null,
       deadline_posting: form.deadline_posting || null,
       storage_bahan: form.storage_bahan || null,
@@ -211,7 +290,7 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
 
       <div className="space-y-1.5">
         <Label className="text-xs text-text-muted">Tema</Label>
-        <Input value={form.tema} onChange={(e) => set('tema', e.target.value)} className="text-sm" />
+        <TemaSelect temas={temas} onChange={setTemas} workspaceId={workspaceId} />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
