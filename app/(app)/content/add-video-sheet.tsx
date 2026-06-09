@@ -40,16 +40,17 @@ type FormData = z.infer<typeof schema>
 interface Props {
   open: boolean
   onOpenChange: (v: boolean) => void
+  defaultValues?: Partial<FormData>
 }
 
-export function AddVideoSheet({ open, onOpenChange }: Props) {
+export function AddVideoSheet({ open, onOpenChange, defaultValues: extraDefaults }: Props) {
   const { workspaceId } = useWorkspace()
   const queryClient = useQueryClient()
   const [saving, setSaving] = useState(false)
 
   const { register, handleSubmit, control, watch, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema) as any,
-    defaultValues: { status: 'ide', is_endorsement: false, is_video_request: false },
+    defaultValues: { status: 'ide', is_endorsement: false, is_video_request: false, ...extraDefaults },
   })
 
   const isEndorsement = watch('is_endorsement')

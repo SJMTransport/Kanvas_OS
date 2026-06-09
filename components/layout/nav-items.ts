@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, CalendarDays, Video, BarChart2,
-  Handshake, Image, Settings, type LucideIcon
+  Handshake, Image, Settings, Lightbulb, type LucideIcon
 } from 'lucide-react'
 
 export interface NavItem {
@@ -22,6 +22,14 @@ export const NAV_ITEMS: NavItem[] = [
   },
   { label: 'Performa', href: '/performance', icon: BarChart2 },
   {
+    label: 'Incubator',
+    icon: Lightbulb,
+    children: [
+      { label: 'Idea', href: '/incubator/idea' },
+      { label: 'Creator', href: '/incubator/creator' },
+    ],
+  },
+  {
     label: 'Brand',
     icon: Handshake,
     children: [
@@ -37,5 +45,5 @@ export const BOTTOM_NAV: NavItem[] = [
   { label: 'Home', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Kalender', href: '/calendar', icon: CalendarDays },
   { label: 'Content', href: '/content', icon: Video },
-  { label: 'Performa', href: '/performance', icon: BarChart2 },
+  { label: 'Incubator', href: '/incubator/idea', icon: Lightbulb },
 ]

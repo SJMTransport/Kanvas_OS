@@ -4,6 +4,7 @@ import { Sidebar } from '@/components/layout/sidebar'
 import { Topbar } from '@/components/layout/topbar'
 import { BottomNav } from '@/components/layout/bottom-nav'
 import { AppMain } from '@/components/layout/app-main'
+import { QuickCaptureButton } from '@/components/incubator/QuickCaptureButton'
 import { Toaster } from 'sonner'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -28,6 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Topbar user={userData} />
         <AppMain>{children}</AppMain>
         <BottomNav />
+        <QuickCaptureButton />
         <Toaster richColors position="top-right" />
       </div>
     )
