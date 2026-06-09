@@ -35,3 +35,125 @@
     @apply bg-background text-text-primary font-sans;
   }
 }
+
+/* ─── Tiptap Editor Styles ─────────────────────────────────────────────────── */
+.tiptap-editor .ProseMirror {
+  outline: none;
+  min-height: 280px;
+  padding: 16px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #111827;
+}
+
+.tiptap-editor .ProseMirror h1 {
+  font-size: 1.5em;
+  font-weight: 700;
+  margin: 1em 0 0.5em;
+  color: #111827;
+}
+.tiptap-editor .ProseMirror h2 {
+  font-size: 1.25em;
+  font-weight: 600;
+  margin: 0.875em 0 0.4em;
+  color: #1f2937;
+}
+.tiptap-editor .ProseMirror h3 {
+  font-size: 1.1em;
+  font-weight: 600;
+  margin: 0.75em 0 0.3em;
+  color: #374151;
+}
+
+.tiptap-editor .ProseMirror ul,
+.tiptap-editor .ProseMirror ol {
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+.tiptap-editor .ProseMirror li { margin: 0.2em 0; }
+
+.tiptap-editor .ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.5em;
+}
+.tiptap-editor .ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.tiptap-editor .ProseMirror ul[data-type="taskList"] li > label {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.tiptap-editor .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: #D4860A;
+  cursor: pointer;
+}
+.tiptap-editor .ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
+  text-decoration: line-through;
+  color: #9AA3AF;
+}
+
+.tiptap-editor .ProseMirror blockquote {
+  border-left: 3px solid #D4860A;
+  padding-left: 1em;
+  margin: 0.75em 0;
+  color: #6B7280;
+  font-style: italic;
+}
+
+.tiptap-editor .ProseMirror hr {
+  border: none;
+  border-top: 1px solid #E8EAED;
+  margin: 1.5em 0;
+}
+
+.tiptap-editor .ProseMirror mark {
+  background-color: #FEF3C7;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+.tiptap-editor .ProseMirror p.is-editor-empty:first-child::before,
+.tiptap-editor .ProseMirror h1.is-empty::before,
+.tiptap-editor .ProseMirror h2.is-empty::before,
+.tiptap-editor .ProseMirror h3.is-empty::before {
+  content: attr(data-placeholder);
+  color: #9AA3AF;
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+.tiptap-editor:focus-within {
+  border-color: #D4860A;
+}
+
+/* Slash command menu */
+.slash-menu {
+  background: white;
+  border: 1px solid #E8EAED;
+  border-radius: 10px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+  padding: 4px;
+  min-width: 200px;
+  z-index: 9999;
+}
+.slash-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #374151;
+}
+.slash-menu-item:hover,
+.slash-menu-item.active {
+  background: #FEF3C7;
+  color: #D4860A;
+}

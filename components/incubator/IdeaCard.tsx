@@ -6,7 +6,19 @@ import { id as localeId } from 'date-fns/locale'
 import { Play, Music, FileText, Link2, Image } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { EmbedModal } from './EmbedModal'
+import type { JSONContent } from '@tiptap/react'
 import type { IdeaCard as IdeaCardType } from '@/lib/types/incubator'
+
+function extractPreviewText(bodyJson: JSONContent | null | undefined, bodyText: string | null | undefined): string {
+  if (bodyJson) {
+    const blocks = (bodyJson as JSONContent).content ?? []
+    for (const block of blocks) {
+      const text = block.content?.map((n: JSONContent) => n.text ?? '').join('') ?? ''
+      if (text.trim()) return text.slice(0, 120)
+    }
+  }
+  return bodyText?.slice(0, 120) ?? ''
+}
 
 const STATUS_COLOR: Record<string, string> = {
   raw: 'bg-gray-100 text-gray-600',
@@ -105,9 +117,12 @@ export function IdeaCard({ card, onClick }: Props) {
           </div>
 
           {/* Body text */}
-          {card.body && (
-            <p className="text-sm text-text-secondary line-clamp-4 mb-2 leading-relaxed">{card.body}</p>
-          )}
+          {(() => {
+            const preview = extractPreviewText((card as any).body_json, card.body)
+            return preview ? (
+              <p className="text-sm text-text-secondary line-clamp-4 mb-2 leading-relaxed">{preview}</p>
+            ) : null
+          })()}
 
           {/* Link domain */}
           {card.type === 'link' && card.link_url && !meta?.image && (

@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { type JSONContent } from '@tiptap/react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,6 +13,9 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { EmbedModal } from './EmbedModal'
+import { IdeaEditor } from './IdeaEditor'
+import { TemplatePicker } from './TemplatePicker'
+import { TEMPLATE_CONTENT, type TemplateType } from './editor-templates'
 import type { IdeaCard, IdeaBoard } from '@/lib/types/incubator'
 
 interface Props {
@@ -24,9 +27,15 @@ interface Props {
   workspaceId: string | null
 }
 
+// Detect if a card is "new" (no body_json and no meaningful body text)
+function isNewCard(card: IdeaCard): boolean {
+  if ((card as any).body_json) return false
+  if (card.body && card.body.trim()) return false
+  return true
+}
+
 export function IdeaCardModal({ card, boards, open, onOpenChange, onConvertToContent, workspaceId }: Props) {
   const queryClient = useQueryClient()
-  const [body, setBody] = useState('')
   const [title, setTitle] = useState('')
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
@@ -35,21 +44,37 @@ export function IdeaCardModal({ card, boards, open, onOpenChange, onConvertToCon
   const [deadline, setDeadline] = useState('')
   const [boardIds, setBoardIds] = useState<string[]>([])
   const [embedOpen, setEmbedOpen] = useState(false)
-  const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Template picker state: shown for new cards that haven't picked a template yet
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false)
+  const [editorContent, setEditorContent] = useState<JSONContent | string | null>(null)
 
   useEffect(() => {
-    if (card) {
-      setBody(card.body ?? '')
+    if (card && open) {
       setTitle(card.title ?? '')
       setTags(card.tags ?? [])
       setStatus(card.status)
       setPriority(card.priority)
       setDeadline(card.deadline ?? '')
       setBoardIds(card.board_ids ?? [])
-    }
-  }, [card])
 
-  async function save(patch: Partial<IdeaCard>) {
+      // Determine initial editor content
+      const bodyJson = (card as any).body_json as JSONContent | null
+      if (bodyJson) {
+        setEditorContent(bodyJson)
+        setShowTemplatePicker(false)
+      } else if (card.body && card.body.trim()) {
+        // Legacy plain text — wrap in paragraph
+        setEditorContent(card.body)
+        setShowTemplatePicker(false)
+      } else {
+        // New card — show template picker
+        setShowTemplatePicker(true)
+        setEditorContent(null)
+      }
+    }
+  }, [card, open])
+
+  async function patchCard(patch: Partial<IdeaCard> & Record<string, unknown>) {
     if (!card) return
     const supabase = createClient()
     const { error } = await supabase.from('idea_cards').update(patch).eq('id', card.id)
@@ -57,33 +82,22 @@ export function IdeaCardModal({ card, boards, open, onOpenChange, onConvertToCon
     else queryClient.invalidateQueries({ queryKey: ['idea-cards', workspaceId] })
   }
 
-  function scheduleAutoSave(patch: Partial<IdeaCard>) {
-    if (saveTimeout.current) clearTimeout(saveTimeout.current)
-    saveTimeout.current = setTimeout(() => save(patch), 600)
-  }
-
-  function handleBodyChange(v: string) {
-    setBody(v)
-    scheduleAutoSave({ body: v })
-  }
-
-  function handleTitleChange(v: string) {
-    setTitle(v)
-    scheduleAutoSave({ title: v })
+  function handleTitleBlur() {
+    if (title !== (card?.title ?? '')) patchCard({ title })
   }
 
   function handleStatusChange(v: string) {
     setStatus(v)
-    save({ status: v as IdeaCard['status'] })
+    patchCard({ status: v as IdeaCard['status'] })
   }
 
   function handlePriorityChange(v: string) {
     setPriority(v)
-    save({ priority: v as IdeaCard['priority'] })
+    patchCard({ priority: v as IdeaCard['priority'] })
   }
 
   function handleDeadlineBlur() {
-    save({ deadline: deadline || null })
+    patchCard({ deadline: deadline || null })
   }
 
   function addTag() {
@@ -92,20 +106,39 @@ export function IdeaCardModal({ card, boards, open, onOpenChange, onConvertToCon
     const next = [...tags, t]
     setTags(next)
     setTagInput('')
-    save({ tags: next })
+    patchCard({ tags: next })
   }
 
   function removeTag(t: string) {
     const next = tags.filter((x) => x !== t)
     setTags(next)
-    save({ tags: next })
+    patchCard({ tags: next })
   }
 
   function toggleBoard(id: string) {
     const next = boardIds.includes(id) ? boardIds.filter((x) => x !== id) : [...boardIds, id]
     setBoardIds(next)
-    save({ board_ids: next })
+    patchCard({ board_ids: next })
   }
+
+  function handleTemplateSelect(type: TemplateType) {
+    const content = TEMPLATE_CONTENT[type]
+    setEditorContent(content)
+    setShowTemplatePicker(false)
+    // Immediately persist the template type
+    patchCard({ template_type: type } as any)
+  }
+
+  const handleEditorSave = useCallback(async (json: JSONContent) => {
+    if (!card) return
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('idea_cards')
+      .update({ body_json: json, updated_at: new Date().toISOString() })
+      .eq('id', card.id)
+    if (error) toast.error(error.message)
+    else queryClient.invalidateQueries({ queryKey: ['idea-cards', workspaceId] })
+  }, [card, workspaceId, queryClient])
 
   if (!card) return null
   const meta = card.link_meta
@@ -134,9 +167,10 @@ export function IdeaCardModal({ card, boards, open, onOpenChange, onConvertToCon
             {/* Title */}
             <Input
               value={title}
-              onChange={(e) => handleTitleChange(e.target.value)}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={handleTitleBlur}
               placeholder="Judul (opsional)..."
-              className="text-base font-medium border-0 border-b rounded-none px-0 focus-visible:ring-0 focus-visible:border-b-accent"
+              className="text-base font-medium border-0 border-b rounded-none px-0 focus-visible:ring-0"
             />
 
             {/* Link preview / embed */}
@@ -178,17 +212,22 @@ export function IdeaCardModal({ card, boards, open, onOpenChange, onConvertToCon
               </div>
             )}
 
-            {/* Scratch / Notes */}
-            <div>
-              <Label className="text-xs text-text-muted mb-1.5 block">Catatan / Script</Label>
-              <Textarea
-                value={body}
-                onChange={(e) => handleBodyChange(e.target.value)}
-                placeholder="Tulis apa saja — script, analisis, inspirasi..."
-                rows={5}
-                className="text-sm resize-none"
-              />
-            </div>
+            {/* Template picker OR Editor */}
+            {showTemplatePicker ? (
+              <TemplatePicker onSelect={handleTemplateSelect} />
+            ) : (
+              <div>
+                <Label className="text-xs text-text-muted mb-1.5 block">Catatan / Script</Label>
+                {open && (
+                  <IdeaEditor
+                    key={card.id}
+                    initialContent={editorContent}
+                    onSave={handleEditorSave}
+                    cardId={card.id}
+                  />
+                )}
+              </div>
+            )}
 
             {/* Tags */}
             <div>
