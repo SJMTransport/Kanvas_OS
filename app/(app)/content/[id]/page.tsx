@@ -408,10 +408,20 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
     queryClient.invalidateQueries({ queryKey: ['schedules'] })
   }
 
+  const [urlPostInputs, setUrlPostInputs] = useState<Record<string, string>>({})
+
   async function markPosted(id: string, url: string) {
+    const trimmed = url.trim()
+    if (!trimmed) return
     const supabase = createClient()
-    await supabase.from('video_platform_schedules').update({ status: 'posted', url_post: url }).eq('id', id)
+    const { error } = await supabase.from('video_platform_schedules').update({
+      status: 'posted',
+      url_post: trimmed,
+      updated_at: new Date().toISOString(),
+    }).eq('id', id)
+    if (error) { toast.error('Gagal menyimpan: ' + error.message); return }
     queryClient.invalidateQueries({ queryKey: ['schedules-video', video.id] })
+    queryClient.invalidateQueries({ queryKey: ['schedules'] })
     toast.success('Status diupdate!')
   }
 
@@ -504,7 +514,15 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
                     ? <a href={s.url_post} target="_blank" rel="noopener noreferrer" className="text-[11px] text-accent flex items-center gap-1"><ExternalLink className="w-3 h-3" />Lihat postingan</a>
                     : s.status !== 'posted' && (
                       <div className="flex gap-1.5 mt-1">
-                        <Input placeholder="URL post (setelah tayang)" className="h-7 text-xs flex-1" onKeyDown={(e) => { if (e.key === 'Enter') markPosted(s.id, (e.target as HTMLInputElement).value) }} />
+                        <Input
+                          type="url"
+                          placeholder="URL post (setelah tayang)"
+                          className="h-7 text-xs flex-1"
+                          value={urlPostInputs[s.id] ?? ''}
+                          onChange={(e) => setUrlPostInputs((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === 'Enter') markPosted(s.id, urlPostInputs[s.id] ?? '') }}
+                        />
+                        <Button size="sm" className="h-7 text-xs" onClick={() => markPosted(s.id, urlPostInputs[s.id] ?? '')}>Simpan</Button>
                       </div>
                     )}
                 </div>
