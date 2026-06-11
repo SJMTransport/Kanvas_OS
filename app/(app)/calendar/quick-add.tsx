@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
 import { Button } from '@/components/ui/button'
@@ -43,6 +43,28 @@ export function QuickAdd({ defaultDate, onSuccess, onCancel }: Props) {
     },
     enabled: !!workspaceId,
   })
+
+  const { data: existingSchedules } = useQuery({
+    queryKey: ['video-scheduled-platforms', videoId],
+    queryFn: async () => {
+      if (!videoId) return []
+      const supabase = createClient()
+      const { data } = await supabase.from('video_platform_schedules').select('platform').eq('video_id', videoId)
+      return (data ?? []).map((s: { platform: string }) => s.platform as Platform)
+    },
+    enabled: !!videoId,
+  })
+
+  const scheduledPlatforms = existingSchedules ?? []
+  const allScheduled = !!videoId && scheduledPlatforms.length >= PLATFORMS.length
+
+  // Switch away from a platform that becomes unavailable once a video is selected
+  useEffect(() => {
+    if (videoId && scheduledPlatforms.includes(platform)) {
+      const firstAvailable = PLATFORMS.find((p) => !scheduledPlatforms.includes(p))
+      if (firstAvailable) setPlatform(firstAvailable)
+    }
+  }, [videoId, JSON.stringify(scheduledPlatforms)])
 
   async function handleSave() {
     if (!videoId || !platform || !date) {
@@ -100,17 +122,29 @@ export function QuickAdd({ defaultDate, onSuccess, onCancel }: Props) {
         )}
       </div>
 
+      {allScheduled && (
+        <p className="text-xs text-warning bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+          Semua platform sudah memiliki jadwal untuk video ini. Buka detail video untuk mengubah jadwal yang ada.
+        </p>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label>Platform</Label>
-          <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)}>
+          <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)} disabled={allScheduled}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {PLATFORMS.map((p) => (
-                <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>
-              ))}
+              {PLATFORMS.map((p) => {
+                const isScheduled = scheduledPlatforms.includes(p)
+                return (
+                  <SelectItem key={p} value={p} disabled={isScheduled}>
+                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                    {isScheduled ? ' — Sudah dijadwalkan' : ''}
+                  </SelectItem>
+                )
+              })}
             </SelectContent>
           </Select>
         </div>
@@ -126,7 +160,7 @@ export function QuickAdd({ defaultDate, onSuccess, onCancel }: Props) {
       </div>
 
       <div className="flex gap-2 pt-1">
-        <Button className="flex-1" onClick={handleSave} disabled={saving || !videoId}>
+        <Button className="flex-1" onClick={handleSave} disabled={saving || !videoId || allScheduled}>
           {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
           Simpan Jadwal
         </Button>

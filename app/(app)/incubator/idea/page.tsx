@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Search, Plus, Lightbulb, Layers, X } from 'lucide-react'
+import { Search, Plus, Lightbulb, Layers, X, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { IdeaCard as IdeaCardType, IdeaBoard } from '@/lib/types/incubator'
@@ -34,6 +34,7 @@ export default function IdeaPage() {
   const [convertCard, setConvertCard] = useState<IdeaCardType | null>(null)
   const [newBoardOpen, setNewBoardOpen] = useState(false)
   const [newBoardName, setNewBoardName] = useState('')
+  const [deleteBoardTarget, setDeleteBoardTarget] = useState<IdeaBoard | null>(null)
 
   const { data: cards = [], isLoading } = useQuery<IdeaCardType[]>({
     queryKey: ['idea-cards', workspaceId],
@@ -76,6 +77,30 @@ export default function IdeaPage() {
       setNewBoardName('')
       setNewBoardOpen(false)
       toast.success('Board dibuat!')
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
+  const deleteBoard = useMutation({
+    mutationFn: async (board: IdeaBoard) => {
+      const supabase = createClient()
+      const { data: affectedCards } = await supabase
+        .from('idea_cards')
+        .select('id, board_ids')
+        .contains('board_ids', [board.id])
+      for (const card of affectedCards || []) {
+        const newBoardIds = (card.board_ids ?? []).filter((id: string) => id !== board.id)
+        await supabase.from('idea_cards').update({ board_ids: newBoardIds }).eq('id', card.id)
+      }
+      const { error } = await supabase.from('idea_boards').delete().eq('id', board.id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['idea-boards', workspaceId] })
+      queryClient.invalidateQueries({ queryKey: ['idea-cards', workspaceId] })
+      setDeleteBoardTarget(null)
+      setBoardFilter('all')
+      toast.success('Board dihapus. Semua card dipindah ke Umum.')
     },
     onError: (e: Error) => toast.error(e.message),
   })
@@ -163,15 +188,23 @@ export default function IdeaPage() {
             {boards.map((b) => {
               const count = cards.filter((c) => (c.board_ids ?? []).includes(b.id)).length
               return (
-                <button
+                <div
                   key={b.id}
-                  onClick={() => setBoardFilter(b.id)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-border rounded-lg text-sm hover:border-accent hover:text-accent transition-colors"
+                  className="group flex items-center gap-1.5 px-3 py-1.5 bg-white border border-border rounded-lg text-sm hover:border-accent transition-colors"
                 >
-                  <span>📌</span>
-                  <span>{b.name}</span>
-                  <span className="text-xs text-text-muted">{count}</span>
-                </button>
+                  <button onClick={() => setBoardFilter(b.id)} className="flex items-center gap-1.5 hover:text-accent">
+                    <span>📌</span>
+                    <span>{b.name}</span>
+                    <span className="text-xs text-text-muted">{count}</span>
+                  </button>
+                  <button
+                    onClick={() => setDeleteBoardTarget(b)}
+                    className="text-text-muted hover:text-error opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Hapus board"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
               )
             })}
           </div>
@@ -231,6 +264,28 @@ export default function IdeaPage() {
               className="w-full"
             >
               {createBoard.isPending ? 'Membuat...' : 'Buat Board'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete board confirmation */}
+      <Dialog open={!!deleteBoardTarget} onOpenChange={(v) => { if (!v) setDeleteBoardTarget(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Hapus board &quot;{deleteBoardTarget?.name}&quot;?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-text-secondary">
+            {cards.filter((c) => (c.board_ids ?? []).includes(deleteBoardTarget?.id ?? '')).length} card akan dipindahkan ke Umum, tidak ada yang hilang.
+          </p>
+          <div className="flex gap-2 justify-end mt-2">
+            <Button variant="secondary" onClick={() => setDeleteBoardTarget(null)}>Batal</Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteBoardTarget && deleteBoard.mutate(deleteBoardTarget)}
+              disabled={deleteBoard.isPending}
+            >
+              {deleteBoard.isPending ? 'Menghapus...' : 'Hapus Board'}
             </Button>
           </div>
         </DialogContent>
