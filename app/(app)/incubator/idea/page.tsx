@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import Masonry from 'react-masonry-css'
 import { createClient } from '@/lib/supabase/client'
@@ -24,6 +25,8 @@ const BREAKPOINTS = { default: 4, 1280: 3, 1024: 3, 768: 2, 640: 2, 0: 1 }
 export default function IdeaPage() {
   const { workspaceId } = useWorkspace()
   const queryClient = useQueryClient()
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [search, setSearch] = useState('')
   const [boardFilter, setBoardFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -116,6 +119,19 @@ export default function IdeaPage() {
     if (tagFilter !== 'all' && !(c.tags ?? []).includes(tagFilter)) return false
     return true
   })
+
+  // Open modal directly if ?card=<id> is present (e.g. from Quick Capture "Simpan & Buka")
+  useEffect(() => {
+    const cardId = searchParams.get('card')
+    if (cardId && cards.length > 0) {
+      const target = cards.find((c) => c.id === cardId)
+      if (target) {
+        setSelectedCard(target)
+        setCardModalOpen(true)
+        router.replace('/incubator/idea')
+      }
+    }
+  }, [searchParams, cards])
 
   function handleCardClick(card: IdeaCardType) {
     setSelectedCard(card)
