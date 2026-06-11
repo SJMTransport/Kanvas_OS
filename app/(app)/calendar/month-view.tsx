@@ -2,11 +2,12 @@
 
 import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek,
-  eachDayOfInterval, isSameMonth, isToday, isSameDay, format
+  eachDayOfInterval, isSameMonth, isToday, format
 } from 'date-fns'
-import { id as localeId } from 'date-fns/locale'
+import { useDraggable, useDroppable } from '@dnd-kit/core'
+import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/utils'
-import { getPlatformChipClass, getPlatformDot } from '@/lib/utils/platform'
+import { getPlatformChipClass } from '@/lib/utils/platform'
 import type { ScheduleEvent } from './types'
 
 const DAY_NAMES = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
@@ -17,6 +18,50 @@ interface Props {
   events: ScheduleEvent[]
   onDayClick: (date: string) => void
   onEventClick: (event: ScheduleEvent) => void
+}
+
+function EventChip({ ev, onEventClick }: { ev: ScheduleEvent; onEventClick: (e: ScheduleEvent) => void }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: ev.id,
+    data: { scheduleId: ev.id },
+  })
+  return (
+    <button
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      style={{ transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.5 : 1 }}
+      className={cn(
+        'w-full text-left text-[10px] px-1.5 py-0.5 rounded truncate leading-tight transition-opacity hover:opacity-80 cursor-grab active:cursor-grabbing touch-none',
+        isDragging && 'shadow-lg ring-2 ring-amber-300',
+        getPlatformChipClass(ev.platform)
+      )}
+      onClick={(e) => { e.stopPropagation(); onEventClick(ev) }}
+      title={`${ev.platform} · ${ev.videos?.judul ?? ''}`}
+    >
+      {ev.jam_post && <span className="mr-1 opacity-70">{ev.jam_post.slice(0, 5)}</span>}
+      {ev.videos?.judul ?? 'Video'}
+    </button>
+  )
+}
+
+function DayCell({ dateStr, children, className, onClick }: {
+  dateStr: string; children: React.ReactNode; className?: string; onClick: () => void
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: dateStr, data: { date: dateStr } })
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        'min-h-[100px] p-1 border-b border-border relative cursor-pointer hover:bg-surface transition-colors',
+        isOver && 'bg-amber-50 ring-2 ring-amber-300 ring-inset',
+        className
+      )}
+      onClick={onClick}
+    >
+      {children}
+    </div>
+  )
 }
 
 export function MonthView({ activeDate, events, onDayClick, onEventClick }: Props) {
@@ -51,12 +96,10 @@ export function MonthView({ activeDate, events, onDayClick, onEventClick }: Prop
           const dateStr = format(day, 'yyyy-MM-dd')
 
           return (
-            <div
+            <DayCell
               key={dateStr}
-              className={cn(
-                'min-h-[100px] p-1 border-b border-border relative cursor-pointer hover:bg-surface transition-colors',
-                !isCurrentMonth && 'bg-surface/50'
-              )}
+              dateStr={dateStr}
+              className={!isCurrentMonth ? 'bg-surface/50' : undefined}
               onClick={() => onDayClick(dateStr)}
             >
               <div className={cn(
@@ -68,18 +111,7 @@ export function MonthView({ activeDate, events, onDayClick, onEventClick }: Prop
 
               <div className="space-y-0.5">
                 {visible.map((ev) => (
-                  <button
-                    key={ev.id}
-                    className={cn(
-                      'w-full text-left text-[10px] px-1.5 py-0.5 rounded truncate leading-tight transition-opacity hover:opacity-80',
-                      getPlatformChipClass(ev.platform)
-                    )}
-                    onClick={(e) => { e.stopPropagation(); onEventClick(ev) }}
-                    title={`${ev.platform} · ${ev.videos?.judul ?? ''}`}
-                  >
-                    {ev.jam_post && <span className="mr-1 opacity-70">{ev.jam_post.slice(0, 5)}</span>}
-                    {ev.videos?.judul ?? 'Video'}
-                  </button>
+                  <EventChip key={ev.id} ev={ev} onEventClick={onEventClick} />
                 ))}
                 {hasMore && (
                   <button
@@ -90,7 +122,7 @@ export function MonthView({ activeDate, events, onDayClick, onEventClick }: Prop
                   </button>
                 )}
               </div>
-            </div>
+            </DayCell>
           )
         })}
       </div>

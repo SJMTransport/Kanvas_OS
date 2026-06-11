@@ -1,7 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
+import { restrictToWindowEdges } from '@dnd-kit/modifiers'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
 import { format, addMonths, subMonths, addWeeks, subWeeks, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns'
@@ -27,6 +30,8 @@ const PLATFORM_LABELS: Record<Platform, string> = {
 
 export function CalendarView() {
   const { workspaceId } = useWorkspace()
+  const queryClient = useQueryClient()
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const [viewMode, setViewMode] = useState<ViewMode>('month')
   const [activeDate, setActiveDate] = useState(new Date())
   const [activePlatforms, setActivePlatforms] = useState<Platform[]>([...PLATFORMS])
@@ -83,6 +88,37 @@ export function CalendarView() {
   function handleEventClick(event: ScheduleEvent) {
     setSelectedEvent(event)
     setDetailOpen(true)
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over) return
+    const scheduleId = active.data.current?.scheduleId as string
+    const newDate = over.data.current?.date as string
+    if (!scheduleId || !newDate) return
+
+    const queryKey = ['schedules', workspaceId, startDate, endDate, activePlatforms]
+    const previous = queryClient.getQueryData<ScheduleEvent[]>(queryKey)
+    if (!previous) return
+    const target = previous.find((e) => e.id === scheduleId)
+    if (!target || target.tanggal_tayang === newDate) return
+
+    queryClient.setQueryData<ScheduleEvent[]>(queryKey, (old) =>
+      (old ?? []).map((e) => e.id === scheduleId ? { ...e, tanggal_tayang: newDate } : e)
+    )
+
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('video_platform_schedules')
+      .update({ tanggal_tayang: newDate, updated_at: new Date().toISOString() })
+      .eq('id', scheduleId)
+
+    if (error) {
+      queryClient.setQueryData(queryKey, previous)
+      toast.error('Gagal mengubah jadwal')
+    } else {
+      toast.success('Jadwal diperbarui')
+    }
   }
 
   const headerLabel = viewMode === 'week'
@@ -170,12 +206,14 @@ export function CalendarView() {
           <p className="text-text-muted text-sm">Memuat jadwal...</p>
         </div>
       ) : viewMode === 'month' ? (
-        <MonthView
-          activeDate={activeDate}
-          events={events}
-          onDayClick={handleDayClick}
-          onEventClick={handleEventClick}
-        />
+        <DndContext sensors={sensors} modifiers={[restrictToWindowEdges]} onDragEnd={handleDragEnd}>
+          <MonthView
+            activeDate={activeDate}
+            events={events}
+            onDayClick={handleDayClick}
+            onEventClick={handleEventClick}
+          />
+        </DndContext>
       ) : viewMode === 'week' ? (
         <WeekView
           activeDate={activeDate}
