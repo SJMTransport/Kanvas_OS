@@ -1,13 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import {
-  DndContext, DragEndEvent, PointerSensor, useSensor, useSensors, closestCenter,
-} from '@dnd-kit/core'
-import {
-  SortableContext, useSortable, verticalListSortingStrategy, arrayMove,
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
@@ -21,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
-  ArrowLeft, Plus, Trash2, Check, ExternalLink, Loader2, FileText, Copy, ChevronRight, GripVertical,
+  ArrowLeft, Plus, Trash2, Check, ExternalLink, Loader2, FileText,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -524,321 +517,6 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
   )
 }
 
-// ─── Script Segment Editor ────────────────────────────────────────────────────
-
-type SegmentType = 'HOOK' | 'ISI' | 'CTA' | 'CATATAN'
-
-interface Segment {
-  id: string
-  type: SegmentType
-  sub_type: string
-  broll: string
-  narasi: string
-}
-
-const SEGMENT_BADGE: Record<SegmentType, string> = {
-  HOOK: 'bg-amber-100 text-amber-800',
-  ISI: 'bg-blue-100 text-blue-800',
-  CTA: 'bg-green-100 text-green-800',
-  CATATAN: 'bg-gray-100 text-gray-700',
-}
-
-const NARASI_PLACEHOLDER: Record<SegmentType, string> = {
-  HOOK: 'Kalimat pertama yang langsung menarik perhatian...',
-  ISI: 'Isi konten utama...',
-  CTA: 'Call to action untuk penonton...',
-  CATATAN: 'Catatan untuk editor atau kru...',
-}
-
-const ISI_SUB_TYPES = ['Context', 'Discovery', 'Problem', 'Solution']
-
-function SortableSegmentCard({ seg, estDur, onUpdate, onDelete, onBlur }: {
-  seg: Segment
-  estDur: (text: string) => string
-  onUpdate: (id: string, field: keyof Segment, value: string) => void
-  onDelete: (id: string) => void
-  onBlur: () => void
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: seg.id })
-  const style = { transform: CSS.Transform.toString(transform), transition }
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn('border border-border rounded-lg overflow-hidden bg-white shadow-sm', isDragging && 'opacity-50 shadow-lg')}
-    >
-      {/* Card header */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-surface border-b border-border">
-        <button
-          {...attributes}
-          {...listeners}
-          className="text-text-muted hover:text-text-primary cursor-grab active:cursor-grabbing touch-none"
-        >
-          <GripVertical className="w-4 h-4" />
-        </button>
-        <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', SEGMENT_BADGE[seg.type])}>
-          {seg.type}
-        </span>
-        {seg.type === 'ISI' && (
-          <select
-            className="text-xs border border-border rounded px-1.5 py-0.5 bg-white"
-            value={seg.sub_type}
-            onChange={(e) => onUpdate(seg.id, 'sub_type', e.target.value)}
-            onBlur={onBlur}
-          >
-            <option value="">-- sub type --</option>
-            {ISI_SUB_TYPES.map((st) => <option key={st} value={st}>{st}</option>)}
-          </select>
-        )}
-        <div className="flex-1" />
-        {seg.narasi.trim() && (
-          <span className="text-[11px] text-text-muted bg-white border border-border px-1.5 py-0.5 rounded">
-            {estDur(seg.narasi)}
-          </span>
-        )}
-        <button onClick={() => onDelete(seg.id)} className="text-text-muted hover:text-error transition-colors">
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
-
-      {/* Card body */}
-      <div className="p-3 space-y-2">
-        <div className="space-y-1">
-          <Label className="text-xs text-text-muted">B-Roll</Label>
-          <Textarea
-            rows={2}
-            placeholder="Deskripsi visual yang perlu diambil..."
-            value={seg.broll}
-            onChange={(e) => onUpdate(seg.id, 'broll', e.target.value)}
-            onBlur={onBlur}
-            className="text-xs resize-none"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-text-muted">Narasi</Label>
-          <Textarea
-            rows={3}
-            placeholder={NARASI_PLACEHOLDER[seg.type]}
-            value={seg.narasi}
-            onChange={(e) => onUpdate(seg.id, 'narasi', e.target.value)}
-            onBlur={onBlur}
-            className="text-sm resize-none"
-          />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function ScriptSegmentEditor({ video }: { video: VideoWithSchedules }) {
-  const [segments, setSegments] = useState<Segment[]>([])
-  const [scriptId, setScriptId] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [view, setView] = useState<'segments' | 'full'>('segments')
-  const [loaded, setLoaded] = useState(false)
-
-  const { isLoading } = useQuery({
-    queryKey: ['script-segments', video.id],
-    queryFn: async () => {
-      const supabase = createClient()
-      const { data } = await supabase.from('scripts').select('*').eq('video_id', video.id).maybeSingle()
-      if (data) {
-        setScriptId(data.id)
-        // Migrate from old columns if segments is empty/null
-        const segs: Segment[] = data.segments && Array.isArray(data.segments) && data.segments.length > 0
-          ? data.segments as Segment[]
-          : (() => {
-              const migrated: Segment[] = []
-              if (data.hook) migrated.push({ id: crypto.randomUUID(), type: 'HOOK', sub_type: '', broll: '', narasi: data.hook })
-              if (data.body) migrated.push({ id: crypto.randomUUID(), type: 'ISI', sub_type: 'Context', broll: '', narasi: data.body })
-              if (data.cta) migrated.push({ id: crypto.randomUUID(), type: 'CTA', sub_type: '', broll: '', narasi: data.cta })
-              return migrated
-            })()
-        setSegments(segs)
-      }
-      setLoaded(true)
-      return data
-    },
-  })
-
-  const saveSegments = useCallback(async (segs: Segment[]) => {
-    setSaving(true)
-    const supabase = createClient()
-    try {
-      const { data, error } = await supabase
-        .from('scripts')
-        .upsert({ video_id: video.id, segments: segs }, { onConflict: 'video_id' })
-        .select('id')
-        .single()
-      if (!error && data && !scriptId) setScriptId(data.id)
-    } finally {
-      setSaving(false)
-    }
-  }, [scriptId, video.id])
-
-  function addSegment(type: SegmentType) {
-    const seg: Segment = {
-      id: crypto.randomUUID(),
-      type,
-      sub_type: type === 'ISI' ? 'Context' : '',
-      broll: '',
-      narasi: '',
-    }
-    const updated = [...segments, seg]
-    setSegments(updated)
-  }
-
-  // use ref to always have latest segments in handleBlur closure
-  const segmentsRef = useRef(segments)
-  useEffect(() => { segmentsRef.current = segments }, [segments])
-
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-    const oldIdx = segments.findIndex((s) => s.id === active.id)
-    const newIdx = segments.findIndex((s) => s.id === over.id)
-    const reordered = arrayMove(segments, oldIdx, newIdx)
-    setSegments(reordered)
-    saveSegments(reordered)
-  }
-
-  function updateSegment(id: string, field: keyof Segment, value: string) {
-    setSegments((prev) => prev.map((s) => s.id === id ? { ...s, [field]: value } : s))
-  }
-
-  function deleteSegment(id: string) {
-    const updated = segments.filter((s) => s.id !== id)
-    setSegments(updated)
-    saveSegments(updated)
-  }
-
-  function handleBlur() {
-    saveSegments(segmentsRef.current)
-  }
-
-  const fullScript = segments.map((s) => {
-    const label = s.type === 'ISI' && s.sub_type ? `[ISI - ${s.sub_type}]` : `[${s.type}]`
-    return `${label}\n${s.narasi}`
-  }).join('\n\n')
-
-  // Estimasi durasi: 130 kata/menit (rata-rata bicara Indonesia)
-  const WPM = 130
-  function estDur(text: string) {
-    const words = text.trim().split(/\s+/).filter(Boolean).length
-    const secs = Math.round((words / WPM) * 60)
-    if (secs < 60) return `${secs}d`
-    return `${Math.floor(secs / 60)}m ${secs % 60}d`
-  }
-  const totalWords = segments.reduce((acc, s) => acc + s.narasi.trim().split(/\s+/).filter(Boolean).length, 0)
-  const totalSecs = Math.round((totalWords / WPM) * 60)
-  const totalDurStr = totalSecs < 60 ? `${totalSecs} detik` : `${Math.floor(totalSecs / 60)} menit ${totalSecs % 60} detik`
-
-  if (isLoading || !loaded) return <div className="space-y-3"><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></div>
-
-  return (
-    <div className="space-y-4">
-      {/* View toggle + saving indicator */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center border border-border rounded-md overflow-hidden">
-          <button
-            className={cn('px-3 py-1.5 text-xs font-medium transition-colors', view === 'segments' ? 'bg-accent text-white' : 'text-text-secondary hover:bg-subtle')}
-            onClick={() => setView('segments')}
-          >
-            Per Segmen
-          </button>
-          <button
-            className={cn('px-3 py-1.5 text-xs font-medium transition-colors', view === 'full' ? 'bg-accent text-white' : 'text-text-secondary hover:bg-subtle')}
-            onClick={() => setView('full')}
-          >
-            Script Utuh
-          </button>
-        </div>
-        <div className="flex items-center gap-3">
-          {totalWords > 0 && (
-            <span className="text-xs text-text-muted">
-              ⏱ Est. <span className="font-semibold text-text-primary">{totalDurStr}</span>
-              <span className="ml-1 text-text-muted">({totalWords} kata)</span>
-            </span>
-          )}
-          {saving && (
-            <div className="flex items-center gap-1 text-xs text-text-muted">
-              <Loader2 className="w-3 h-3 animate-spin" />Menyimpan...
-            </div>
-          )}
-        </div>
-      </div>
-
-      {view === 'segments' ? (
-        <>
-          {/* Add segment buttons */}
-          <div className="flex flex-wrap gap-2">
-            {(['HOOK', 'ISI', 'CTA', 'CATATAN'] as SegmentType[]).map((type) => (
-              <Button key={type} size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={() => addSegment(type)}>
-                <Plus className="w-3 h-3" />+ {type === 'ISI' ? 'Isi' : type === 'CATATAN' ? 'Catatan' : type}
-              </Button>
-            ))}
-          </div>
-
-          {/* Segment cards */}
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={segments.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-              <div className="space-y-3">
-                {segments.length === 0 && (
-                  <div className="text-center py-8 text-text-muted text-sm border-2 border-dashed border-border rounded-lg">
-                    Belum ada segmen. Klik tombol di atas untuk menambah.
-                  </div>
-                )}
-                {segments.map((seg) => (
-                  <SortableSegmentCard
-                    key={seg.id}
-                    seg={seg}
-                    estDur={estDur}
-                    onUpdate={updateSegment}
-                    onDelete={deleteSegment}
-                    onBlur={handleBlur}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        </>
-      ) : (
-        /* Full script view */
-        <div className="space-y-3">
-          <div className="flex justify-end">
-            <Button
-              size="sm"
-              variant="secondary"
-              className="h-8 text-xs gap-1.5"
-              onClick={() => {
-                navigator.clipboard.writeText(fullScript)
-                toast.success('Script disalin!')
-              }}
-            >
-              <Copy className="w-3.5 h-3.5" />Salin Script
-            </Button>
-          </div>
-          {totalWords > 0 && (
-            <div className="flex gap-4 text-xs text-text-muted bg-surface border border-border rounded-lg px-4 py-2.5">
-              <span>📝 <strong className="text-text-primary">{totalWords}</strong> kata</span>
-              <span>⏱ Est. <strong className="text-text-primary">{totalDurStr}</strong></span>
-              <span>🎬 <strong className="text-text-primary">{segments.length}</strong> segmen</span>
-            </div>
-          )}
-          <div className="border border-border rounded-lg p-4 bg-surface">
-            <pre className="text-sm text-text-primary whitespace-pre-wrap font-sans leading-relaxed">
-              {fullScript || <span className="text-text-muted">Belum ada script.</span>}
-            </pre>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ─── Checklist Section ────────────────────────────────────────────────────────
 
 function ChecklistSection({ title, table, videoId }: {
@@ -983,22 +661,6 @@ function PerformanceTab({ video }: { video: VideoWithSchedules }) {
   )
 }
 
-// ─── Production Sheet Tab ─────────────────────────────────────────────────────
-
-function ProductionSheetTab({ videoId }: { videoId: string }) {
-  const router = useRouter()
-  return (
-    <div className="flex flex-col items-center justify-center py-12 gap-4">
-      <FileText className="w-10 h-10 text-text-muted" />
-      <p className="text-sm text-text-muted">Buka Production Sheet lengkap untuk video ini.</p>
-      <Button onClick={() => router.push(`/content/${videoId}/production`)} className="gap-1.5">
-        Buka Production Sheet
-        <ChevronRight className="w-4 h-4" />
-      </Button>
-    </div>
-  )
-}
-
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ContentDetailPage() {
@@ -1064,6 +726,9 @@ export default function ContentDetailPage() {
               )}
             </div>
           </div>
+          <Button onClick={() => router.push(`/content/${video.id}/production`)} className="gap-1.5 shrink-0">
+            📋 Production Sheet
+          </Button>
         </div>
       </div>
 
@@ -1071,18 +736,13 @@ export default function ContentDetailPage() {
       <Tabs defaultValue="info">
         <TabsList className="w-full justify-start overflow-x-auto rounded-lg mb-6">
           <TabsTrigger value="info" className="text-sm">Info</TabsTrigger>
-          <TabsTrigger value="script" className="text-sm">Script</TabsTrigger>
-          <TabsTrigger value="jadwal" className="text-sm">Jadwal</TabsTrigger>
+          <TabsTrigger value="jadwal" className="text-sm">Jadwal Platform</TabsTrigger>
           <TabsTrigger value="checklist" className="text-sm">Checklist</TabsTrigger>
           <TabsTrigger value="performa" className="text-sm">Performa</TabsTrigger>
-          <TabsTrigger value="production" className="text-sm">Production Sheet</TabsTrigger>
         </TabsList>
 
         <TabsContent value="info" className="mt-0">
           <InfoTab video={video} />
-        </TabsContent>
-        <TabsContent value="script" className="mt-0">
-          <ScriptSegmentEditor video={video} />
         </TabsContent>
         <TabsContent value="jadwal" className="mt-0">
           <ScheduleTab video={video} />
@@ -1095,9 +755,6 @@ export default function ContentDetailPage() {
         </TabsContent>
         <TabsContent value="performa" className="mt-0">
           <PerformanceTab video={video} />
-        </TabsContent>
-        <TabsContent value="production" className="mt-0">
-          <ProductionSheetTab videoId={video.id} />
         </TabsContent>
       </Tabs>
     </div>
