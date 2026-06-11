@@ -27,9 +27,15 @@ export default function ContentPage() {
   const searchParams = useSearchParams()
   const { workspaceId } = useWorkspace()
 
+  const initialStatusParam = searchParams.get('status')
+  const initialMonthParam = searchParams.get('month')
+
   const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [search, setSearch] = useState(searchParams.get('search') ?? '')
-  const [statusFilter, setStatusFilter] = useState<VideoStatus | 'all'>((searchParams.get('status') as VideoStatus) ?? 'all')
+  const [statusFilter, setStatusFilter] = useState<VideoStatus[] | 'all'>(
+    initialStatusParam ? (initialStatusParam.split(',') as VideoStatus[]) : 'all'
+  )
+  const [monthCurrent, setMonthCurrent] = useState(initialMonthParam === 'current')
   const [sortBy, setSortBy] = useState('sort_order')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [page, setPage] = useState(0)
@@ -72,6 +78,7 @@ export default function ContentPage() {
     status: statusFilter === 'all' ? null : statusFilter,
     search: search || undefined,
     tema: temaFilter,
+    monthCurrent,
     sortBy,
     sortDir,
     page,
@@ -96,10 +103,23 @@ export default function ContentPage() {
   }
 
   // Reset page on filter changes
-  useEffect(() => { setPage(0) }, [search, statusFilter, temaFilter])
+  useEffect(() => { setPage(0) }, [search, statusFilter, temaFilter, monthCurrent])
+
+  function clearFilters() {
+    setStatusFilter('all')
+    setMonthCurrent(false)
+    router.replace('/content')
+  }
+
+  const statusFilterLabel = statusFilter === 'all'
+    ? null
+    : statusFilter.length === 1
+      ? statusFilter[0].charAt(0).toUpperCase() + statusFilter[0].slice(1)
+      : `${statusFilter.length} status`
+  const hasActiveFilter = statusFilter !== 'all' || monthCurrent
 
   return (
-    <div className="flex flex-col h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)]">
+    <div className="flex flex-col h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] min-h-0">
       {/* Toolbar */}
       <div className="bg-white border-b border-border px-4 py-2.5 flex flex-wrap items-center gap-2">
         {/* Search */}
@@ -119,12 +139,16 @@ export default function ContentPage() {
         </div>
 
         {/* Status filter */}
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as VideoStatus | 'all')}>
+        <Select
+          value={statusFilter === 'all' ? 'all' : statusFilter.length === 1 ? statusFilter[0] : 'multi'}
+          onValueChange={(v) => { setStatusFilter(v === 'all' ? 'all' : [v as VideoStatus]); setMonthCurrent(false) }}
+        >
           <SelectTrigger className="h-8 text-sm w-36">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Semua Status</SelectItem>
+            {statusFilter !== 'all' && statusFilter.length > 1 && <SelectItem value="multi" disabled>{statusFilter.length} status</SelectItem>}
             {STATUS_ORDER.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}
           </SelectContent>
         </Select>
@@ -164,8 +188,28 @@ export default function ContentPage() {
         </Button>
       </div>
 
+      {/* Active filter chip */}
+      {hasActiveFilter && (
+        <div className="bg-white border-b border-border px-4 py-1.5 flex items-center gap-2">
+          <span className="text-[11px] text-text-muted">Filter aktif:</span>
+          {statusFilter !== 'all' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent-light text-accent text-[11px] rounded-full font-medium">
+              Status: {statusFilterLabel}
+            </span>
+          )}
+          {monthCurrent && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent-light text-accent text-[11px] rounded-full font-medium">
+              Bulan ini
+            </span>
+          )}
+          <button onClick={clearFilters} className="text-[11px] text-text-muted hover:text-error underline ml-1">
+            Hapus filter
+          </button>
+        </div>
+      )}
+
       {/* Content area */}
-      <div className="flex-1 overflow-hidden relative">
+      <div className="flex-1 overflow-hidden relative min-h-0">
         {viewMode === 'table' ? (
           <TableView
             videos={videosQuery.data ?? []}

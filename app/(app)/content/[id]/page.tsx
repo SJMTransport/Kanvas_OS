@@ -339,6 +339,7 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
   const queryClient = useQueryClient()
   const { workspaceId } = useWorkspace()
   const [adding, setAdding] = useState<Platform | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '' })
 
   const { data: schedules } = useQuery({
@@ -364,20 +365,54 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
   async function addSchedule(platform: Platform) {
     if (!form.tanggal_tayang) { toast.error('Tanggal tayang wajib diisi'); return }
     const supabase = createClient()
-    const { error } = await supabase.from('video_platform_schedules').insert({
-      video_id: video.id, platform,
+    const payload = {
       social_account_id: form.social_account_id || null,
       tanggal_tayang: form.tanggal_tayang,
       jam_post: form.jam_post || null,
       caption_override: form.caption_override || null,
-      status: 'scheduled',
-    })
+    }
+
+    let error
+    if (editingId) {
+      ({ error } = await supabase.from('video_platform_schedules').update(payload).eq('id', editingId))
+    } else {
+      const existing = (schedules ?? []).find((s: { platform: string }) => s.platform === platform)
+      if (existing) {
+        ({ error } = await supabase.from('video_platform_schedules').update(payload).eq('id', existing.id))
+      } else {
+        ({ error } = await supabase.from('video_platform_schedules').insert({
+          video_id: video.id, platform, status: 'scheduled', ...payload,
+        }))
+      }
+    }
     if (error) { toast.error(error.message); return }
-    toast.success('Jadwal ditambahkan!')
+    toast.success('Jadwal disimpan!')
     queryClient.invalidateQueries({ queryKey: ['schedules-video', video.id] })
     queryClient.invalidateQueries({ queryKey: ['schedules'] })
     setAdding(null)
+    setEditingId(null)
     setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '' })
+  }
+
+  function startEdit(s: { id: string; platform: string; social_account_id?: string | null; tanggal_tayang: string; jam_post?: string | null; caption_override?: string | null }) {
+    setForm({
+      social_account_id: s.social_account_id ?? '',
+      tanggal_tayang: s.tanggal_tayang,
+      jam_post: s.jam_post ?? '',
+      caption_override: s.caption_override ?? '',
+    })
+    setEditingId(s.id)
+    setAdding(s.platform as Platform)
+  }
+
+  async function deleteSchedule(id: string) {
+    if (!confirm('Hapus jadwal ini?')) return
+    const supabase = createClient()
+    const { error } = await supabase.from('video_platform_schedules').delete().eq('id', id)
+    if (error) { toast.error(error.message); return }
+    toast.success('Jadwal dihapus')
+    queryClient.invalidateQueries({ queryKey: ['schedules-video', video.id] })
+    queryClient.invalidateQueries({ queryKey: ['schedules'] })
   }
 
   async function markPosted(id: string, url: string) {
@@ -400,9 +435,14 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
                 <div className={cn('w-2.5 h-2.5 rounded-full', getPlatformDot(platform))} />
                 <span className="text-sm font-semibold text-text-primary">{PLATFORM_LABELS[platform]}</span>
               </div>
-              <Button size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={() => setAdding(platform === adding ? null : platform)}>
-                <Plus className="w-3 h-3" /> Jadwal
-              </Button>
+              {platformSchedules.length === 0 && (
+                <Button size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={() => {
+                  if (platform === adding) { setAdding(null); setEditingId(null) }
+                  else { setAdding(platform); setEditingId(null); setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '' }) }
+                }}>
+                  <Plus className="w-3 h-3" /> Jadwal
+                </Button>
+              )}
             </div>
 
             {adding === platform && (
@@ -436,7 +476,10 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
                   <Label className="text-xs">Caption Override</Label>
                   <Textarea className="mt-1 text-xs" rows={2} placeholder="Kosongkan untuk pakai caption default" value={form.caption_override} onChange={(e) => setForm((f) => ({ ...f, caption_override: e.target.value }))} />
                 </div>
-                <Button size="sm" className="w-full h-8 text-xs" onClick={() => addSchedule(platform)}>Simpan Jadwal</Button>
+                <div className="flex gap-2">
+                  <Button size="sm" className="flex-1 h-8 text-xs" onClick={() => addSchedule(platform)}>{editingId ? 'Update Jadwal' : 'Simpan Jadwal'}</Button>
+                  <Button size="sm" variant="secondary" className="h-8 text-xs" onClick={() => { setAdding(null); setEditingId(null); setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '' }) }}>Batal</Button>
+                </div>
               </div>
             )}
 
@@ -445,18 +488,23 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
                 <p className="px-3 py-3 text-xs text-text-muted">Belum ada jadwal</p>
               )}
               {platformSchedules.map((s: {
-                id: string; tanggal_tayang: string; jam_post?: string; status: string
-                url_post?: string; social_accounts?: { handle: string } | null
+                id: string; platform: string; tanggal_tayang: string; jam_post?: string; status: string
+                url_post?: string; social_account_id?: string | null; caption_override?: string | null
+                social_accounts?: { handle: string } | null
               }) => (
                 <div key={s.id} className="px-3 py-2.5 space-y-1">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-medium text-text-primary">
                       📅 {s.tanggal_tayang}{s.jam_post ? ` · 🕐 ${s.jam_post.slice(0, 5)}` : ''}
                     </p>
-                    <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full font-medium',
-                      s.status === 'posted' ? 'bg-green-100 text-success' : s.status === 'failed' ? 'bg-red-100 text-error' : 'bg-accent-light text-accent')}>
-                      {s.status === 'posted' ? 'Tayang' : s.status === 'failed' ? 'Gagal' : 'Terjadwal'}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full font-medium',
+                        s.status === 'posted' ? 'bg-green-100 text-success' : s.status === 'failed' ? 'bg-red-100 text-error' : 'bg-accent-light text-accent')}>
+                        {s.status === 'posted' ? 'Tayang' : s.status === 'failed' ? 'Gagal' : 'Terjadwal'}
+                      </span>
+                      <button onClick={() => startEdit(s)} className="text-[11px] text-accent hover:underline">Edit</button>
+                      <button onClick={() => deleteSchedule(s.id)} className="text-[11px] text-error hover:underline">Hapus</button>
+                    </div>
                   </div>
                   {s.social_accounts && <p className="text-[11px] text-text-muted">@{s.social_accounts.handle}</p>}
                   {s.url_post

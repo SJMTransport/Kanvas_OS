@@ -22,6 +22,7 @@ interface UseVideosOptions {
   status?: VideoStatus | VideoStatus[] | null
   search?: string
   tema?: string | null
+  monthCurrent?: boolean
   sortBy?: string
   sortDir?: 'asc' | 'desc'
   page?: number
@@ -30,10 +31,10 @@ interface UseVideosOptions {
 
 export function useVideos(opts: UseVideosOptions = {}) {
   const { workspaceId } = useWorkspace()
-  const { status, search, tema, sortBy = 'sort_order', sortDir = 'asc', page = 0, pageSize = 25 } = opts
+  const { status, search, tema, monthCurrent, sortBy = 'sort_order', sortDir = 'asc', page = 0, pageSize = 25 } = opts
 
   return useQuery<VideoWithSchedules[]>({
-    queryKey: ['videos', workspaceId, status, search, tema, sortBy, sortDir, page],
+    queryKey: ['videos', workspaceId, status, search, tema, monthCurrent, sortBy, sortDir, page],
     queryFn: async () => {
       if (!workspaceId) return []
       const supabase = createClient()
@@ -48,6 +49,10 @@ export function useVideos(opts: UseVideosOptions = {}) {
       }
       if (search) q = q.ilike('judul', `%${search}%`)
       if (tema) q = q.contains('temas', [tema])
+      if (monthCurrent) {
+        const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0, 0, 0, 0)
+        q = q.gte('updated_at', startOfMonth.toISOString())
+      }
 
       q = q.order(sortBy, { ascending: sortDir === 'asc' })
         .range(page * pageSize, (page + 1) * pageSize - 1)

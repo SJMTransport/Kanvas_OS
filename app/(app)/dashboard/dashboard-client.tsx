@@ -154,8 +154,8 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
           {[
             { label: 'Total Video', value: pipeline.total, icon: Video, href: '/content' },
             { label: 'Terjadwal', value: pipeline.scheduled, icon: CalendarCheck, href: '/content?status=scheduled' },
-            { label: 'Live Bulan Ini', value: pipeline.live, icon: Sparkles, href: '/content?status=live' },
-            { label: 'Draft', value: pipeline.draft, icon: FileEdit, href: '/content?status=draft' },
+            { label: 'Live Bulan Ini', value: pipeline.live, icon: Sparkles, href: '/content?status=live&month=current' },
+            { label: 'Draft', value: pipeline.draft, icon: FileEdit, href: '/content?status=ide,scripting,produksi,editing' },
           ].map((stat) => {
             const Icon = stat.icon
             return (

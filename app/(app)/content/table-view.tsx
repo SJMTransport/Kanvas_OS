@@ -188,8 +188,8 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
   }
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
-      <div className="flex-1 overflow-auto">
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex-1 overflow-auto min-h-0">
         <table className="w-full border-collapse min-w-[840px]">
           <thead className="sticky top-0 bg-white border-b border-border z-10">
             <tr>
