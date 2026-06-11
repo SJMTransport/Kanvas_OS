@@ -16,6 +16,7 @@ import { EmbedModal } from './EmbedModal'
 import { IdeaEditor } from './IdeaEditor'
 import { TemplatePicker } from './TemplatePicker'
 import { TEMPLATE_CONTENT, type TemplateType } from './editor-templates'
+import { TagChip, TAG_COLORS, tagColor, useWorkspaceTags, useUpsertWorkspaceTag } from './TagChip'
 import type { IdeaCard, IdeaBoard } from '@/lib/types/incubator'
 
 interface Props {
@@ -39,6 +40,9 @@ export function IdeaCardModal({ card, boards, open, onOpenChange, onConvertToCon
   const [title, setTitle] = useState('')
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
+  const [tagColorInput, setTagColorInput] = useState(TAG_COLORS[0])
+  const { data: workspaceTags } = useWorkspaceTags(workspaceId)
+  const upsertTag = useUpsertWorkspaceTag(workspaceId)
   const [status, setStatus] = useState('raw')
   const [priority, setPriority] = useState('medium')
   const [deadline, setDeadline] = useState('')
@@ -107,6 +111,7 @@ export function IdeaCardModal({ card, boards, open, onOpenChange, onConvertToCon
     setTags(next)
     setTagInput('')
     patchCard({ tags: next })
+    upsertTag.mutate({ name: t, color: tagColorInput })
   }
 
   function removeTag(t: string) {
@@ -234,20 +239,32 @@ export function IdeaCardModal({ card, boards, open, onOpenChange, onConvertToCon
               <Label className="text-xs text-text-muted mb-1.5 block">Tags</Label>
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {tags.map((t) => (
-                  <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 bg-subtle text-text-secondary text-xs rounded-full">
-                    {t}
-                    <button onClick={() => removeTag(t)} className="hover:text-error leading-none">&times;</button>
+                  <span key={t} className="inline-flex items-center gap-1">
+                    <TagChip name={t} color={tagColor(workspaceTags, t)} />
+                    <button onClick={() => removeTag(t)} className="hover:text-error leading-none text-text-muted">&times;</button>
                   </span>
                 ))}
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
                 <Input
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }}
                   placeholder="+ Tambah tag"
-                  className="h-7 text-xs"
+                  className="h-7 text-xs flex-1"
                 />
+                <div className="flex gap-1">
+                  {TAG_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setTagColorInput(c)}
+                      className={cn('w-5 h-5 rounded-full border-2', tagColorInput === c ? 'border-text-primary' : 'border-transparent')}
+                      style={{ backgroundColor: c }}
+                      title={c}
+                    />
+                  ))}
+                </div>
                 <Button size="sm" variant="secondary" className="h-7 text-xs" onClick={addTag}>Tambah</Button>
               </div>
             </div>

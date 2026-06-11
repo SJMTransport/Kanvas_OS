@@ -14,13 +14,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Search, Plus, Lightbulb, Layers, X, Trash2 } from 'lucide-react'
+import { Search, Plus, Lightbulb, Layers, X, Trash2, LayoutGrid, List } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { formatDistanceToNow } from 'date-fns'
+import { id as localeId } from 'date-fns/locale'
+import { TagChip, tagColor, useWorkspaceTags } from '@/components/incubator/TagChip'
+import { STATUS_ACCENT } from '@/components/incubator/IdeaCard'
 import type { IdeaCard as IdeaCardType, IdeaBoard } from '@/lib/types/incubator'
 import { AddVideoSheet } from '@/app/(app)/content/add-video-sheet'
 
 const BREAKPOINTS = { default: 4, 1280: 3, 1024: 3, 768: 2, 640: 2, 0: 1 }
+const CARD_ICONS: Record<string, string> = { scratch: '✍️', link: '🔗', image: '🖼️', audio: '🎵', combo: '📎' }
+type ViewMode = 'grid' | 'list'
 
 export default function IdeaPage() {
   const { workspaceId } = useWorkspace()
@@ -38,6 +44,20 @@ export default function IdeaPage() {
   const [newBoardOpen, setNewBoardOpen] = useState(false)
   const [newBoardName, setNewBoardName] = useState('')
   const [deleteBoardTarget, setDeleteBoardTarget] = useState<IdeaBoard | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const { data: workspaceTags } = useWorkspaceTags(workspaceId)
+
+  useEffect(() => {
+    if (workspaceId) {
+      const saved = localStorage.getItem(`view-incubator-${workspaceId}`)
+      if (saved === 'grid' || saved === 'list') setViewMode(saved)
+    }
+  }, [workspaceId])
+
+  function changeView(v: ViewMode) {
+    setViewMode(v)
+    if (workspaceId) localStorage.setItem(`view-incubator-${workspaceId}`, v)
+  }
 
   const { data: cards = [], isLoading } = useQuery<IdeaCardType[]>({
     queryKey: ['idea-cards', workspaceId],
@@ -192,6 +212,16 @@ export default function IdeaPage() {
 
         <div className="flex-1" />
 
+        {/* View toggle */}
+        <div className="flex items-center border border-border rounded-md overflow-hidden">
+          <button onClick={() => changeView('grid')} className={cn('p-1.5 transition-colors', viewMode === 'grid' ? 'bg-accent text-white' : 'text-text-secondary hover:bg-subtle')}>
+            <LayoutGrid className="w-4 h-4" />
+          </button>
+          <button onClick={() => changeView('list')} className={cn('p-1.5 transition-colors', viewMode === 'list' ? 'bg-accent text-white' : 'text-text-secondary hover:bg-subtle')}>
+            <List className="w-4 h-4" />
+          </button>
+        </div>
+
         <Button variant="secondary" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setNewBoardOpen(true)}>
           <Layers className="w-3.5 h-3.5" /> Board
         </Button>
@@ -237,6 +267,31 @@ export default function IdeaPage() {
             <Lightbulb className="w-12 h-12 text-amber-300 mx-auto mb-3" />
             <p className="text-text-muted font-medium">Belum ada ide</p>
             <p className="text-sm text-text-muted mt-1">Gunakan tombol 💡 di pojok kanan bawah untuk capture ide</p>
+          </div>
+        ) : viewMode === 'list' ? (
+          <div className="bg-white border border-border rounded-xl divide-y divide-border overflow-hidden">
+            {filtered.map((card) => (
+              <div
+                key={card.id}
+                onClick={() => handleCardClick(card)}
+                className="flex items-center gap-3 px-3 py-2.5 hover:bg-surface cursor-pointer transition-colors"
+              >
+                <div className="w-1 h-8 rounded-full shrink-0" style={{ background: STATUS_ACCENT[card.status] ?? '#9AA3AF' }} />
+                <span className="text-lg shrink-0">{CARD_ICONS[card.type] ?? '📎'}</span>
+                <p className="flex-1 min-w-0 font-medium text-sm text-text-primary truncate">{card.title || 'Tanpa judul'}</p>
+                <div className="hidden sm:flex items-center gap-1 shrink-0">
+                  {(card.tags ?? []).slice(0, 3).map((t) => (
+                    <TagChip key={t} name={t} color={tagColor(workspaceTags, t)} />
+                  ))}
+                </div>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-subtle text-text-secondary shrink-0">
+                  {card.status}
+                </span>
+                <span className="text-[10px] text-text-muted shrink-0 hidden sm:inline">
+                  {formatDistanceToNow(new Date(card.created_at), { locale: localeId, addSuffix: true })}
+                </span>
+              </div>
+            ))}
           </div>
         ) : (
           <Masonry breakpointCols={BREAKPOINTS} className="flex gap-3 -ml-3 w-auto" columnClassName="pl-3">

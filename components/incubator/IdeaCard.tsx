@@ -3,9 +3,11 @@
 import { useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import { Play, Music, FileText, Link2, Image } from 'lucide-react'
+import { Play, Music } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { EmbedModal } from './EmbedModal'
+import { TagChip, tagColor, useWorkspaceTags } from './TagChip'
+import { useWorkspace } from '@/lib/hooks/useWorkspace'
 import type { JSONContent } from '@tiptap/react'
 import type { IdeaCard as IdeaCardType } from '@/lib/types/incubator'
 
@@ -20,7 +22,7 @@ function extractPreviewText(bodyJson: JSONContent | null | undefined, bodyText: 
   return bodyText?.slice(0, 120) ?? ''
 }
 
-const STATUS_COLOR: Record<string, string> = {
+const STATUS_BADGE: Record<string, string> = {
   raw: 'bg-gray-100 text-gray-600',
   developing: 'bg-blue-100 text-blue-700',
   ready: 'bg-green-100 text-green-700',
@@ -28,12 +30,20 @@ const STATUS_COLOR: Record<string, string> = {
   archived: 'bg-gray-100 text-gray-400',
 }
 
-const TYPE_ICON: Record<string, React.ReactNode> = {
-  scratch: <FileText className="w-3.5 h-3.5" />,
-  link: <Link2 className="w-3.5 h-3.5" />,
-  image: <Image className="w-3.5 h-3.5" />,
-  audio: <Music className="w-3.5 h-3.5" />,
-  combo: <FileText className="w-3.5 h-3.5" />,
+export const STATUS_ACCENT: Record<string, string> = {
+  raw: '#9AA3AF',
+  developing: '#3B82F6',
+  ready: '#22C55E',
+  converted: '#D4860A',
+  archived: '#E5E7EB',
+}
+
+const CARD_ICONS: Record<string, string> = {
+  scratch: '✍️',
+  link: '🔗',
+  image: '🖼️',
+  audio: '🎵',
+  combo: '📎',
 }
 
 interface Props {
@@ -43,6 +53,8 @@ interface Props {
 
 export function IdeaCard({ card, onClick }: Props) {
   const [embedOpen, setEmbedOpen] = useState(false)
+  const { workspaceId } = useWorkspace()
+  const { data: workspaceTags } = useWorkspaceTags(workspaceId)
   const meta = card.link_meta
   const isEmbeddable = meta?.embed_url && !meta?.open_new_tab
 
@@ -55,9 +67,10 @@ export function IdeaCard({ card, onClick }: Props) {
   return (
     <>
       <div
-        className="bg-white border border-border rounded-xl overflow-hidden cursor-pointer hover:shadow-md transition-shadow mb-3 break-inside-avoid"
+        className="group bg-white border border-border rounded-xl overflow-hidden cursor-pointer hover:border-amber-400/40 hover:shadow-md transition-all duration-200 mb-3 break-inside-avoid"
         onClick={() => onClick(card)}
       >
+        <div className="h-1 w-full" style={{ background: STATUS_ACCENT[card.status] ?? '#9AA3AF' }} />
         {/* Link card thumbnail */}
         {card.type === 'link' && meta?.image && (
           <div className="relative">
@@ -110,10 +123,8 @@ export function IdeaCard({ card, onClick }: Props) {
         <div className="px-3 pt-3 pb-2.5">
           {/* Type + title row */}
           <div className="flex items-start gap-1.5 mb-1.5">
-            <span className="text-text-muted mt-0.5 shrink-0">{TYPE_ICON[card.type]}</span>
-            {card.title && (
-              <p className="font-medium text-text-primary text-sm leading-snug line-clamp-2">{card.title}</p>
-            )}
+            <span className="text-lg leading-none mt-0.5 shrink-0">{CARD_ICONS[card.type]}</span>
+            <p className="font-semibold text-text-primary text-sm leading-snug line-clamp-2">{card.title || 'Tanpa judul'}</p>
           </div>
 
           {/* Body text */}
@@ -139,7 +150,7 @@ export function IdeaCard({ card, onClick }: Props) {
           {card.tags && card.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mb-2">
               {card.tags.slice(0, 4).map((t) => (
-                <span key={t} className="text-[10px] px-1.5 py-0.5 bg-subtle text-text-secondary rounded-full">{t}</span>
+                <TagChip key={t} name={t} color={tagColor(workspaceTags, t)} />
               ))}
               {card.tags.length > 4 && (
                 <span className="text-[10px] px-1.5 py-0.5 bg-subtle text-text-muted rounded-full">+{card.tags.length - 4}</span>
@@ -148,8 +159,8 @@ export function IdeaCard({ card, onClick }: Props) {
           )}
 
           {/* Footer */}
-          <div className="flex items-center gap-2">
-            <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full font-medium', STATUS_COLOR[card.status])}>
+          <div className="flex items-center justify-between mt-2">
+            <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full font-medium', STATUS_BADGE[card.status])}>
               {card.status}
             </span>
             <span className="text-[10px] text-text-muted">
