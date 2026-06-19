@@ -47,6 +47,8 @@ export interface SocialAccount {
   created_at: string
 }
 
+export type ContentType = 'video' | 'foto'
+
 export interface Video {
   id: string
   workspace_id: string
@@ -69,6 +71,8 @@ export interface Video {
   google_drive_link: string | null
   caption_default: string | null
   thumbnail_url: string | null
+  content_type: ContentType
+  image_urls: string[] | null
   status: VideoStatus
   created_at: string
   updated_at: string

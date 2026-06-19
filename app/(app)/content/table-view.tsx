@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { format, isPast, parseISO } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import { ChevronUp, ChevronDown, Video, ChevronLeft, ChevronRight, ClipboardList, GripVertical } from 'lucide-react'
+import { ChevronUp, ChevronDown, Video, ImageIcon, ChevronLeft, ChevronRight, ClipboardList, GripVertical } from 'lucide-react'
 import {
   DndContext, DragEndEvent, PointerSensor, useSensor, useSensors, closestCenter,
 } from '@dnd-kit/core'
@@ -92,7 +92,9 @@ function SortableRow({ video, onRowClick, sortBy, sortDir }: {
         <div className="w-10 h-10 rounded-md overflow-hidden bg-subtle flex items-center justify-center shrink-0">
           {video.thumbnail_url
             ? <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover" />
-            : <Video className="w-4 h-4 text-border" />}
+            : (video as any).content_type === 'foto'
+              ? <ImageIcon className="w-4 h-4 text-border" />
+              : <Video className="w-4 h-4 text-border" />}
         </div>
       </td>
       <td className="px-3 py-2.5 max-w-[200px]">

@@ -17,7 +17,7 @@ import { LayoutList, Columns, Search, Upload, Plus, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { STATUS_ORDER } from '@/lib/utils/status'
 import type { VideoWithSchedules } from '@/lib/hooks/useVideos'
-import type { VideoStatus } from '@/lib/types'
+import type { VideoStatus, ContentType } from '@/lib/types'
 
 type ViewMode = 'table' | 'kanban'
 const PAGE_SIZE = 25
@@ -40,6 +40,7 @@ export default function ContentPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [page, setPage] = useState(0)
   const [temaFilter, setTemaFilter] = useState<string | null>(null)
+  const [contentTypeFilter, setContentTypeFilter] = useState<ContentType | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
 
@@ -76,6 +77,7 @@ export default function ContentPage() {
 
   const videosQuery = useVideos({
     status: statusFilter === 'all' ? null : statusFilter,
+    contentType: contentTypeFilter,
     search: search || undefined,
     tema: temaFilter,
     monthCurrent,
@@ -103,10 +105,11 @@ export default function ContentPage() {
   }
 
   // Reset page on filter changes
-  useEffect(() => { setPage(0) }, [search, statusFilter, temaFilter, monthCurrent])
+  useEffect(() => { setPage(0) }, [search, statusFilter, temaFilter, contentTypeFilter, monthCurrent])
 
   function clearFilters() {
     setStatusFilter('all')
+    setContentTypeFilter(null)
     setMonthCurrent(false)
     router.replace('/content')
   }
@@ -116,7 +119,7 @@ export default function ContentPage() {
     : statusFilter.length === 1
       ? statusFilter[0].charAt(0).toUpperCase() + statusFilter[0].slice(1)
       : `${statusFilter.length} status`
-  const hasActiveFilter = statusFilter !== 'all' || monthCurrent
+  const hasActiveFilter = statusFilter !== 'all' || monthCurrent || !!contentTypeFilter
 
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] min-h-0">
@@ -166,6 +169,18 @@ export default function ContentPage() {
           </Select>
         )}
 
+        {/* Content type filter */}
+        <Select value={contentTypeFilter ?? 'all'} onValueChange={(v) => setContentTypeFilter(v === 'all' ? null : v as ContentType)}>
+          <SelectTrigger className="h-8 text-sm w-32">
+            <SelectValue placeholder="Tipe" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Semua Tipe</SelectItem>
+            <SelectItem value="video">🎬 Video</SelectItem>
+            <SelectItem value="foto">🖼️ Foto</SelectItem>
+          </SelectContent>
+        </Select>
+
         <div className="flex-1" />
 
         {/* View toggle */}
@@ -184,7 +199,7 @@ export default function ContentPage() {
         </Button>
         <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setAddOpen(true)}>
           <Plus className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Tambah Video</span>
+          <span className="hidden sm:inline">Tambah Konten</span>
         </Button>
       </div>
 
@@ -195,6 +210,11 @@ export default function ContentPage() {
           {statusFilter !== 'all' && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent-light text-accent text-[11px] rounded-full font-medium">
               Status: {statusFilterLabel}
+            </span>
+          )}
+          {contentTypeFilter && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent-light text-accent text-[11px] rounded-full font-medium">
+              Tipe: {contentTypeFilter === 'video' ? '🎬 Video' : '🖼️ Foto'}
             </span>
           )}
           {monthCurrent && (

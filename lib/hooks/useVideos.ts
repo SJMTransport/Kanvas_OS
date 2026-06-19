@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from './useWorkspace'
-import type { VideoStatus, Video } from '@/lib/types'
+import type { VideoStatus, ContentType, Video } from '@/lib/types'
 
 export interface VideoWithSchedules extends Video {
   video_platform_schedules: { platform: string; tanggal_tayang: string; status: string }[]
@@ -14,12 +14,13 @@ export interface VideoWithSchedules extends Video {
 const VIDEO_LIST_COLUMNS = `
   id, judul, status, format, tema, temas, no_upload, no_video,
   deadline_posting, thumbnail_url, assigned_to, brand_id,
-  is_endorsement, updated_at, sort_order,
+  is_endorsement, updated_at, sort_order, content_type, image_urls,
   video_platform_schedules(platform, tanggal_tayang, status)
 `
 
 interface UseVideosOptions {
   status?: VideoStatus | VideoStatus[] | null
+  contentType?: ContentType | null
   search?: string
   tema?: string | null
   monthCurrent?: boolean
@@ -31,10 +32,10 @@ interface UseVideosOptions {
 
 export function useVideos(opts: UseVideosOptions = {}) {
   const { workspaceId } = useWorkspace()
-  const { status, search, tema, monthCurrent, sortBy = 'sort_order', sortDir = 'asc', page = 0, pageSize = 25 } = opts
+  const { status, contentType, search, tema, monthCurrent, sortBy = 'sort_order', sortDir = 'asc', page = 0, pageSize = 25 } = opts
 
   return useQuery<VideoWithSchedules[]>({
-    queryKey: ['videos', workspaceId, status, search, tema, monthCurrent, sortBy, sortDir, page],
+    queryKey: ['videos', workspaceId, status, contentType, search, tema, monthCurrent, sortBy, sortDir, page],
     queryFn: async () => {
       if (!workspaceId) return []
       const supabase = createClient()
@@ -47,6 +48,7 @@ export function useVideos(opts: UseVideosOptions = {}) {
         if (Array.isArray(status)) q = q.in('status', status)
         else q = q.eq('status', status)
       }
+      if (contentType) q = q.eq('content_type', contentType)
       if (search) q = q.ilike('judul', `%${search}%`)
       if (tema) q = q.contains('temas', [tema])
       if (monthCurrent) {

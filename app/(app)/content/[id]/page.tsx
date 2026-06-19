@@ -229,6 +229,7 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
 
   const STATUS_OPTIONS = ['ide', 'scripting', 'produksi', 'editing', 'scheduled', 'live', 'archived']
   const FORMAT_OPTIONS = ['Short Video', 'Long Video', 'Reels', 'Live']
+  const isFoto = (video as any).content_type === 'foto'
 
   return (
     <div className="space-y-4">
@@ -259,7 +260,7 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
         <Input value={form.judul} onChange={(e) => set('judul', e.target.value)} className="text-sm" />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className={isFoto ? '' : 'grid grid-cols-2 gap-4'}>
         <div className="space-y-1.5">
           <Label className="text-xs text-text-muted">Status</Label>
           <Select value={form.status} onValueChange={(v) => set('status', v)}>
@@ -271,15 +272,17 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs text-text-muted">Format</Label>
-          <Select value={form.format} onValueChange={(v) => set('format', v)}>
-            <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {FORMAT_OPTIONS.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
+        {!isFoto && (
+          <div className="space-y-1.5">
+            <Label className="text-xs text-text-muted">Format</Label>
+            <Select value={form.format} onValueChange={(v) => set('format', v)}>
+              <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {FORMAT_OPTIONS.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       <div className="space-y-1.5">
@@ -287,27 +290,36 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
         <TemaSelect temas={temas} onChange={setTemas} workspaceId={workspaceId} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label className="text-xs text-text-muted">Tanggal Shooting</Label>
-          <Input type="date" value={form.tanggal_shooting} onChange={(e) => set('tanggal_shooting', e.target.value)} className="text-sm" />
-        </div>
+      {isFoto ? (
         <div className="space-y-1.5">
           <Label className="text-xs text-text-muted">Deadline Posting</Label>
           <Input type="date" value={form.deadline_posting} onChange={(e) => set('deadline_posting', e.target.value)} className="text-sm" />
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-text-muted">Tanggal Shooting</Label>
+            <Input type="date" value={form.tanggal_shooting} onChange={(e) => set('tanggal_shooting', e.target.value)} className="text-sm" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-text-muted">Deadline Posting</Label>
+            <Input type="date" value={form.deadline_posting} onChange={(e) => set('deadline_posting', e.target.value)} className="text-sm" />
+          </div>
+        </div>
+      )}
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label className="text-xs text-text-muted">Storage Bahan</Label>
-          <Input value={form.storage_bahan} onChange={(e) => set('storage_bahan', e.target.value)} placeholder="Link folder..." className="text-sm" />
+      {!isFoto && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-text-muted">Storage Bahan</Label>
+            <Input value={form.storage_bahan} onChange={(e) => set('storage_bahan', e.target.value)} placeholder="Link folder..." className="text-sm" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-text-muted">Storage Video</Label>
+            <Input value={form.storage_video} onChange={(e) => set('storage_video', e.target.value)} placeholder="Link folder..." className="text-sm" />
+          </div>
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs text-text-muted">Storage Video</Label>
-          <Input value={form.storage_video} onChange={(e) => set('storage_video', e.target.value)} placeholder="Link folder..." className="text-sm" />
-        </div>
-      </div>
+      )}
 
       <div className="space-y-1.5">
         <Label className="text-xs text-text-muted">Google Drive</Label>
@@ -778,7 +790,7 @@ export default function ContentDetailPage() {
         <TabsList className="w-full justify-start overflow-x-auto rounded-lg mb-6">
           <TabsTrigger value="info" className="text-sm">Info</TabsTrigger>
           <TabsTrigger value="jadwal" className="text-sm">Jadwal Platform</TabsTrigger>
-          <TabsTrigger value="script" className="text-sm">Script</TabsTrigger>
+          {(video as any).content_type !== 'foto' && <TabsTrigger value="script" className="text-sm">Script</TabsTrigger>}
           <TabsTrigger value="checklist" className="text-sm">Checklist</TabsTrigger>
           <TabsTrigger value="performa" className="text-sm">Performa</TabsTrigger>
         </TabsList>
@@ -789,9 +801,11 @@ export default function ContentDetailPage() {
         <TabsContent value="jadwal" className="mt-0">
           <ScheduleTab video={video} />
         </TabsContent>
-        <TabsContent value="script" className="mt-0">
-          <ScriptTab video={video} />
-        </TabsContent>
+        {(video as any).content_type !== 'foto' && (
+          <TabsContent value="script" className="mt-0">
+            <ScriptTab video={video} />
+          </TabsContent>
+        )}
         <TabsContent value="checklist" className="mt-0">
           <div className="space-y-6">
             <ChecklistSection title="Shooting Checklist" table="shooting_checklists" videoId={video.id} />
