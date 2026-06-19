@@ -103,10 +103,9 @@ export function AddVideoSheet({ open, onOpenChange, defaultValues: extraDefaults
       const nextSortOrder = ((maxRow?.sort_order ?? -1) as number) + 1
 
       const isVideo = contentType === 'video'
-      const payload = {
+      const payload: Record<string, unknown> = {
         workspace_id: workspaceId,
         created_by: user?.id,
-        content_type: contentType,
         judul: data.judul,
         format: isVideo ? (data.format || null) : null,
         tema: data.tema || null,
@@ -123,10 +122,11 @@ export function AddVideoSheet({ open, onOpenChange, defaultValues: extraDefaults
         storage_video: isVideo ? (data.storage_video || null) : null,
         google_drive_link: data.google_drive_link || null,
         caption_default: data.caption_default || null,
-        image_urls: !isVideo ? imageUrls : [],
       }
-      const { error } = await supabase.from('videos').insert(payload)
-      if (error) throw error
+      if (contentType) payload.content_type = contentType
+      if (!isVideo && imageUrls.length > 0) payload.image_urls = imageUrls
+      const { error } = await supabase.from('videos').insert(payload as any)
+      if (error) throw new Error(error.message)
       toast.success(isVideo ? 'Video berhasil ditambahkan!' : 'Foto/Carousel berhasil ditambahkan!')
       queryClient.invalidateQueries({ queryKey: ['videos'] })
       reset()
