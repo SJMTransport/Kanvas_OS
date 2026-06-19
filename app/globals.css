@@ -157,3 +157,9 @@
   background: #FEF3C7;
   color: #D4860A;
 }
+
+@media print {
+  .sidebar, header, nav, .no-print { display: none !important; }
+  .print-area { padding: 0; max-width: 100%; }
+  body { background: white; }
+}

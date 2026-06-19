@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils'
 import { getStatusBadgeClass, STATUS_CONFIG } from '@/lib/utils/status'
 import { getPlatformDot } from '@/lib/utils/platform'
 import { formatNumber } from '@/lib/utils/formatters'
+import { ScriptBlocks, type ScriptBlock } from '@/components/content/ScriptBlocks'
 import type { VideoStatus, Platform } from '@/lib/types'
 import type { VideoWithSchedules } from '@/lib/hooks/useVideos'
 
@@ -535,6 +536,31 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
   )
 }
 
+// ─── Script Tab ──────────────────────────────────────────────────────────────
+
+function ScriptTab({ video }: { video: VideoWithSchedules }) {
+  const queryClient = useQueryClient()
+
+  async function handleSave(blocks: ScriptBlock[]) {
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('videos')
+      .update({ script_blocks: blocks, updated_at: new Date().toISOString() })
+      .eq('id', video.id)
+    if (error) toast.error(error.message)
+    else queryClient.invalidateQueries({ queryKey: ['video', video.id] })
+  }
+
+  return (
+    <ScriptBlocks
+      videoId={video.id}
+      videoTitle={video.judul}
+      initialBlocks={(video as any).script_blocks ?? []}
+      onSave={handleSave}
+    />
+  )
+}
+
 // ─── Checklist Section ────────────────────────────────────────────────────────
 
 function ChecklistSection({ title, table, videoId }: {
@@ -744,9 +770,6 @@ export default function ContentDetailPage() {
               )}
             </div>
           </div>
-          <Button onClick={() => router.push(`/content/${video.id}/production`)} className="gap-1.5 shrink-0">
-            📋 Production Sheet
-          </Button>
         </div>
       </div>
 
@@ -755,6 +778,7 @@ export default function ContentDetailPage() {
         <TabsList className="w-full justify-start overflow-x-auto rounded-lg mb-6">
           <TabsTrigger value="info" className="text-sm">Info</TabsTrigger>
           <TabsTrigger value="jadwal" className="text-sm">Jadwal Platform</TabsTrigger>
+          <TabsTrigger value="script" className="text-sm">Script</TabsTrigger>
           <TabsTrigger value="checklist" className="text-sm">Checklist</TabsTrigger>
           <TabsTrigger value="performa" className="text-sm">Performa</TabsTrigger>
         </TabsList>
@@ -764,6 +788,9 @@ export default function ContentDetailPage() {
         </TabsContent>
         <TabsContent value="jadwal" className="mt-0">
           <ScheduleTab video={video} />
+        </TabsContent>
+        <TabsContent value="script" className="mt-0">
+          <ScriptTab video={video} />
         </TabsContent>
         <TabsContent value="checklist" className="mt-0">
           <div className="space-y-6">
