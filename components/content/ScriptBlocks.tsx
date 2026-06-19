@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import {
   DndContext, closestCenter, type DragEndEvent,
   KeyboardSensor, PointerSensor, useSensor, useSensors,
@@ -179,7 +180,7 @@ export function ScriptBlocks({ videoId, videoTitle, initialBlocks, onSave }: Scr
       </button>
 
       {fullScriptOpen && (
-        <FullScriptOverlay
+        <FullScriptPortal
           blocks={blocks}
           videoTitle={videoTitle}
           onClose={() => setFullScriptOpen(false)}
@@ -347,7 +348,7 @@ function AddSectionDropdown({ onAdd }: { onAdd: (type: string, customLabel?: str
   )
 }
 
-function FullScriptOverlay({
+function FullScriptPortal({
   blocks, videoTitle, onClose,
 }: {
   blocks: ScriptBlock[]
@@ -358,11 +359,22 @@ function FullScriptOverlay({
   const totalWords = blocks.reduce((sum, b) => sum + wordCount(b.content), 0)
   const durText = durationText(totalWords)
 
-  return (
-    <div className="fixed inset-0 z-50 bg-white flex flex-col print-area">
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
+
+  useEffect(() => {
+    function handleEsc(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose])
+
+  return createPortal(
+    <div id="full-script-overlay" className="fixed inset-0 z-[100] bg-white flex flex-col">
       <div className="flex items-center justify-between px-8 py-4 border-b border-border shrink-0 no-print">
         <div>
-          <p className="font-semibold text-text-primary">{videoTitle}</p>
+          <p className="font-semibold text-text-primary text-lg">{videoTitle || 'Untitled Video'}</p>
           <p className="text-xs text-text-muted mt-0.5">{durText} · {totalWords} kata</p>
         </div>
         <div className="flex gap-3 items-center">
@@ -374,22 +386,32 @@ function FullScriptOverlay({
           </button>
         </div>
       </div>
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto print-area">
         <div className="max-w-2xl mx-auto py-10 px-8">
-          {nonEmpty.map((block) => (
-            <div key={block.id} className="mb-10">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-xs font-bold uppercase tracking-widest text-accent">{block.label}</span>
-                <div className="flex-1 h-px bg-border" />
+          <div className="hidden print:block mb-8">
+            <h1 className="text-2xl font-bold text-text-primary">{videoTitle}</h1>
+            <p className="text-xs text-text-muted mt-1">{durText} · {totalWords} kata</p>
+            <div className="border-b border-border mt-4" />
+          </div>
+          {nonEmpty.length === 0 ? (
+            <p className="text-text-muted text-center py-12">Belum ada konten script.</p>
+          ) : (
+            nonEmpty.map((block) => (
+              <div key={block.id} className="mb-10">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-xs font-bold uppercase tracking-widest text-accent">{block.label}</span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+                <p className="text-text-primary leading-relaxed whitespace-pre-wrap text-base">{block.content}</p>
               </div>
-              <p className="text-text-primary leading-relaxed whitespace-pre-wrap text-base">{block.content}</p>
-            </div>
-          ))}
+            ))
+          )}
           <div className="mt-16 pt-6 border-t border-border text-center">
             <p className="text-xs text-text-muted">{durText} · {totalWords} kata · Kanvas OS</p>
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
