@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
-import { format, isPast, parseISO } from 'date-fns'
+import { format } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import { ChevronUp, ChevronDown, Video, ImageIcon, ChevronLeft, ChevronRight, ClipboardList, GripVertical } from 'lucide-react'
+import { ChevronUp, ChevronDown, Video, ImageIcon, ChevronLeft, ChevronRight, Trash2, GripVertical } from 'lucide-react'
 import {
   DndContext, DragEndEvent, PointerSensor, useSensor, useSensors, closestCenter,
 } from '@dnd-kit/core'
@@ -12,8 +11,8 @@ import {
   SortableContext, useSortable, verticalListSortingStrategy, arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useQueryClient } from '@tanstack/react-query'
 import { getPlatformBadge } from '@/lib/utils/platform'
 import { getStatusBadgeClass, STATUS_CONFIG } from '@/lib/utils/status'
 import { cn } from '@/lib/utils'
@@ -59,16 +58,16 @@ function Th({ children, col, sortBy, sortDir, onSort, className }: {
   )
 }
 
-function SortableRow({ video, onRowClick, sortBy, sortDir }: {
+function SortableRow({ video, onRowClick, onDelete, sortBy, sortDir }: {
   video: VideoWithSchedules
   onRowClick: (v: VideoWithSchedules) => void
+  onDelete: (v: VideoWithSchedules) => void
   sortBy: string
   sortDir: string
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: video.id })
   const style = { transform: CSS.Transform.toString(transform), transition }
 
-  const isDeadlinePast = video.deadline_posting && isPast(parseISO(video.deadline_posting))
   const scheduledPlatforms = video.video_platform_schedules?.map((s) => s.platform as Platform) ?? []
 
   return (
@@ -125,37 +124,17 @@ function SortableRow({ video, onRowClick, sortBy, sortDir }: {
           })}
         </div>
       </td>
-      <td className="px-3 py-2.5 text-xs whitespace-nowrap">
-        {video.deadline_posting ? (
-          <span className={isDeadlinePast ? 'text-error font-medium' : 'text-text-secondary'}>
-            {isDeadlinePast ? 'Terlewat' : format(parseISO(video.deadline_posting), 'd MMM', { locale: localeId })}
-          </span>
-        ) : <span className="text-text-muted">—</span>}
-      </td>
-      <td className="px-3 py-2.5 text-xs text-text-secondary">
-        {video.is_endorsement ? '✓' : '—'}
-      </td>
-      <td className="px-3 py-2.5">
-        {video.users ? (
-          <Avatar className="w-6 h-6" title={video.users.full_name ?? ''}>
-            <AvatarImage src={video.users.avatar_url ?? ''} />
-            <AvatarFallback className="text-[9px] bg-accent-light text-accent">
-              {video.users.full_name?.slice(0, 2).toUpperCase() ?? '?'}
-            </AvatarFallback>
-          </Avatar>
-        ) : <span className="text-text-muted text-xs">—</span>}
-      </td>
       <td className="px-3 py-2.5 text-xs text-text-muted whitespace-nowrap">
         {format(new Date(video.updated_at), 'd MMM', { locale: localeId })}
       </td>
       <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
-        <Link
-          href={`/content/${video.id}/production`}
-          className="p-1 rounded hover:bg-accent-light text-text-muted hover:text-accent transition-colors inline-flex"
-          title="Production Sheet"
+        <button
+          onClick={() => onDelete(video)}
+          className="p-1 rounded hover:bg-red-50 text-text-muted hover:text-error transition-colors inline-flex"
+          title="Hapus"
         >
-          <ClipboardList className="w-3.5 h-3.5" />
-        </Link>
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
       </td>
     </tr>
   )
@@ -165,6 +144,17 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
   const totalPages = Math.ceil(total / pageSize)
   const [videos, setVideos] = useState(initialVideos)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  const queryClient = useQueryClient()
+
+  async function handleDelete(video: VideoWithSchedules) {
+    if (!confirm(`Hapus "${video.judul}"? Data jadwal dan performa terkait juga akan dihapus.`)) return
+    const supabase = createClient()
+    const { error } = await supabase.from('videos').delete().eq('id', video.id)
+    if (error) { toast.error('Gagal menghapus: ' + error.message); return }
+    toast.success('Konten dihapus')
+    setVideos((prev) => prev.filter((v) => v.id !== video.id))
+    queryClient.invalidateQueries({ queryKey: ['videos'] })
+  }
 
   // Sync only when initialVideos reference changes (new page/filter/fetch)
   useEffect(() => {
@@ -201,9 +191,6 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
               <Th col="judul" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Judul</Th>
               <Th col="status" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Status</Th>
               <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Platform</Th>
-              <Th col="deadline_posting" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Deadline</Th>
-              <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Brand</Th>
-              <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Assigned</Th>
               <Th col="updated_at" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Update</Th>
               <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-10">{''}</Th>
             </tr>
@@ -214,13 +201,13 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
                 {loading
                   ? Array.from({ length: 8 }).map((_, i) => (
                       <tr key={i}>
-                        {Array.from({ length: 11 }).map((_, j) => (
+                        {Array.from({ length: 8 }).map((_, j) => (
                           <td key={j} className="px-3 py-2.5"><Skeleton className="h-4 w-full" /></td>
                         ))}
                       </tr>
                     ))
                   : videos.map((v) => (
-                      <SortableRow key={v.id} video={v} onRowClick={onRowClick} sortBy={sortBy} sortDir={sortDir} />
+                      <SortableRow key={v.id} video={v} onRowClick={onRowClick} onDelete={handleDelete} sortBy={sortBy} sortDir={sortDir} />
                     ))}
               </tbody>
             </SortableContext>
