@@ -12,9 +12,7 @@ export interface VideoWithSchedules extends Video {
 }
 
 const VIDEO_LIST_COLUMNS = `
-  id, judul, status, format, tema, temas, no_upload, no_video,
-  deadline_posting, thumbnail_url, assigned_to, brand_id,
-  is_endorsement, updated_at, sort_order, content_type, image_urls,
+  *,
   video_platform_schedules(platform, tanggal_tayang, status)
 `
 
