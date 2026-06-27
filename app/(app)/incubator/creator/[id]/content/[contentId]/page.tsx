@@ -38,7 +38,7 @@ function getEmbedUrl(url: string, meta: LinkMeta | null): string | null {
         : u.searchParams.get('v')
       if (videoId) return `https://www.youtube.com/embed/${videoId}`
     }
-    if (u.hostname.includes('tiktok.com')) {
+    if (u.hostname.includes('tiktok.com') || u.hostname.includes('vt.tiktok') || u.hostname.includes('vm.tiktok')) {
       const match = u.pathname.match(/\/video\/(\d+)/)
       if (match) return `https://www.tiktok.com/embed/v2/${match[1]}`
     }

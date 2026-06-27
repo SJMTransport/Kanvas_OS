@@ -3,7 +3,7 @@ import ogs from 'open-graph-scraper'
 
 function detectPlatform(url: string): string {
   if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube'
-  if (url.includes('tiktok.com')) return 'tiktok'
+  if (url.includes('tiktok.com') || url.includes('vt.tiktok') || url.includes('vm.tiktok')) return 'tiktok'
   if (url.includes('instagram.com')) return 'instagram'
   if (url.includes('pinterest.com')) return 'pinterest'
   if (url.includes('twitter.com') || url.includes('x.com')) return 'twitter'
@@ -25,10 +25,37 @@ function extractYouTubeId(url: string): string | null {
   return null
 }
 
-function getEmbedUrl(url: string, platform: string): string | null {
+async function extractTikTokVideoId(url: string): Promise<string | null> {
+  const directMatch = url.match(/\/video\/(\d+)/)
+  if (directMatch) return directMatch[1]
+
+  // Short links (vt.tiktok.com, vm.tiktok.com) — resolve via TikTok oEmbed
+  try {
+    const res = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(5000) })
+    if (res.ok) {
+      const data = await res.json()
+      const htmlMatch = data.html?.match(/data-video-id="(\d+)"/) || data.html?.match(/cite="[^"]*\/video\/(\d+)/)
+      if (htmlMatch) return htmlMatch[1]
+      // Fallback: thumbnail URL often contains video ID
+      const thumbMatch = data.thumbnail_url?.match(/\/(\d{15,})/)
+      if (thumbMatch) return thumbMatch[1]
+    }
+  } catch { /* ignore */ }
+  return null
+}
+
+async function getEmbedUrl(url: string, platform: string): Promise<string | null> {
   if (platform === 'youtube') {
     const id = extractYouTubeId(url)
     return id ? `https://www.youtube.com/embed/${id}?autoplay=1` : null
+  }
+  if (platform === 'tiktok') {
+    const id = await extractTikTokVideoId(url)
+    return id ? `https://www.tiktok.com/embed/v2/${id}` : null
+  }
+  if (platform === 'instagram') {
+    const match = url.match(/\/(p|reel|reels)\/([^/?&#]+)/)
+    if (match) return `https://www.instagram.com/${match[1]}/${match[2]}/embed`
   }
   return null
 }
@@ -38,8 +65,8 @@ export async function GET(req: NextRequest) {
   if (!url) return NextResponse.json({ error: 'Missing url' }, { status: 400 })
 
   const platform = detectPlatform(url)
-  const embed_url = getEmbedUrl(url, platform)
-  const open_new_tab = ['instagram', 'pinterest', 'twitter', 'threads'].includes(platform)
+  const embed_url = await getEmbedUrl(url, platform)
+  const open_new_tab = !embed_url && ['instagram', 'pinterest', 'twitter', 'threads'].includes(platform)
 
   try {
     const { result } = await ogs({ url, timeout: 5000 })
