@@ -133,7 +133,7 @@ export default function ContentAnalysisPage() {
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
       <Skeleton className="h-6 w-32" />
       <div className="grid lg:grid-cols-2 gap-6">
-        <Skeleton className="aspect-video rounded-xl" />
+        <Skeleton className="aspect-[9/16] max-h-[70vh] rounded-xl" />
         <Skeleton className="h-96 rounded-xl" />
       </div>
     </div>
@@ -185,7 +185,7 @@ export default function ContentAnalysisPage() {
           <div className="space-y-3">
             <div className="bg-black rounded-xl overflow-hidden">
               {embedUrl ? (
-                <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                <div className="relative w-full aspect-[9/16] max-h-[70vh]">
                   <iframe
                     src={embedUrl}
                     className="absolute inset-0 w-full h-full"
@@ -194,7 +194,7 @@ export default function ContentAnalysisPage() {
                   />
                 </div>
               ) : (
-                <div className="aspect-video flex flex-col items-center justify-center gap-3 text-white/60">
+                <div className="aspect-[9/16] max-h-[70vh] flex flex-col items-center justify-center gap-3 text-white/60">
                   <p className="text-sm">Embed tidak tersedia untuk link ini</p>
                   <a
                     href={content.url}
