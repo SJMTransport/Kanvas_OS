@@ -62,6 +62,7 @@ export default function ContentAnalysisPage() {
   const [viewCount, setViewCount] = useState('')
   const [analysis, setAnalysis] = useState<Record<string, string>>({})
   const [learnings, setLearnings] = useState('')
+  const [hashtags, setHashtags] = useState('')
 
   const { data: content, isLoading } = useQuery<CreatorSavedContent>({
     queryKey: ['saved-content-detail', contentId],
@@ -80,12 +81,14 @@ export default function ContentAnalysisPage() {
     const a = (content.analysis ?? {}) as Record<string, string>
     setAnalysis(a)
     setLearnings(a.learnings ?? '')
+    setHashtags((content.hashtags ?? []).map((h) => `#${h}`).join(' '))
   }, [content])
 
   async function saveData(patch: {
     platform?: string
     view_count?: number | null
     analysis?: Record<string, string>
+    hashtags?: string[]
   }) {
     const supabase = createClient()
     const { error } = await supabase
@@ -120,6 +123,11 @@ export default function ContentAnalysisPage() {
   function handlePlatformChange(value: string) {
     setPlatform(value)
     saveData({ platform: value === 'none' ? '' : value })
+  }
+
+  function handleHashtagsBlur() {
+    const tags = hashtags.split(/[\s,]+/).map((t) => t.replace(/^#/, '').trim()).filter(Boolean)
+    saveData({ hashtags: tags })
   }
 
   function handleViewCountBlur() {
@@ -253,6 +261,18 @@ export default function ContentAnalysisPage() {
                   className="text-sm h-8"
                 />
               </div>
+            </div>
+
+            {/* Hashtags */}
+            <div className="space-y-1">
+              <Label className="text-xs text-text-muted">Hashtag</Label>
+              <Input
+                value={hashtags}
+                onChange={(e) => setHashtags(e.target.value)}
+                onBlur={handleHashtagsBlur}
+                placeholder="#hook #storytelling #editing"
+                className="text-sm h-8"
+              />
             </div>
 
             {/* Aspek Video */}

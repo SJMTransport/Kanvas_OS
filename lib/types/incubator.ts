@@ -93,6 +93,7 @@ export interface CreatorSavedContent {
   platform: string | null
   view_count: number | null
   analysis: ContentAnalysis | null
+  hashtags: string[] | null
   creator_username: string | null
   creator_platform: string | null
   created_at: string

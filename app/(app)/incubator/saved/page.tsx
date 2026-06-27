@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Search, X, Play, Bookmark, Plus, Loader2, Trash2 } from 'lucide-react'
+import { Search, X, Play, Bookmark, Plus, Loader2, Trash2, Hash } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
@@ -29,6 +29,7 @@ interface SavedContentRow {
   view_count: number | null
   analysis: Record<string, string> | null
   notes: string | null
+  hashtags: string[] | null
   creator_username: string | null
   creator_platform: string | null
   created_at: string
@@ -43,6 +44,8 @@ export default function SavedContentPage() {
   const [platformFilter, setPlatformFilter] = useState<string | null>(null)
   const [analysisFilter, setAnalysisFilter] = useState<'all' | 'analyzed' | 'not_analyzed'>('all')
 
+  const [hashtagFilter, setHashtagFilter] = useState<string | null>(null)
+
   const [addOpen, setAddOpen] = useState(false)
   const [adding, setAdding] = useState(false)
   const [addUrl, setAddUrl] = useState('')
@@ -51,6 +54,7 @@ export default function SavedContentPage() {
   const [addCreatorId, setAddCreatorId] = useState('')
   const [addNewUsername, setAddNewUsername] = useState('')
   const [addNewPlatform, setAddNewPlatform] = useState('tiktok')
+  const [addHashtags, setAddHashtags] = useState('')
 
   const { data: creators = [] } = useQuery<{ id: string; username: string; platform: string }[]>({
     queryKey: ['creators-list', workspaceId],
@@ -95,6 +99,8 @@ export default function SavedContentPage() {
     enabled: !!workspaceId,
   })
 
+  const allHashtags = [...new Set(items.flatMap((i) => i.hashtags ?? []))].sort()
+
   const filtered = items.filter((item) => {
     if (search) {
       const q = search.toLowerCase()
@@ -104,6 +110,7 @@ export default function SavedContentPage() {
       if (!hook.toLowerCase().includes(q) && !title.toLowerCase().includes(q) && !creator.toLowerCase().includes(q)) return false
     }
     if (platformFilter && item.platform !== platformFilter) return false
+    if (hashtagFilter && !(item.hashtags ?? []).includes(hashtagFilter)) return false
     if (analysisFilter === 'analyzed') {
       const a = item.analysis
       if (!a || !Object.values(a).some((v) => v && v.trim())) return false
@@ -158,6 +165,7 @@ export default function SavedContentPage() {
         thumbnail_url: meta?.image ?? null,
         link_meta: meta,
         notes: addNotes || null,
+        hashtags: addHashtags.trim() ? addHashtags.split(/[\s,]+/).map((t) => t.replace(/^#/, '').trim()).filter(Boolean) : [],
       }
 
       if (addCreatorMode === 'existing' && addCreatorId) {
@@ -176,6 +184,7 @@ export default function SavedContentPage() {
       setAddNotes('')
       setAddCreatorId('')
       setAddNewUsername('')
+      setAddHashtags('')
       setAddOpen(false)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Terjadi kesalahan')
@@ -231,6 +240,20 @@ export default function SavedContentPage() {
             <SelectItem value="not_analyzed">Belum Dibedah</SelectItem>
           </SelectContent>
         </Select>
+
+        {allHashtags.length > 0 && (
+          <Select value={hashtagFilter ?? 'all'} onValueChange={(v) => setHashtagFilter(v === 'all' ? null : v)}>
+            <SelectTrigger className="h-8 text-sm w-36">
+              <SelectValue placeholder="Hashtag" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Hashtag</SelectItem>
+              {allHashtags.map((h) => (
+                <SelectItem key={h} value={h}>#{h}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         <div className="flex-1" />
         <span className="text-xs text-text-muted">{filtered.length} konten</span>
@@ -303,6 +326,12 @@ export default function SavedContentPage() {
               <Textarea value={addNotes} onChange={(e) => setAddNotes(e.target.value)} placeholder="Catatan..." rows={2} className="text-sm" />
             </div>
 
+            <div className="space-y-1.5">
+              <Label className="text-xs">Hashtag</Label>
+              <Input value={addHashtags} onChange={(e) => setAddHashtags(e.target.value)} placeholder="#hook #storytelling #editing" className="h-8 text-sm" />
+              <p className="text-[10px] text-text-muted">Pisahkan dengan spasi atau koma</p>
+            </div>
+
             <div className="flex gap-2">
               <Button size="sm" onClick={handleAddContent} disabled={adding || !addUrl.trim()} className="h-7 text-xs">
                 {adding ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> Menyimpan...</> : 'Simpan'}
@@ -346,11 +375,14 @@ export default function SavedContentPage() {
                     <p className="text-sm font-medium text-text-primary truncate">
                       {hook || item.title || item.url}
                     </p>
-                    <div className="flex items-center gap-2 mt-0.5">
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       {creatorLabel && <span className="text-[11px] text-text-muted">{creatorLabel}</span>}
                       {hook && item.title && (
                         <span className="text-[11px] text-text-muted truncate max-w-[200px]">{item.title}</span>
                       )}
+                      {(item.hashtags ?? []).map((h) => (
+                        <span key={h} className="text-[10px] text-accent font-medium">#{h}</span>
+                      ))}
                     </div>
                   </div>
 
