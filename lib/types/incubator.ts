@@ -71,6 +71,17 @@ export interface CreatorProfile {
   updated_at: string
 }
 
+export interface ContentAnalysis {
+  ide: string
+  angle: string
+  hook: string
+  flow: string
+  highlight: string
+  emotion: string
+  takeaway: string
+  learnings: string
+}
+
 export interface CreatorSavedContent {
   id: string
   creator_id: string
@@ -79,5 +90,9 @@ export interface CreatorSavedContent {
   thumbnail_url: string | null
   link_meta: LinkMeta | null
   notes: string | null
+  platform: string | null
+  view_count: number | null
+  analysis: ContentAnalysis | null
   created_at: string
+  updated_at: string
 }

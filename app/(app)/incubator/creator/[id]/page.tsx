@@ -12,7 +12,6 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { EmbedModal } from '@/components/incubator/EmbedModal'
 import { ArrowLeft, ExternalLink, Plus, Star, Sparkles, Lightbulb, Play } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -50,8 +49,6 @@ export default function CreatorDetailPage() {
   const [contentUrl, setContentUrl] = useState('')
   const [contentNotes, setContentNotes] = useState('')
   const [addingContent, setAddingContent] = useState(false)
-  const [embedOpen, setEmbedOpen] = useState(false)
-  const [embedMeta, setEmbedMeta] = useState<{ url: string; meta: LinkMeta | null } | null>(null)
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const { data: creator, isLoading } = useQuery<CreatorProfile>({
@@ -159,14 +156,8 @@ export default function CreatorDetailPage() {
     }
   }
 
-  function openEmbed(content: CreatorSavedContent) {
-    const meta = content.link_meta as LinkMeta | null
-    if (meta?.embed_url) {
-      setEmbedMeta({ url: content.url, meta })
-      setEmbedOpen(true)
-    } else {
-      window.open(content.url, '_blank')
-    }
+  function openContentAnalysis(content: CreatorSavedContent) {
+    router.push(`/incubator/creator/${id}/content/${content.id}`)
   }
 
   if (isLoading) return (
@@ -261,7 +252,7 @@ export default function CreatorDetailPage() {
               ) : (
                 <div className="grid grid-cols-2 gap-2">
                   {savedContent.map((c) => (
-                    <div key={c.id} className="rounded-lg overflow-hidden border border-border cursor-pointer hover:shadow-sm transition-shadow" onClick={() => openEmbed(c)}>
+                    <div key={c.id} className="rounded-lg overflow-hidden border border-border cursor-pointer hover:shadow-sm transition-shadow" onClick={() => openContentAnalysis(c)}>
                       <div className="relative aspect-video bg-subtle">
                         {c.thumbnail_url
                           ? <img src={c.thumbnail_url} alt="" className="w-full h-full object-cover" />
@@ -347,13 +338,6 @@ export default function CreatorDetailPage() {
         </div>
       </div>
 
-      <EmbedModal
-        open={embedOpen}
-        onOpenChange={setEmbedOpen}
-        embedUrl={embedMeta?.meta?.embed_url ?? null}
-        title={embedMeta?.meta?.title ?? null}
-        sourceUrl={embedMeta?.url ?? ''}
-      />
     </div>
   )
 }
