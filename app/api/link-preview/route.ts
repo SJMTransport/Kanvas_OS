@@ -25,33 +25,74 @@ function extractYouTubeId(url: string): string | null {
   return null
 }
 
-async function extractTikTokVideoId(url: string): Promise<string | null> {
-  const directMatch = url.match(/\/(?:video|photo)\/(\d+)/)
-  if (directMatch) return directMatch[1]
-
-  // Short links (vt.tiktok.com, vm.tiktok.com) — resolve via TikTok oEmbed
+async function resolveShortUrl(url: string): Promise<string> {
   try {
-    const res = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(5000) })
-    if (res.ok) {
-      const data = await res.json()
-      const htmlMatch = data.html?.match(/data-video-id="(\d+)"/) || data.html?.match(/cite="[^"]*\/(?:video|photo)\/(\d+)/)
-      if (htmlMatch) return htmlMatch[1]
-      // Fallback: thumbnail URL often contains video ID
-      const thumbMatch = data.thumbnail_url?.match(/\/(\d{15,})/)
-      if (thumbMatch) return thumbMatch[1]
-    }
-  } catch { /* ignore */ }
-  return null
+    const res = await fetch(url, { method: 'HEAD', redirect: 'follow', signal: AbortSignal.timeout(5000) })
+    return res.url || url
+  } catch {
+    try {
+      const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(5000) })
+      return res.url || url
+    } catch { /* ignore */ }
+  }
+  return url
 }
 
-async function getEmbedUrl(url: string, platform: string): Promise<string | null> {
+interface TikTokOembedData {
+  title?: string
+  author_name?: string
+  thumbnail_url?: string
+  html?: string
+}
+
+async function resolveTikTok(url: string): Promise<{ id: string | null; title: string | null; thumbnail: string | null }> {
+  // Try direct match first
+  const directMatch = url.match(/\/(?:video|photo)\/(\d+)/)
+  if (directMatch) {
+    // Still call oEmbed for title
+    try {
+      const res = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(5000) })
+      if (res.ok) {
+        const data: TikTokOembedData = await res.json()
+        return { id: directMatch[1], title: data.title ?? null, thumbnail: data.thumbnail_url ?? null }
+      }
+    } catch { /* ignore */ }
+    return { id: directMatch[1], title: null, thumbnail: null }
+  }
+
+  // Short link — resolve redirect first
+  const resolved = await resolveShortUrl(url)
+  const resolvedMatch = resolved.match(/\/(?:video|photo)\/(\d+)/)
+
+  // Also try oEmbed
+  let oembedData: TikTokOembedData | null = null
+  try {
+    const res = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(5000) })
+    if (res.ok) oembedData = await res.json()
+  } catch { /* ignore */ }
+
+  let videoId = resolvedMatch?.[1] ?? null
+
+  if (!videoId && oembedData?.html) {
+    const htmlMatch = oembedData.html.match(/data-video-id="(\d+)"/) || oembedData.html.match(/cite="[^"]*\/(?:video|photo)\/(\d+)/)
+    if (htmlMatch) videoId = htmlMatch[1]
+  }
+
+  if (!videoId && oembedData?.thumbnail_url) {
+    const thumbMatch = oembedData.thumbnail_url.match(/\/(\d{15,})/)
+    if (thumbMatch) videoId = thumbMatch[1]
+  }
+
+  return { id: videoId, title: oembedData?.title ?? null, thumbnail: oembedData?.thumbnail_url ?? null }
+}
+
+function getEmbedUrl(url: string, platform: string, resolvedId?: string | null): string | null {
   if (platform === 'youtube') {
     const id = extractYouTubeId(url)
     return id ? `https://www.youtube.com/embed/${id}?autoplay=1` : null
   }
-  if (platform === 'tiktok') {
-    const id = await extractTikTokVideoId(url)
-    return id ? `https://www.tiktok.com/embed/v2/${id}` : null
+  if (platform === 'tiktok' && resolvedId) {
+    return `https://www.tiktok.com/embed/v2/${resolvedId}`
   }
   if (platform === 'instagram') {
     const match = url.match(/\/(p|reel|reels)\/([^/?&#]+)/)
@@ -65,7 +106,14 @@ export async function GET(req: NextRequest) {
   if (!url) return NextResponse.json({ error: 'Missing url' }, { status: 400 })
 
   const platform = detectPlatform(url)
-  const embed_url = await getEmbedUrl(url, platform)
+
+  // For TikTok, resolve ID and get title via oEmbed (more reliable than OGS for short links)
+  let tiktokResult: { id: string | null; title: string | null; thumbnail: string | null } | null = null
+  if (platform === 'tiktok') {
+    tiktokResult = await resolveTikTok(url)
+  }
+
+  const embed_url = getEmbedUrl(url, platform, tiktokResult?.id)
   const open_new_tab = !embed_url && ['instagram', 'pinterest', 'twitter', 'threads'].includes(platform)
 
   try {
@@ -75,19 +123,25 @@ export async function GET(req: NextRequest) {
       (result.twitterImage && result.twitterImage[0]?.url) ||
       null
 
+    let title = result.ogTitle ?? result.twitterTitle ?? null
+    // Override generic TikTok titles with oEmbed title
+    if (platform === 'tiktok' && tiktokResult?.title && (!title || title.includes('TikTok'))) {
+      title = tiktokResult.title
+    }
+
     return NextResponse.json({
-      title: result.ogTitle ?? result.twitterTitle ?? null,
+      title,
       description: result.ogDescription ?? result.twitterDescription ?? null,
-      image,
+      image: image ?? tiktokResult?.thumbnail ?? null,
       platform,
       embed_url,
       open_new_tab,
     })
   } catch {
     return NextResponse.json({
-      title: null,
+      title: tiktokResult?.title ?? null,
       description: null,
-      image: null,
+      image: tiktokResult?.thumbnail ?? null,
       platform,
       embed_url,
       open_new_tab,
