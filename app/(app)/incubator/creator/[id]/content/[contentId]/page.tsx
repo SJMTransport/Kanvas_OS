@@ -39,7 +39,7 @@ function getEmbedUrl(url: string, meta: LinkMeta | null): string | null {
       if (videoId) return `https://www.youtube.com/embed/${videoId}`
     }
     if (u.hostname.includes('tiktok.com') || u.hostname.includes('vt.tiktok') || u.hostname.includes('vm.tiktok')) {
-      const match = u.pathname.match(/\/video\/(\d+)/)
+      const match = u.pathname.match(/\/(?:video|photo)\/(\d+)/)
       if (match) return `https://www.tiktok.com/embed/v2/${match[1]}`
     }
     if (u.hostname.includes('instagram.com')) {
@@ -133,7 +133,7 @@ export default function ContentAnalysisPage() {
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
       <Skeleton className="h-6 w-32" />
       <div className="grid lg:grid-cols-2 gap-6">
-        <Skeleton className="aspect-[9/16] max-h-[70vh] rounded-xl" />
+        <Skeleton className="aspect-[9/16] rounded-xl" style={{ maxWidth: 'calc(70vh * 9 / 16)' }} />
         <Skeleton className="h-96 rounded-xl" />
       </div>
     </div>
@@ -183,9 +183,9 @@ export default function ContentAnalysisPage() {
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Left: Embedded Player */}
           <div className="space-y-3">
-            <div className="bg-black rounded-xl overflow-hidden">
+            <div className="bg-black rounded-xl overflow-hidden mx-auto" style={{ maxWidth: 'calc(70vh * 9 / 16)' }}>
               {embedUrl ? (
-                <div className="relative w-full aspect-[9/16] max-h-[70vh]">
+                <div className="relative w-full aspect-[9/16]">
                   <iframe
                     src={embedUrl}
                     className="absolute inset-0 w-full h-full"
@@ -194,7 +194,7 @@ export default function ContentAnalysisPage() {
                   />
                 </div>
               ) : (
-                <div className="aspect-[9/16] max-h-[70vh] flex flex-col items-center justify-center gap-3 text-white/60">
+                <div className="aspect-[9/16] flex flex-col items-center justify-center gap-3 text-white/60">
                   <p className="text-sm">Embed tidak tersedia untuk link ini</p>
                   <a
                     href={content.url}

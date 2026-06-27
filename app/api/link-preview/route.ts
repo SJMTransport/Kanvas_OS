@@ -26,7 +26,7 @@ function extractYouTubeId(url: string): string | null {
 }
 
 async function extractTikTokVideoId(url: string): Promise<string | null> {
-  const directMatch = url.match(/\/video\/(\d+)/)
+  const directMatch = url.match(/\/(?:video|photo)\/(\d+)/)
   if (directMatch) return directMatch[1]
 
   // Short links (vt.tiktok.com, vm.tiktok.com) — resolve via TikTok oEmbed
@@ -34,7 +34,7 @@ async function extractTikTokVideoId(url: string): Promise<string | null> {
     const res = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(5000) })
     if (res.ok) {
       const data = await res.json()
-      const htmlMatch = data.html?.match(/data-video-id="(\d+)"/) || data.html?.match(/cite="[^"]*\/video\/(\d+)/)
+      const htmlMatch = data.html?.match(/data-video-id="(\d+)"/) || data.html?.match(/cite="[^"]*\/(?:video|photo)\/(\d+)/)
       if (htmlMatch) return htmlMatch[1]
       // Fallback: thumbnail URL often contains video ID
       const thumbMatch = data.thumbnail_url?.match(/\/(\d{15,})/)
