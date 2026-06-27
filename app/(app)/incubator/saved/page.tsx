@@ -8,7 +8,12 @@ import { useWorkspace } from '@/lib/hooks/useWorkspace'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Search, X, Play, ExternalLink, Bookmark } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Search, X, Play, Bookmark, Plus, Loader2 } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
@@ -32,9 +37,34 @@ interface SavedContentRow {
 export default function SavedContentPage() {
   const router = useRouter()
   const { workspaceId } = useWorkspace()
+  const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [platformFilter, setPlatformFilter] = useState<string | null>(null)
   const [analysisFilter, setAnalysisFilter] = useState<'all' | 'analyzed' | 'not_analyzed'>('all')
+
+  const [addOpen, setAddOpen] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [addUrl, setAddUrl] = useState('')
+  const [addNotes, setAddNotes] = useState('')
+  const [addCreatorMode, setAddCreatorMode] = useState<'existing' | 'new'>('existing')
+  const [addCreatorId, setAddCreatorId] = useState('')
+  const [addNewUsername, setAddNewUsername] = useState('')
+  const [addNewPlatform, setAddNewPlatform] = useState('tiktok')
+
+  const { data: creators = [] } = useQuery<{ id: string; username: string; platform: string }[]>({
+    queryKey: ['creators-list', workspaceId],
+    queryFn: async () => {
+      if (!workspaceId) return []
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('creator_profiles')
+        .select('id, username, platform')
+        .eq('workspace_id', workspaceId)
+        .order('username')
+      return (data ?? []) as { id: string; username: string; platform: string }[]
+    },
+    enabled: !!workspaceId,
+  })
 
   const { data: items = [], isLoading } = useQuery<SavedContentRow[]>({
     queryKey: ['all-saved-content', workspaceId],
@@ -73,6 +103,63 @@ export default function SavedContentPage() {
 
   function openContent(item: SavedContentRow) {
     router.push(`/incubator/creator/${item.creator_id}/content/${item.id}`)
+  }
+
+  async function handleAddContent() {
+    if (!addUrl.trim() || !workspaceId) return
+    setAdding(true)
+    try {
+      const supabase = createClient()
+      let creatorId = addCreatorId
+
+      if (addCreatorMode === 'new') {
+        if (!addNewUsername.trim()) { toast.error('Username creator wajib diisi'); setAdding(false); return }
+        const { data: { user } } = await supabase.auth.getUser()
+        const { data: newCreator, error: cErr } = await supabase
+          .from('creator_profiles')
+          .insert({
+            workspace_id: workspaceId,
+            created_by: user?.id,
+            username: addNewUsername.trim().replace(/^@/, ''),
+            platform: addNewPlatform,
+          })
+          .select('id')
+          .single()
+        if (cErr) throw new Error(cErr.message)
+        creatorId = newCreator.id
+        queryClient.invalidateQueries({ queryKey: ['creators-list', workspaceId] })
+      }
+
+      if (!creatorId) { toast.error('Pilih atau buat creator'); setAdding(false); return }
+
+      let meta = null
+      try {
+        const res = await fetch(`/api/link-preview?url=${encodeURIComponent(addUrl)}`)
+        if (res.ok) meta = await res.json()
+      } catch { /* ignore */ }
+
+      const { error } = await supabase.from('creator_saved_content').insert({
+        creator_id: creatorId,
+        url: addUrl,
+        title: meta?.title ?? null,
+        thumbnail_url: meta?.image ?? null,
+        link_meta: meta,
+        notes: addNotes || null,
+      })
+      if (error) throw new Error(error.message)
+
+      toast.success('Konten disimpan!')
+      queryClient.invalidateQueries({ queryKey: ['all-saved-content', workspaceId] })
+      setAddUrl('')
+      setAddNotes('')
+      setAddCreatorId('')
+      setAddNewUsername('')
+      setAddOpen(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Terjadi kesalahan')
+    } finally {
+      setAdding(false)
+    }
   }
 
   function aspectCount(item: SavedContentRow): number {
@@ -125,7 +212,82 @@ export default function SavedContentPage() {
 
         <div className="flex-1" />
         <span className="text-xs text-text-muted">{filtered.length} konten</span>
+        <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setAddOpen(true)}>
+          <Plus className="w-3.5 h-3.5" /> Simpan Konten
+        </Button>
       </div>
+
+      {/* Add content form */}
+      {addOpen && (
+        <div className="bg-white border-b border-border px-4 py-3">
+          <div className="max-w-xl space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">URL Konten</Label>
+              <Input value={addUrl} onChange={(e) => setAddUrl(e.target.value)} placeholder="https://..." className="h-8 text-sm" />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Creator</Label>
+              <div className="flex items-center gap-2 mb-2">
+                <button
+                  type="button"
+                  onClick={() => setAddCreatorMode('existing')}
+                  className={cn('text-xs px-2.5 py-1 rounded-full border transition-colors', addCreatorMode === 'existing' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'border-border text-text-muted hover:bg-subtle')}
+                >
+                  Creator Tersimpan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAddCreatorMode('new')}
+                  className={cn('text-xs px-2.5 py-1 rounded-full border transition-colors', addCreatorMode === 'new' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'border-border text-text-muted hover:bg-subtle')}
+                >
+                  Creator Baru
+                </button>
+              </div>
+
+              {addCreatorMode === 'existing' ? (
+                <Select value={addCreatorId || 'none'} onValueChange={(v) => setAddCreatorId(v === 'none' ? '' : v)}>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="Pilih creator..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none" disabled>Pilih creator...</SelectItem>
+                    {creators.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>@{c.username} ({c.platform})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <Input value={addNewUsername} onChange={(e) => setAddNewUsername(e.target.value)} placeholder="@username" className="h-8 text-sm" />
+                  <Select value={addNewPlatform} onValueChange={setAddNewPlatform}>
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PLATFORMS.map((p) => (
+                        <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Catatan (opsional)</Label>
+              <Textarea value={addNotes} onChange={(e) => setAddNotes(e.target.value)} placeholder="Catatan..." rows={2} className="text-sm" />
+            </div>
+
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleAddContent} disabled={adding || !addUrl.trim()} className="h-7 text-xs">
+                {adding ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> Menyimpan...</> : 'Simpan'}
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAddOpen(false)}>Batal</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* List */}
       <div className="flex-1 overflow-y-auto">
