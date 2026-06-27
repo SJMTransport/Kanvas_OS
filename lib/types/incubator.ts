@@ -84,7 +84,7 @@ export interface ContentAnalysis {
 
 export interface CreatorSavedContent {
   id: string
-  creator_id: string
+  creator_id: string | null
   url: string
   title: string | null
   thumbnail_url: string | null
@@ -93,6 +93,8 @@ export interface CreatorSavedContent {
   platform: string | null
   view_count: number | null
   analysis: ContentAnalysis | null
+  creator_username: string | null
+  creator_platform: string | null
   created_at: string
   updated_at: string
 }

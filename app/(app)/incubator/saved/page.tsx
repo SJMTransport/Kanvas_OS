@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
 import { Input } from '@/components/ui/input'
@@ -11,8 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Search, X, Play, Bookmark, Plus, Loader2 } from 'lucide-react'
-import { useQueryClient } from '@tanstack/react-query'
+import { Search, X, Play, Bookmark, Plus, Loader2, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
@@ -22,7 +21,7 @@ const PLATFORMS = ['tiktok', 'instagram', 'youtube', 'facebook', 'twitter', 'thr
 
 interface SavedContentRow {
   id: string
-  creator_id: string
+  creator_id: string | null
   url: string
   title: string | null
   thumbnail_url: string | null
@@ -30,6 +29,8 @@ interface SavedContentRow {
   view_count: number | null
   analysis: Record<string, string> | null
   notes: string | null
+  creator_username: string | null
+  creator_platform: string | null
   created_at: string
   creator_profiles: { id: string; username: string; platform: string; avatar_url: string | null } | null
 }
@@ -46,7 +47,7 @@ export default function SavedContentPage() {
   const [adding, setAdding] = useState(false)
   const [addUrl, setAddUrl] = useState('')
   const [addNotes, setAddNotes] = useState('')
-  const [addCreatorMode, setAddCreatorMode] = useState<'existing' | 'new'>('existing')
+  const [addCreatorMode, setAddCreatorMode] = useState<'existing' | 'manual'>('manual')
   const [addCreatorId, setAddCreatorId] = useState('')
   const [addNewUsername, setAddNewUsername] = useState('')
   const [addNewPlatform, setAddNewPlatform] = useState('tiktok')
@@ -71,12 +72,25 @@ export default function SavedContentPage() {
     queryFn: async () => {
       if (!workspaceId) return []
       const supabase = createClient()
-      const { data } = await supabase
+      // Fetch content with linked creators (inner join) + standalone content (no creator)
+      const { data: linked } = await supabase
         .from('creator_saved_content')
         .select('*, creator_profiles!inner(id, username, platform, avatar_url)')
         .eq('creator_profiles.workspace_id', workspaceId)
         .order('created_at', { ascending: false })
-      return (data ?? []) as unknown as SavedContentRow[]
+
+      const { data: standalone } = await supabase
+        .from('creator_saved_content')
+        .select('*')
+        .is('creator_id', null)
+        .order('created_at', { ascending: false })
+
+      const all = [
+        ...((linked ?? []) as unknown as SavedContentRow[]),
+        ...((standalone ?? []).map((s: any) => ({ ...s, creator_profiles: null })) as SavedContentRow[]),
+      ]
+      all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      return all
     },
     enabled: !!workspaceId,
   })
@@ -86,7 +100,7 @@ export default function SavedContentPage() {
       const q = search.toLowerCase()
       const hook = item.analysis?.hook ?? ''
       const title = item.title ?? ''
-      const creator = item.creator_profiles?.username ?? ''
+      const creator = item.creator_profiles?.username ?? item.creator_username ?? ''
       if (!hook.toLowerCase().includes(q) && !title.toLowerCase().includes(q) && !creator.toLowerCase().includes(q)) return false
     }
     if (platformFilter && item.platform !== platformFilter) return false
@@ -102,35 +116,35 @@ export default function SavedContentPage() {
   })
 
   function openContent(item: SavedContentRow) {
-    router.push(`/incubator/creator/${item.creator_id}/content/${item.id}`)
+    if (item.creator_id) {
+      router.push(`/incubator/creator/${item.creator_id}/content/${item.id}`)
+    } else {
+      router.push(`/incubator/saved/${item.id}`)
+    }
+  }
+
+  function getCreatorLabel(item: SavedContentRow): string {
+    if (item.creator_profiles) return `@${item.creator_profiles.username}`
+    if (item.creator_username) return `@${item.creator_username}`
+    return ''
+  }
+
+  async function handleDelete(e: React.MouseEvent, item: SavedContentRow) {
+    e.stopPropagation()
+    const label = item.title || item.url
+    if (!confirm(`Hapus "${label}"?`)) return
+    const supabase = createClient()
+    const { error } = await supabase.from('creator_saved_content').delete().eq('id', item.id)
+    if (error) { toast.error('Gagal menghapus: ' + error.message); return }
+    toast.success('Konten dihapus')
+    queryClient.invalidateQueries({ queryKey: ['all-saved-content', workspaceId] })
   }
 
   async function handleAddContent() {
-    if (!addUrl.trim() || !workspaceId) return
+    if (!addUrl.trim()) return
     setAdding(true)
     try {
       const supabase = createClient()
-      let creatorId = addCreatorId
-
-      if (addCreatorMode === 'new') {
-        if (!addNewUsername.trim()) { toast.error('Username creator wajib diisi'); setAdding(false); return }
-        const { data: { user } } = await supabase.auth.getUser()
-        const { data: newCreator, error: cErr } = await supabase
-          .from('creator_profiles')
-          .insert({
-            workspace_id: workspaceId,
-            created_by: user?.id,
-            username: addNewUsername.trim().replace(/^@/, ''),
-            platform: addNewPlatform,
-          })
-          .select('id')
-          .single()
-        if (cErr) throw new Error(cErr.message)
-        creatorId = newCreator.id
-        queryClient.invalidateQueries({ queryKey: ['creators-list', workspaceId] })
-      }
-
-      if (!creatorId) { toast.error('Pilih atau buat creator'); setAdding(false); return }
 
       let meta = null
       try {
@@ -138,14 +152,22 @@ export default function SavedContentPage() {
         if (res.ok) meta = await res.json()
       } catch { /* ignore */ }
 
-      const { error } = await supabase.from('creator_saved_content').insert({
-        creator_id: creatorId,
+      const payload: Record<string, unknown> = {
         url: addUrl,
         title: meta?.title ?? null,
         thumbnail_url: meta?.image ?? null,
         link_meta: meta,
         notes: addNotes || null,
-      })
+      }
+
+      if (addCreatorMode === 'existing' && addCreatorId) {
+        payload.creator_id = addCreatorId
+      } else if (addCreatorMode === 'manual' && addNewUsername.trim()) {
+        payload.creator_username = addNewUsername.trim().replace(/^@/, '')
+        payload.creator_platform = addNewPlatform
+      }
+
+      const { error } = await supabase.from('creator_saved_content').insert(payload as any)
       if (error) throw new Error(error.message)
 
       toast.success('Konten disimpan!')
@@ -231,18 +253,20 @@ export default function SavedContentPage() {
               <div className="flex items-center gap-2 mb-2">
                 <button
                   type="button"
-                  onClick={() => setAddCreatorMode('existing')}
-                  className={cn('text-xs px-2.5 py-1 rounded-full border transition-colors', addCreatorMode === 'existing' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'border-border text-text-muted hover:bg-subtle')}
+                  onClick={() => setAddCreatorMode('manual')}
+                  className={cn('text-xs px-2.5 py-1 rounded-full border transition-colors', addCreatorMode === 'manual' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'border-border text-text-muted hover:bg-subtle')}
                 >
-                  Creator Tersimpan
+                  Tulis Manual
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setAddCreatorMode('new')}
-                  className={cn('text-xs px-2.5 py-1 rounded-full border transition-colors', addCreatorMode === 'new' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'border-border text-text-muted hover:bg-subtle')}
-                >
-                  Creator Baru
-                </button>
+                {creators.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setAddCreatorMode('existing')}
+                    className={cn('text-xs px-2.5 py-1 rounded-full border transition-colors', addCreatorMode === 'existing' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'border-border text-text-muted hover:bg-subtle')}
+                  >
+                    Dari Creator Tersimpan
+                  </button>
+                )}
               </div>
 
               {addCreatorMode === 'existing' ? (
@@ -259,7 +283,7 @@ export default function SavedContentPage() {
                 </Select>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
-                  <Input value={addNewUsername} onChange={(e) => setAddNewUsername(e.target.value)} placeholder="@username" className="h-8 text-sm" />
+                  <Input value={addNewUsername} onChange={(e) => setAddNewUsername(e.target.value)} placeholder="@username (opsional)" className="h-8 text-sm" />
                   <Select value={addNewPlatform} onValueChange={setAddNewPlatform}>
                     <SelectTrigger className="h-8 text-sm">
                       <SelectValue />
@@ -301,7 +325,7 @@ export default function SavedContentPage() {
           <div className="py-16 text-center">
             <Bookmark className="w-10 h-10 text-border mx-auto mb-2" />
             <p className="text-sm text-text-muted">
-              {items.length === 0 ? 'Belum ada konten disimpan dari creator manapun' : 'Tidak ada konten sesuai filter'}
+              {items.length === 0 ? 'Belum ada konten disimpan' : 'Tidak ada konten sesuai filter'}
             </p>
           </div>
         ) : (
@@ -309,10 +333,11 @@ export default function SavedContentPage() {
             {filtered.map((item) => {
               const hook = item.analysis?.hook
               const filled = aspectCount(item)
+              const creatorLabel = getCreatorLabel(item)
               return (
                 <div
                   key={item.id}
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-subtle transition-colors"
+                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-subtle transition-colors group"
                   onClick={() => openContent(item)}
                 >
                   <Play className="w-4 h-4 text-text-muted shrink-0" />
@@ -322,7 +347,7 @@ export default function SavedContentPage() {
                       {hook || item.title || item.url}
                     </p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[11px] text-text-muted">@{item.creator_profiles?.username}</span>
+                      {creatorLabel && <span className="text-[11px] text-text-muted">{creatorLabel}</span>}
                       {hook && item.title && (
                         <span className="text-[11px] text-text-muted truncate max-w-[200px]">{item.title}</span>
                       )}
@@ -355,6 +380,14 @@ export default function SavedContentPage() {
                   <span className="text-[10px] text-text-muted shrink-0">
                     {format(new Date(item.created_at), 'd MMM', { locale: localeId })}
                   </span>
+
+                  <button
+                    onClick={(e) => handleDelete(e, item)}
+                    className="p-1 rounded hover:bg-red-50 text-text-muted hover:text-error transition-colors opacity-0 group-hover:opacity-100"
+                    title="Hapus"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               )
             })}
