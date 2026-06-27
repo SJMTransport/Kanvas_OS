@@ -241,19 +241,17 @@ export default function SavedContentPage() {
           </SelectContent>
         </Select>
 
-        {allHashtags.length > 0 && (
-          <Select value={hashtagFilter ?? 'all'} onValueChange={(v) => setHashtagFilter(v === 'all' ? null : v)}>
-            <SelectTrigger className="h-8 text-sm w-36">
-              <SelectValue placeholder="Hashtag" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Hashtag</SelectItem>
-              {allHashtags.map((h) => (
-                <SelectItem key={h} value={h}>#{h}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+        <Select value={hashtagFilter ?? 'all'} onValueChange={(v) => setHashtagFilter(v === 'all' ? null : v)}>
+          <SelectTrigger className="h-8 text-sm w-36">
+            <SelectValue placeholder="Hashtag" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Semua Hashtag</SelectItem>
+            {allHashtags.map((h) => (
+              <SelectItem key={h} value={h}>#{h}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         <div className="flex-1" />
         <span className="text-xs text-text-muted">{filtered.length} konten</span>
@@ -381,7 +379,7 @@ export default function SavedContentPage() {
                         <span className="text-[11px] text-text-muted truncate max-w-[200px]">{item.title}</span>
                       )}
                       {(item.hashtags ?? []).map((h) => (
-                        <span key={h} className="text-[10px] text-accent font-medium">#{h}</span>
+                        <span key={h} className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 font-medium border border-amber-200">#{h}</span>
                       ))}
                     </div>
                   </div>
