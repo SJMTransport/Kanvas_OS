@@ -250,20 +250,24 @@ export default function CreatorDetailPage() {
               {savedContent.length === 0 ? (
                 <p className="text-sm text-text-muted text-center py-4">Belum ada konten tersimpan</p>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  {savedContent.map((c) => (
-                    <div key={c.id} className="rounded-lg overflow-hidden border border-border cursor-pointer hover:shadow-sm transition-shadow" onClick={() => openContentAnalysis(c)}>
-                      <div className="relative aspect-video bg-subtle">
-                        {c.thumbnail_url
-                          ? <img src={c.thumbnail_url} alt="" className="w-full h-full object-cover" />
-                          : <div className="w-full h-full flex items-center justify-center"><Play className="w-5 h-5 text-text-muted" /></div>}
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors">
-                          <Play className="w-4 h-4 text-white" />
+                <div className="space-y-1">
+                  {savedContent.map((c) => {
+                    const hook = (c.analysis as Record<string, string> | null)?.hook
+                    return (
+                      <div
+                        key={c.id}
+                        className="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-border cursor-pointer hover:bg-subtle transition-colors"
+                        onClick={() => openContentAnalysis(c)}
+                      >
+                        <Play className="w-3.5 h-3.5 text-text-muted shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-text-primary truncate">{hook || c.title || c.url}</p>
+                          {hook && c.title && <p className="text-[10px] text-text-muted truncate">{c.title}</p>}
                         </div>
+                        {c.platform && <span className="text-[10px] text-text-muted capitalize shrink-0">{c.platform}</span>}
                       </div>
-                      {c.notes && <p className="text-[10px] text-text-muted px-2 py-1 truncate">{c.notes}</p>}
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
