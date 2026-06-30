@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
@@ -124,7 +124,9 @@ export default function SavedContentPage() {
     return true
   })
 
-  function getEmbedUrl(item: SavedContentRow): string | null {
+  const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({})
+
+  function getEmbedUrl(item: SavedContentRow, isActive: boolean): string | null {
     const meta = item as any
     let base = meta.link_meta?.embed_url ?? null
     if (!base) {
@@ -143,17 +145,35 @@ export default function SavedContentPage() {
       } catch { /* ignore */ }
     }
     if (!base) return null
-    // Add autoplay params per platform
     if (base.includes('youtube.com/embed')) {
-      return base.includes('?') ? base + '&autoplay=1' : base + '?autoplay=1'
+      // Always include enablejsapi so we can postMessage play/pause without reload
+      const sep = base.includes('?') ? '&' : '?'
+      return base + sep + 'enablejsapi=1' + (isActive ? '&autoplay=1' : '')
     }
     if (base.includes('tiktok.com/embed')) {
-      // TikTok: autoplay=1, mute=0 (browser may still enforce mute on autoplay)
+      if (!isActive) return base
       const sep = base.includes('?') ? '&' : '?'
       return base + sep + 'autoplay=1&mute=0&music_info=1&description=1'
     }
     return base
   }
+
+  // When feedIndex changes: pause all YouTube iframes via postMessage, play current
+  useEffect(() => {
+    if (!feedMode) return
+    filtered.forEach((item, idx) => {
+      const iframe = iframeRefs.current[item.id]
+      if (!iframe?.contentWindow) return
+      const embedUrl = getEmbedUrl(item, false)
+      if (!embedUrl?.includes('youtube.com/embed')) return
+      if (idx === feedIndex) {
+        iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*')
+      } else {
+        iframe.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*')
+      }
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedIndex, feedMode])
 
   const feedItem = filtered[feedIndex] ?? null
 
@@ -424,12 +444,18 @@ export default function SavedContentPage() {
                   const idx = feedIndex + offset
                   const item = filtered[idx]
                   if (!item) return null
-                  const embedUrl = getEmbedUrl(item)
                   const isCurrent = offset === 0
+                  const embedUrl = getEmbedUrl(item, isCurrent)
+                  const isYT = embedUrl?.includes('youtube.com/embed')
+                  // YouTube: same key always (postMessage controls play/pause, no reload)
+                  // TikTok/Instagram: key includes feedIndex only when current so src change triggers reload with autoplay
+                  const iframeKey = isYT ? item.id : isCurrent ? `${item.id}-${feedIndex}` : item.id
                   return (
                     <div key={item.id} className={cn('absolute inset-0', isCurrent ? 'z-10' : 'z-0 opacity-0 pointer-events-none')}>
                       {embedUrl ? (
                         <iframe
+                          key={iframeKey}
+                          ref={(el) => { iframeRefs.current[item.id] = el }}
                           src={embedUrl}
                           className="w-full h-full"
                           allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
