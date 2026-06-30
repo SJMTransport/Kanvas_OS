@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Search, X, Play, Bookmark, Plus, Loader2, Trash2, Hash } from 'lucide-react'
+import { Search, X, Play, Bookmark, Plus, Loader2, Trash2, Hash, Tv2, List, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
@@ -45,6 +45,8 @@ export default function SavedContentPage() {
   const [analysisFilter, setAnalysisFilter] = useState<'all' | 'analyzed' | 'not_analyzed'>('all')
 
   const [hashtagFilter, setHashtagFilter] = useState<string | null>(null)
+  const [feedMode, setFeedMode] = useState(false)
+  const [feedIndex, setFeedIndex] = useState(0)
 
   const [addOpen, setAddOpen] = useState(false)
   const [adding, setAdding] = useState(false)
@@ -121,6 +123,49 @@ export default function SavedContentPage() {
     }
     return true
   })
+
+  function getEmbedUrl(item: SavedContentRow): string | null {
+    const meta = item as any
+    if (meta.link_meta?.embed_url) return meta.link_meta.embed_url
+    try {
+      const u = new URL(item.url)
+      if (u.hostname.includes('youtube.com') || u.hostname.includes('youtu.be')) {
+        const id = u.hostname.includes('youtu.be') ? u.pathname.slice(1) : u.searchParams.get('v')
+        if (id) return `https://www.youtube.com/embed/${id}`
+      }
+      if (u.hostname.includes('tiktok.com')) {
+        const m = u.pathname.match(/\/(?:video|photo)\/(\d+)/)
+        if (m) return `https://www.tiktok.com/embed/v2/${m[1]}`
+      }
+      if (u.hostname.includes('instagram.com')) {
+        const m = u.pathname.match(/\/(p|reel|reels)\/([^/?&#]+)/)
+        if (m) return `https://www.instagram.com/${m[1]}/${m[2]}/embed`
+      }
+    } catch { /* ignore */ }
+    return null
+  }
+
+  const feedItem = filtered[feedIndex] ?? null
+
+  function feedNav(dir: 1 | -1) {
+    setFeedIndex((i) => Math.max(0, Math.min(filtered.length - 1, i + dir)))
+  }
+
+  function enterFeed(startIndex = 0) {
+    setFeedIndex(startIndex)
+    setFeedMode(true)
+  }
+
+  useEffect(() => {
+    if (!feedMode) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); feedNav(1) }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); feedNav(-1) }
+      if (e.key === 'Escape') setFeedMode(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [feedMode, filtered.length])
 
   function openContent(item: SavedContentRow) {
     if (item.creator_id) {
@@ -255,6 +300,23 @@ export default function SavedContentPage() {
 
         <div className="flex-1" />
         <span className="text-xs text-text-muted">{filtered.length} konten</span>
+        <div className="flex items-center border border-border rounded-md overflow-hidden">
+          <button
+            onClick={() => setFeedMode(false)}
+            className={cn('p-1.5 transition-colors', !feedMode ? 'bg-accent text-white' : 'text-text-secondary hover:bg-subtle')}
+            title="Tampilan List"
+          >
+            <List className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => enterFeed(0)}
+            disabled={filtered.length === 0}
+            className={cn('p-1.5 transition-colors', feedMode ? 'bg-accent text-white' : 'text-text-secondary hover:bg-subtle disabled:opacity-40')}
+            title="Tampilan Feed"
+          >
+            <Tv2 className="w-4 h-4" />
+          </button>
+        </div>
         <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setAddOpen(true)}>
           <Plus className="w-3.5 h-3.5" /> Simpan Konten
         </Button>
@@ -340,8 +402,113 @@ export default function SavedContentPage() {
         </div>
       )}
 
+      {/* Feed Mode */}
+      {feedMode && feedItem && (
+        <div className="flex-1 flex overflow-hidden bg-gray-950">
+          {/* Left: player */}
+          <div className="flex flex-col items-center justify-center flex-1 min-w-0 p-4 gap-4">
+            <div className="bg-black rounded-2xl overflow-hidden shadow-2xl" style={{ maxHeight: 'calc(100vh - 12rem)', maxWidth: 'calc((100vh - 12rem) * 9 / 16)', width: '100%' }}>
+              {getEmbedUrl(feedItem) ? (
+                <div className="relative w-full aspect-[9/16]">
+                  <iframe
+                    key={feedItem.id}
+                    src={getEmbedUrl(feedItem)!}
+                    className="absolute inset-0 w-full h-full"
+                    allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+                    allowFullScreen
+                  />
+                </div>
+              ) : (
+                <div className="aspect-[9/16] flex flex-col items-center justify-center gap-3 text-white/50">
+                  <p className="text-sm">Embed tidak tersedia</p>
+                  <a href={feedItem.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-amber-400 hover:underline">
+                    Buka di tab baru <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              )}
+            </div>
+
+            {/* Nav controls */}
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => feedNav(-1)}
+                disabled={feedIndex === 0}
+                className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white disabled:opacity-30 transition-colors"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <span className="text-white/60 text-sm tabular-nums">{feedIndex + 1} / {filtered.length}</span>
+              <button
+                onClick={() => feedNav(1)}
+                disabled={feedIndex >= filtered.length - 1}
+                className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white disabled:opacity-30 transition-colors"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Right: info panel */}
+          <div className="w-72 shrink-0 bg-gray-900 border-l border-white/10 flex flex-col overflow-hidden">
+            <div className="p-4 border-b border-white/10">
+              <p className="text-white font-semibold text-sm line-clamp-2 leading-snug">
+                {feedItem.analysis?.hook || feedItem.title || feedItem.url}
+              </p>
+              {(() => {
+                const label = feedItem.creator_profiles ? `@${feedItem.creator_profiles.username}` : feedItem.creator_username ? `@${feedItem.creator_username}` : null
+                return label ? <p className="text-white/50 text-xs mt-1">{label}</p> : null
+              })()}
+              <div className="flex flex-wrap gap-1 mt-2">
+                {(feedItem.hashtags ?? []).map((h) => (
+                  <span key={h} className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-medium">#{h}</span>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {(['ide','angle','hook','flow','highlight','emotion','takeaway'] as const).map((key) => {
+                const val = feedItem.analysis?.[key]
+                if (!val?.trim()) return null
+                return (
+                  <div key={key}>
+                    <p className="text-[10px] uppercase tracking-wide text-white/40 font-semibold mb-0.5">{key}</p>
+                    <p className="text-white/80 text-xs leading-relaxed">{val}</p>
+                  </div>
+                )
+              })}
+              {feedItem.analysis?.learnings && (
+                <div className="mt-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                  <p className="text-[10px] uppercase tracking-wide text-amber-400 font-semibold mb-1">Learnings</p>
+                  <p className="text-white/80 text-xs leading-relaxed">{feedItem.analysis.learnings}</p>
+                </div>
+              )}
+              {feedItem.view_count != null && feedItem.view_count > 0 && (
+                <div className="pt-2 border-t border-white/10">
+                  <p className="text-white/40 text-[10px]">
+                    {feedItem.view_count >= 1000000 ? `${(feedItem.view_count / 1000000).toFixed(1)}M` : feedItem.view_count >= 1000 ? `${(feedItem.view_count / 1000).toFixed(1)}K` : feedItem.view_count} views
+                    {feedItem.platform && ` · ${feedItem.platform}`}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-3 border-t border-white/10 flex gap-2">
+              <button
+                onClick={() => openContent(feedItem)}
+                className="flex-1 text-xs py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-medium transition-colors"
+              >
+                Buka & Edit Analisis
+              </button>
+              <a href={feedItem.url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors">
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className={cn('flex-1 overflow-y-auto', feedMode && 'hidden')}>
         {isLoading ? (
           <div className="p-4 space-y-2">
             {Array.from({ length: 8 }).map((_, i) => (
@@ -365,7 +532,7 @@ export default function SavedContentPage() {
                 <div
                   key={item.id}
                   className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-subtle transition-colors group"
-                  onClick={() => openContent(item)}
+                  onClick={() => enterFeed(filtered.indexOf(item))}
                 >
                   <Play className="w-4 h-4 text-text-muted shrink-0" />
 
