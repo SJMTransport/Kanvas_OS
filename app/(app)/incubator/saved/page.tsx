@@ -126,23 +126,33 @@ export default function SavedContentPage() {
 
   function getEmbedUrl(item: SavedContentRow): string | null {
     const meta = item as any
-    if (meta.link_meta?.embed_url) return meta.link_meta.embed_url
-    try {
-      const u = new URL(item.url)
-      if (u.hostname.includes('youtube.com') || u.hostname.includes('youtu.be')) {
-        const id = u.hostname.includes('youtu.be') ? u.pathname.slice(1) : u.searchParams.get('v')
-        if (id) return `https://www.youtube.com/embed/${id}`
-      }
-      if (u.hostname.includes('tiktok.com')) {
-        const m = u.pathname.match(/\/(?:video|photo)\/(\d+)/)
-        if (m) return `https://www.tiktok.com/embed/v2/${m[1]}`
-      }
-      if (u.hostname.includes('instagram.com')) {
-        const m = u.pathname.match(/\/(p|reel|reels)\/([^/?&#]+)/)
-        if (m) return `https://www.instagram.com/${m[1]}/${m[2]}/embed`
-      }
-    } catch { /* ignore */ }
-    return null
+    let base = meta.link_meta?.embed_url ?? null
+    if (!base) {
+      try {
+        const u = new URL(item.url)
+        if (u.hostname.includes('youtube.com') || u.hostname.includes('youtu.be')) {
+          const id = u.hostname.includes('youtu.be') ? u.pathname.slice(1) : u.searchParams.get('v')
+          if (id) base = `https://www.youtube.com/embed/${id}`
+        } else if (u.hostname.includes('tiktok.com')) {
+          const m = u.pathname.match(/\/(?:video|photo)\/(\d+)/)
+          if (m) base = `https://www.tiktok.com/embed/v2/${m[1]}`
+        } else if (u.hostname.includes('instagram.com')) {
+          const m = u.pathname.match(/\/(p|reel|reels)\/([^/?&#]+)/)
+          if (m) base = `https://www.instagram.com/${m[1]}/${m[2]}/embed`
+        }
+      } catch { /* ignore */ }
+    }
+    if (!base) return null
+    // Add autoplay params per platform
+    if (base.includes('youtube.com/embed')) {
+      return base.includes('?') ? base + '&autoplay=1' : base + '?autoplay=1'
+    }
+    if (base.includes('tiktok.com/embed')) {
+      // TikTok: autoplay=1, mute=0 (browser may still enforce mute on autoplay)
+      const sep = base.includes('?') ? '&' : '?'
+      return base + sep + 'autoplay=1&mute=0&music_info=1&description=1'
+    }
+    return base
   }
 
   const feedItem = filtered[feedIndex] ?? null
@@ -407,25 +417,36 @@ export default function SavedContentPage() {
         <div className="flex-1 flex overflow-hidden bg-gray-950">
           {/* Left: player */}
           <div className="flex flex-col items-center justify-center flex-1 min-w-0 p-4 gap-4">
-            <div className="bg-black rounded-2xl overflow-hidden shadow-2xl" style={{ maxHeight: 'calc(100vh - 12rem)', maxWidth: 'calc((100vh - 12rem) * 9 / 16)', width: '100%' }}>
-              {getEmbedUrl(feedItem) ? (
-                <div className="relative w-full aspect-[9/16]">
-                  <iframe
-                    key={feedItem.id}
-                    src={getEmbedUrl(feedItem)!}
-                    className="absolute inset-0 w-full h-full"
-                    allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-                    allowFullScreen
-                  />
-                </div>
-              ) : (
-                <div className="aspect-[9/16] flex flex-col items-center justify-center gap-3 text-white/50">
-                  <p className="text-sm">Embed tidak tersedia</p>
-                  <a href={feedItem.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-amber-400 hover:underline">
-                    Buka di tab baru <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-              )}
+            <div className="bg-black rounded-2xl overflow-hidden shadow-2xl relative" style={{ maxHeight: 'calc(100vh - 12rem)', maxWidth: 'calc((100vh - 12rem) * 9 / 16)', width: '100%' }}>
+              <div className="relative w-full aspect-[9/16]">
+                {/* Preload window: render prev2..next2, only show current */}
+                {[-2, -1, 0, 1, 2].map((offset) => {
+                  const idx = feedIndex + offset
+                  const item = filtered[idx]
+                  if (!item) return null
+                  const embedUrl = getEmbedUrl(item)
+                  const isCurrent = offset === 0
+                  return (
+                    <div key={item.id} className={cn('absolute inset-0', isCurrent ? 'z-10' : 'z-0 opacity-0 pointer-events-none')}>
+                      {embedUrl ? (
+                        <iframe
+                          src={embedUrl}
+                          className="w-full h-full"
+                          allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+                          allowFullScreen
+                        />
+                      ) : isCurrent ? (
+                        <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-white/50">
+                          <p className="text-sm">Embed tidak tersedia</p>
+                          <a href={item.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-amber-400 hover:underline">
+                            Buka di tab baru <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      ) : null}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
 
             {/* Nav controls */}
