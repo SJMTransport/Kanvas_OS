@@ -268,25 +268,27 @@ export default function ShotListPage() {
               const isPlaying = playingId === item.id
               return (
                 <div key={item.id} className="group flex flex-col rounded-lg border border-border bg-white overflow-hidden hover:shadow-sm transition-shadow">
-                  <div className="relative w-full aspect-[9/16] bg-gray-100">
+                  <div className="relative w-full aspect-[9/16] bg-black flex items-center justify-center overflow-hidden">
                     {isPlaying ? (
-                      <iframe
-                        src={driveEmbedUrl(item.drive_file_id)}
-                        className="w-full h-full"
-                        allow="autoplay; fullscreen"
-                        allowFullScreen
-                      />
+                      <div className="relative w-full aspect-video">
+                        <iframe
+                          src={driveEmbedUrl(item.drive_file_id)}
+                          className="absolute inset-0 w-full h-full"
+                          allow="autoplay; fullscreen"
+                          allowFullScreen
+                        />
+                      </div>
                     ) : (
                       <button
                         type="button"
                         onClick={() => setPlayingId(item.id)}
-                        className="relative w-full h-full block"
+                        className="relative w-full h-full flex items-center justify-center"
                       >
                         <img
                           src={driveThumbnailUrl(item.drive_file_id)}
                           alt={item.deskripsi}
                           loading="lazy"
-                          className="w-full h-full object-cover"
+                          className="max-w-full max-h-full w-full h-full object-contain"
                         />
                         <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/25 transition-colors">
                           <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center">
