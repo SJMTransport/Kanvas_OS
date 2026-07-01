@@ -282,14 +282,15 @@ export default function ShotListPage() {
                       <button
                         type="button"
                         onClick={() => setPlayingId(item.id)}
-                        className="relative w-full h-full flex items-center justify-center"
+                        className="relative w-full h-full block"
+                        aria-label={item.deskripsi}
+                        style={{
+                          backgroundImage: `url(${driveThumbnailUrl(item.drive_file_id)})`,
+                          backgroundSize: 'contain',
+                          backgroundPosition: 'center',
+                          backgroundRepeat: 'no-repeat',
+                        }}
                       >
-                        <img
-                          src={driveThumbnailUrl(item.drive_file_id)}
-                          alt={item.deskripsi}
-                          loading="lazy"
-                          className="max-w-full max-h-full w-full h-full object-contain"
-                        />
                         <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/25 transition-colors">
                           <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center">
                             <Play className="w-4 h-4 text-text-primary fill-current ml-0.5" />
