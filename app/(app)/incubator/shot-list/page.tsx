@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Search, X, Plus, Loader2, Trash2, Pencil, Clapperboard, Play } from 'lucide-react'
+import { Search, X, Plus, Loader2, Trash2, Pencil, Clapperboard, Play, ChevronLeft, ChevronRight, Maximize2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { KATEGORI_SHOT, TIPE_SHOT, type ShotListReference, type KategoriShot, type TipeShot } from '@/lib/types/incubator'
@@ -64,7 +64,7 @@ export default function ShotListPage() {
   const [search, setSearch] = useState('')
   const [kategoriFilter, setKategoriFilter] = useState<string | null>(null)
   const [tipeFilter, setTipeFilter] = useState<string | null>(null)
-  const [playingId, setPlayingId] = useState<string | null>(null)
+  const [feedIndex, setFeedIndex] = useState<number | null>(null)
 
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<ShotListReference | null>(null)
@@ -104,6 +104,32 @@ export default function ShotListPage() {
     if (tipeFilter && item.tipe_shot !== tipeFilter) return false
     return true
   })
+
+  const feedItem = feedIndex != null ? filtered[feedIndex] ?? null : null
+
+  function openFeed(index: number) {
+    setFeedIndex(index)
+  }
+
+  function closeFeed() {
+    setFeedIndex(null)
+  }
+
+  function feedNav(dir: 1 | -1) {
+    setFeedIndex((i) => (i == null ? null : Math.max(0, Math.min(filtered.length - 1, i + dir))))
+  }
+
+  useEffect(() => {
+    if (feedIndex == null) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); feedNav(1) }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); feedNav(-1) }
+      if (e.key === 'Escape') closeFeed()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedIndex, filtered.length])
 
   function resetForm() {
     setEditing(null)
@@ -264,42 +290,37 @@ export default function ShotListPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-            {filtered.map((item) => {
-              const isPlaying = playingId === item.id
+            {filtered.map((item, index) => {
               return (
                 <div key={item.id} className="group flex flex-col rounded-lg border border-border bg-white overflow-hidden hover:shadow-sm transition-shadow">
-                  <div className="relative w-full aspect-[9/16] bg-black flex items-center justify-center overflow-hidden">
-                    {isPlaying ? (
-                      <div className="relative w-full aspect-video">
-                        <iframe
-                          src={driveEmbedUrl(item.drive_file_id)}
-                          className="absolute inset-0 w-full h-full"
-                          allow="autoplay; fullscreen"
-                          allowFullScreen
-                        />
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setPlayingId(item.id)}
-                        className="relative w-full h-full block"
-                        aria-label={item.deskripsi}
-                        style={{
-                          backgroundImage: `url(${driveThumbnailUrl(item.drive_file_id)})`,
-                          backgroundSize: 'contain',
-                          backgroundPosition: 'center',
-                          backgroundRepeat: 'no-repeat',
-                        }}
-                      >
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/25 transition-colors">
-                          <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center">
-                            <Play className="w-4 h-4 text-text-primary fill-current ml-0.5" />
-                          </div>
+                  <div className="relative w-full aspect-[9/16] bg-black overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => openFeed(index)}
+                      className="absolute inset-0 w-full h-full"
+                      aria-label={item.deskripsi}
+                    >
+                      <img
+                        src={driveThumbnailUrl(item.drive_file_id)}
+                        alt={item.deskripsi}
+                        loading="lazy"
+                        className="absolute inset-0 w-full h-full object-contain"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/25 transition-colors">
+                        <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center">
+                          <Play className="w-4 h-4 text-text-primary fill-current ml-0.5" />
                         </div>
-                      </button>
-                    )}
+                      </div>
+                    </button>
 
                     <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => openFeed(index)}
+                        className="p-1 rounded bg-white/90 hover:bg-white text-text-secondary hover:text-text-primary shadow-sm"
+                        title="Preview penuh"
+                      >
+                        <Maximize2 className="w-3 h-3" />
+                      </button>
                       <button
                         onClick={() => openEdit(item)}
                         className="p-1 rounded bg-white/90 hover:bg-white text-text-secondary hover:text-text-primary shadow-sm"
@@ -342,6 +363,64 @@ export default function ShotListPage() {
           </div>
         )}
       </div>
+
+      {/* Fullscreen preview with prev/next navigation */}
+      {feedItem && (
+        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-4 gap-4">
+          <button
+            onClick={closeFeed}
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+            title="Tutup"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
+          <div className="flex items-center gap-4 flex-1 min-h-0 w-full justify-center">
+            <button
+              onClick={() => feedNav(-1)}
+              disabled={feedIndex === 0}
+              className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white disabled:opacity-30 transition-colors shrink-0"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+
+            <div className="relative bg-black rounded-2xl overflow-hidden shadow-2xl" style={{ height: 'min(75vh, calc((100vw - 12rem) * 16 / 9))', aspectRatio: '9 / 16' }}>
+              <iframe
+                key={feedItem.id}
+                src={driveEmbedUrl(feedItem.drive_file_id)}
+                className="absolute inset-0 w-full h-full"
+                allow="autoplay; fullscreen"
+                allowFullScreen
+              />
+            </div>
+
+            <button
+              onClick={() => feedNav(1)}
+              disabled={feedIndex === filtered.length - 1}
+              className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white disabled:opacity-30 transition-colors shrink-0"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="w-full max-w-md text-center space-y-1.5 shrink-0">
+            <p className="text-white text-sm font-medium">{feedItem.deskripsi}</p>
+            <div className="flex flex-wrap justify-center gap-1">
+              <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full border font-medium', KATEGORI_COLORS[feedItem.kategori_shot])}>
+                {feedItem.kategori_shot}
+              </span>
+              <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full border font-medium', TIPE_COLORS[feedItem.tipe_shot])}>
+                {feedItem.tipe_shot}
+              </span>
+              {(feedItem.tags ?? []).map((t) => (
+                <span key={t} className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 text-white/70">#{t}</span>
+              ))}
+            </div>
+            {feedItem.sumber && <p className="text-white/50 text-xs">{feedItem.sumber}</p>}
+            <p className="text-white/40 text-[11px] tabular-nums">{(feedIndex ?? 0) + 1} / {filtered.length}</p>
+          </div>
+        </div>
+      )}
 
       {/* Add/Edit Modal */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
