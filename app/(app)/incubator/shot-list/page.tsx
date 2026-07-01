@@ -395,7 +395,7 @@ export default function ShotListPage() {
               <ChevronLeft className="w-5 h-5" />
             </button>
 
-            <div className="relative bg-black rounded-2xl overflow-hidden shadow-2xl" style={{ height: 'min(75vh, calc((100vw - 12rem) * 16 / 9))', aspectRatio: '9 / 16' }}>
+            <div className="relative bg-black rounded-2xl overflow-hidden shadow-2xl h-[75vh] max-h-[75vh] aspect-[9/16]">
               <iframe
                 key={feedItem.id}
                 src={driveEmbedUrl(feedItem.drive_file_id)}
