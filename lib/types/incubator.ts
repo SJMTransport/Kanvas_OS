@@ -82,6 +82,26 @@ export interface ContentAnalysis {
   learnings: string
 }
 
+export const KATEGORI_SHOT = ['Opening', 'B-roll', 'PTC', 'Detail', 'Reaction', 'Transisi', 'Closing', 'Halal Food'] as const
+export const TIPE_SHOT = ['Wide', 'Medium', 'Close', 'Detail', 'Drone', 'POV'] as const
+export type KategoriShot = (typeof KATEGORI_SHOT)[number]
+export type TipeShot = (typeof TIPE_SHOT)[number]
+
+export interface ShotListReference {
+  id: string
+  workspace_id: string
+  created_by: string | null
+  drive_link: string
+  drive_file_id: string
+  deskripsi: string
+  kategori_shot: KategoriShot
+  tipe_shot: TipeShot
+  sumber: string | null
+  tags: string[] | null
+  catatan: string | null
+  created_at: string
+}
+
 export interface CreatorSavedContent {
   id: string
   creator_id: string | null

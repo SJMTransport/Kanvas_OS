@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Lightbulb, Users, Bookmark } from 'lucide-react'
+import { Lightbulb, Users, Bookmark, Clapperboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const TABS = [
   { label: 'Idea', href: '/incubator/idea', icon: Lightbulb },
   { label: 'Creator', href: '/incubator/creator', icon: Users },
   { label: 'Konten Disimpan', href: '/incubator/saved', icon: Bookmark },
+  { label: 'Shot List', href: '/incubator/shot-list', icon: Clapperboard },
 ]
 
 export default function IncubatorLayout({ children }: { children: React.ReactNode }) {
