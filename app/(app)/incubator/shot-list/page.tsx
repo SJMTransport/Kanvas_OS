@@ -65,6 +65,7 @@ export default function ShotListPage() {
   const [kategoriFilter, setKategoriFilter] = useState<string | null>(null)
   const [tipeFilter, setTipeFilter] = useState<string | null>(null)
   const [feedIndex, setFeedIndex] = useState<number | null>(null)
+  const [playingId, setPlayingId] = useState<string | null>(null)
 
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<ShotListReference | null>(null)
@@ -291,27 +292,37 @@ export default function ShotListPage() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
             {filtered.map((item, index) => {
+              const isPlaying = playingId === item.id
               return (
                 <div key={item.id} className="group flex flex-col rounded-lg border border-border bg-white overflow-hidden hover:shadow-sm transition-shadow">
                   <div className="relative w-full aspect-[9/16] bg-black overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => openFeed(index)}
-                      className="absolute inset-0 w-full h-full"
-                      aria-label={item.deskripsi}
-                    >
-                      <img
-                        src={driveThumbnailUrl(item.drive_file_id)}
-                        alt={item.deskripsi}
-                        loading="lazy"
-                        className="absolute inset-0 w-full h-full object-contain"
+                    {isPlaying ? (
+                      <iframe
+                        src={driveEmbedUrl(item.drive_file_id)}
+                        className="absolute inset-0 w-full h-full"
+                        allow="autoplay; fullscreen"
+                        allowFullScreen
                       />
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/25 transition-colors">
-                        <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center">
-                          <Play className="w-4 h-4 text-text-primary fill-current ml-0.5" />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setPlayingId(item.id)}
+                        className="absolute inset-0 w-full h-full"
+                        aria-label={item.deskripsi}
+                      >
+                        <img
+                          src={driveThumbnailUrl(item.drive_file_id)}
+                          alt={item.deskripsi}
+                          loading="lazy"
+                          className="absolute inset-0 w-full h-full object-contain"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/25 transition-colors">
+                          <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center">
+                            <Play className="w-4 h-4 text-text-primary fill-current ml-0.5" />
+                          </div>
                         </div>
-                      </div>
-                    </button>
+                      </button>
+                    )}
 
                     <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
