@@ -57,6 +57,13 @@ function driveEmbedUrl(fileId: string): string {
   return `https://drive.google.com/file/d/${fileId}/preview`
 }
 
+function previewTransformStyle(zoom: number, offsetY: number): React.CSSProperties {
+  return {
+    transform: `scale(${zoom}) translateY(${offsetY}%)`,
+    transformOrigin: 'center center',
+  }
+}
+
 export default function ShotListPage() {
   const { workspaceId } = useWorkspace()
   const queryClient = useQueryClient()
@@ -78,6 +85,8 @@ export default function ShotListPage() {
   const [sumber, setSumber] = useState('')
   const [tagsInput, setTagsInput] = useState('')
   const [catatan, setCatatan] = useState('')
+  const [previewZoom, setPreviewZoom] = useState(1)
+  const [previewOffsetY, setPreviewOffsetY] = useState(0)
 
   const { data: items = [], isLoading } = useQuery<ShotListReference[]>({
     queryKey: ['shot-list', workspaceId],
@@ -142,6 +151,8 @@ export default function ShotListPage() {
     setSumber('')
     setTagsInput('')
     setCatatan('')
+    setPreviewZoom(1)
+    setPreviewOffsetY(0)
   }
 
   function openAdd() {
@@ -159,6 +170,8 @@ export default function ShotListPage() {
     setSumber(item.sumber ?? '')
     setTagsInput((item.tags ?? []).join(', '))
     setCatatan(item.catatan ?? '')
+    setPreviewZoom(item.preview_zoom ?? 1)
+    setPreviewOffsetY(item.preview_offset_y ?? 0)
     setFormOpen(true)
   }
 
@@ -187,6 +200,8 @@ export default function ShotListPage() {
         sumber: sumber.trim() || null,
         tags: tagsInput.trim() ? tagsInput.split(',').map((t) => t.trim()).filter(Boolean) : [],
         catatan: catatan.trim() || null,
+        preview_zoom: previewZoom,
+        preview_offset_y: previewOffsetY,
       }
 
       if (editing) {
@@ -300,6 +315,7 @@ export default function ShotListPage() {
                       <iframe
                         src={driveEmbedUrl(item.drive_file_id)}
                         className="absolute inset-0 w-full h-full"
+                        style={previewTransformStyle(item.preview_zoom ?? 1, item.preview_offset_y ?? 0)}
                         allow="autoplay; fullscreen"
                         allowFullScreen
                       />
@@ -315,6 +331,7 @@ export default function ShotListPage() {
                           alt={item.deskripsi}
                           loading="lazy"
                           className="absolute inset-0 w-full h-full object-contain"
+                          style={previewTransformStyle(item.preview_zoom ?? 1, item.preview_offset_y ?? 0)}
                         />
                         <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/25 transition-colors">
                           <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center">
@@ -400,6 +417,7 @@ export default function ShotListPage() {
                 key={feedItem.id}
                 src={driveEmbedUrl(feedItem.drive_file_id)}
                 className="absolute inset-0 w-full h-full"
+                style={previewTransformStyle(feedItem.preview_zoom ?? 1, feedItem.preview_offset_y ?? 0)}
                 allow="autoplay; fullscreen"
                 allowFullScreen
               />
@@ -501,6 +519,65 @@ export default function ShotListPage() {
               <Label className="text-xs">Catatan (opsional)</Label>
               <Textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder="Catatan tambahan..." rows={2} className="text-sm" />
             </div>
+
+            {(() => {
+              const previewFileId = extractDriveFileId(driveLink.trim())
+              if (!previewFileId) return null
+              return (
+                <div className="space-y-2 border-t border-border pt-3">
+                  <Label className="text-xs">Sesuaikan Framing Preview</Label>
+                  <p className="text-[10px] text-text-muted -mt-1">
+                    Kalau video sumbernya berisi UI/chrome ekstra (mis. rekaman layar), atur zoom &amp; geser supaya subjek utama terlihat center.
+                  </p>
+                  <div className="relative w-24 mx-auto aspect-[9/16] bg-black rounded-lg overflow-hidden">
+                    <iframe
+                      src={driveEmbedUrl(previewFileId)}
+                      className="absolute inset-0 w-full h-full pointer-events-none"
+                      style={previewTransformStyle(previewZoom, previewOffsetY)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[11px] text-text-muted">Zoom</Label>
+                      <span className="text-[11px] text-text-muted tabular-nums">{previewZoom.toFixed(1)}x</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={1}
+                      max={3}
+                      step={0.1}
+                      value={previewZoom}
+                      onChange={(e) => setPreviewZoom(parseFloat(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[11px] text-text-muted">Geser Vertikal</Label>
+                      <span className="text-[11px] text-text-muted tabular-nums">{previewOffsetY}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={-50}
+                      max={50}
+                      step={1}
+                      value={previewOffsetY}
+                      onChange={(e) => setPreviewOffsetY(parseInt(e.target.value, 10))}
+                      className="w-full"
+                    />
+                  </div>
+                  {(previewZoom !== 1 || previewOffsetY !== 0) && (
+                    <button
+                      type="button"
+                      onClick={() => { setPreviewZoom(1); setPreviewOffsetY(0) }}
+                      className="text-[11px] text-amber-600 hover:underline"
+                    >
+                      Reset ke default
+                    </button>
+                  )}
+                </div>
+              )
+            })()}
 
             <div className="flex gap-2 pt-1">
               <Button size="sm" onClick={handleSubmit} disabled={saving || !deskripsi.trim() || !driveLink.trim()} className="h-8 text-xs">

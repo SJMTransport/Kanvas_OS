@@ -99,6 +99,8 @@ export interface ShotListReference {
   sumber: string | null
   tags: string[] | null
   catatan: string | null
+  preview_zoom: number
+  preview_offset_y: number
   created_at: string
 }
 
