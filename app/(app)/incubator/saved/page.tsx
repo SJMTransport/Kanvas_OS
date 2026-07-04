@@ -57,6 +57,11 @@ export default function SavedContentPage() {
   const [addNewUsername, setAddNewUsername] = useState('')
   const [addNewPlatform, setAddNewPlatform] = useState('tiktok')
   const [addHashtags, setAddHashtags] = useState('')
+  const [addSelectedTags, setAddSelectedTags] = useState<string[]>([])
+
+  function toggleAddSuggestedTag(tag: string) {
+    setAddSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
+  }
 
   const { data: creators = [] } = useQuery<{ id: string; username: string; platform: string }[]>({
     queryKey: ['creators-list', workspaceId],
@@ -240,7 +245,10 @@ export default function SavedContentPage() {
         thumbnail_url: meta?.image ?? null,
         link_meta: meta,
         notes: addNotes || null,
-        hashtags: addHashtags.trim() ? addHashtags.split(/[\s,]+/).map((t) => t.replace(/^#/, '').trim()).filter(Boolean) : [],
+        hashtags: [
+          ...addSelectedTags,
+          ...(addHashtags.trim() ? addHashtags.split(/[\s,]+/).map((t) => t.replace(/^#/, '').trim()).filter(Boolean) : []),
+        ].filter((t, i, arr) => t && arr.indexOf(t) === i),
       }
 
       if (addCreatorMode === 'existing' && addCreatorId) {
@@ -260,6 +268,7 @@ export default function SavedContentPage() {
       setAddCreatorId('')
       setAddNewUsername('')
       setAddHashtags('')
+      setAddSelectedTags([])
       setAddOpen(false)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Terjadi kesalahan')
@@ -419,7 +428,29 @@ export default function SavedContentPage() {
             <div className="space-y-1.5">
               <Label className="text-xs">Hashtag</Label>
               <Input value={addHashtags} onChange={(e) => setAddHashtags(e.target.value)} placeholder="#hook #storytelling #editing" className="h-8 text-sm" />
-              <p className="text-[10px] text-text-muted">Pisahkan dengan spasi atau koma</p>
+              <p className="text-[10px] text-text-muted">Pisahkan dengan spasi atau koma untuk hashtag baru</p>
+              {allHashtags.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {allHashtags.map((h) => {
+                    const selected = addSelectedTags.includes(h)
+                    return (
+                      <button
+                        key={h}
+                        type="button"
+                        onClick={() => toggleAddSuggestedTag(h)}
+                        className={cn(
+                          'text-[10px] px-2 py-0.5 rounded-full border font-medium transition-colors',
+                          selected
+                            ? 'bg-amber-500 border-amber-500 text-white'
+                            : 'bg-white border-border text-text-muted hover:border-amber-300 hover:text-amber-600'
+                        )}
+                      >
+                        #{h}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="flex gap-2">

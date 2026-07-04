@@ -27,6 +27,8 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { label: 'Idea', href: '/incubator/idea' },
       { label: 'Creator', href: '/incubator/creator' },
+      { label: 'Konten Disimpan', href: '/incubator/saved' },
+      { label: 'Shot List', href: '/incubator/shot-list' },
     ],
   },
   {
