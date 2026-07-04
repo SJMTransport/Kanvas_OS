@@ -5,11 +5,13 @@ import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
 import { DashboardClient } from './dashboard-client'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
+import { AlertTriangle } from 'lucide-react'
 
 export default function DashboardPage() {
   const { workspaceId, role } = useWorkspace()
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['dashboard', workspaceId],
     queryFn: async () => {
       if (!workspaceId) return null
@@ -17,18 +19,9 @@ export default function DashboardPage() {
       const today = new Date().toISOString().split('T')[0]
       const startOfMonth = new Date(); startOfMonth.setDate(1)
 
-      // All queries run in parallel — much faster than sequential
-      const [
-        { data: { user } },
-        { data: todaySchedules },
-        { count: totalVideos },
-        { count: scheduledCount },
-        { count: liveCount },
-        { count: draftCount },
-        { data: followups },
-        { data: overdueInvoices },
-        { data: recentVideos },
-      ] = await Promise.all([
+      // All queries run in parallel — much faster than sequential.
+      // Each is settled independently so one flaky request can't sink the whole dashboard.
+      const results = await Promise.allSettled([
         supabase.auth.getUser(),
         supabase.from('video_platform_schedules').select('*, videos(id, judul, thumbnail_url, status, workspace_id)').eq('tanggal_tayang', today).order('jam_post', { ascending: true }),
         supabase.from('videos').select('*', { count: 'exact', head: true }).eq('workspace_id', workspaceId),
@@ -40,8 +33,21 @@ export default function DashboardPage() {
         supabase.from('videos').select('id, judul, status, updated_at, created_by, users(full_name)').eq('workspace_id', workspaceId).order('updated_at', { ascending: false }).limit(5),
       ])
 
+      const settledValue = <T,>(r: PromiseSettledResult<T>): T | undefined =>
+        r.status === 'fulfilled' ? r.value : undefined
+
+      const user = (settledValue(results[0]) as any)?.data?.user ?? null
+      const todaySchedules = (settledValue(results[1]) as any)?.data ?? []
+      const totalVideos = (settledValue(results[2]) as any)?.count ?? 0
+      const scheduledCount = (settledValue(results[3]) as any)?.count ?? 0
+      const liveCount = (settledValue(results[4]) as any)?.count ?? 0
+      const draftCount = (settledValue(results[5]) as any)?.count ?? 0
+      const followups = (settledValue(results[6]) as any)?.data ?? []
+      const overdueInvoices = (settledValue(results[7]) as any)?.data ?? []
+      const recentVideos = (settledValue(results[8]) as any)?.data ?? []
+
       const filteredSchedules = (todaySchedules ?? []).filter(
-        (s: any) => s.videos?.workspace_id === workspaceId
+        (s: any) => s?.videos?.workspace_id === workspaceId
       )
 
       return {
@@ -56,6 +62,19 @@ export default function DashboardPage() {
     enabled: !!workspaceId,
     staleTime: 60 * 1000,
   })
+
+  if (isError) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-16 text-center">
+        <AlertTriangle className="w-10 h-10 text-error mx-auto mb-3" />
+        <h2 className="font-heading text-lg font-bold text-text-primary mb-1">Gagal memuat dashboard</h2>
+        <p className="text-sm text-text-secondary mb-4">Pastikan koneksi stabil, lalu coba lagi.</p>
+        <Button onClick={() => refetch()} disabled={isRefetching}>
+          {isRefetching ? 'Memuat...' : 'Coba Lagi'}
+        </Button>
+      </div>
+    )
+  }
 
   if (isLoading || !data) {
     return (
@@ -88,7 +107,7 @@ export interface RecentVideo {
   id: string
   judul: string
   status: string
-  updated_at: string
+  updated_at: string | null
   created_by: string | null
-  users: { full_name: string | null } | null
+  users: { full_name: string | null } | { full_name: string | null }[] | null
 }

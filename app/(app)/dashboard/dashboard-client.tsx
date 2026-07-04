@@ -47,8 +47,8 @@ interface OverdueInvoice {
   id: string
   invoice_number: string
   total: number
-  due_date: string
-  brands: { nama_brand: string } | null
+  due_date: string | null
+  brands: { nama_brand: string } | { nama_brand: string }[] | null
 }
 
 interface Props {
@@ -59,6 +59,39 @@ interface Props {
   followups: Followup[]
   overdueInvoices: OverdueInvoice[]
   recentVideos: RecentVideo[]
+}
+
+function safeDate(value: string | null | undefined): Date | null {
+  if (!value) return null
+  const d = new Date(value)
+  return isNaN(d.getTime()) ? null : d
+}
+
+function safeDistanceToNow(value: string | null | undefined): string {
+  const d = safeDate(value)
+  if (!d) return '-'
+  try {
+    return formatDistanceToNow(d, { addSuffix: true, locale: localeId })
+  } catch {
+    return '-'
+  }
+}
+
+function safeDaysAgo(value: string | null | undefined): number {
+  const d = safeDate(value)
+  if (!d) return 0
+  try {
+    return differenceInDays(new Date(), d)
+  } catch {
+    return 0
+  }
+}
+
+// Supabase can return a to-one FK join as either an object or a single-item array
+// depending on relationship metadata — normalize defensively either way.
+function firstOf<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null
+  return Array.isArray(value) ? (value[0] ?? null) : value
 }
 
 function getGreeting() {
@@ -194,18 +227,16 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
           ) : (
             <div className="bg-white border border-border rounded-xl divide-y divide-border">
               {followups.map((f) => {
-                const daysAgo = f.next_followup_date
-                  ? differenceInDays(new Date(), new Date(f.next_followup_date))
-                  : 0
+                const daysAgo = safeDaysAgo(f.next_followup_date)
                 return (
                   <div key={f.id} className="flex items-center gap-3 p-3">
                     <Avatar className="w-8 h-8 shrink-0">
                       <AvatarFallback className="bg-accent-light text-accent text-xs font-bold">
-                        {f.nama_brand.slice(0, 2).toUpperCase()}
+                        {(f.nama_brand ?? '??').slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-text-primary truncate">{f.nama_brand}</p>
+                      <p className="text-sm font-medium text-text-primary truncate">{f.nama_brand ?? 'Tanpa nama'}</p>
                       <p className="text-xs text-text-muted">
                         {BRAND_STATUS_LABEL[f.status] ?? f.status} •{' '}
                         <span className={cn(daysAgo > 0 ? 'text-error' : 'text-warning')}>
@@ -237,7 +268,8 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
               </h2>
               <div className="bg-white border border-error/30 rounded-xl divide-y divide-border">
                 {overdueInvoices.map((inv) => {
-                  const daysAgo = differenceInDays(new Date(), new Date(inv.due_date))
+                  const daysAgo = safeDaysAgo(inv.due_date)
+                  const brand = firstOf(inv.brands)
                   return (
                     <Link
                       key={inv.id}
@@ -248,7 +280,7 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-text-primary">{inv.invoice_number}</p>
                         <p className="text-xs text-text-muted">
-                          {inv.brands?.nama_brand} · {daysAgo} hari lalu
+                          {brand?.nama_brand ?? 'Brand'} · {daysAgo} hari lalu
                         </p>
                       </div>
                       <span className="text-sm font-semibold text-error shrink-0">
@@ -282,7 +314,7 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
                     <div className="w-2 h-2 rounded-full bg-accent mt-1.5 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-text-primary">
-                        <span className="font-medium">{v.users?.full_name ?? 'Seseorang'}</span>
+                        <span className="font-medium">{firstOf(v.users)?.full_name ?? 'Seseorang'}</span>
                         {' '}mengupdate{' '}
                         <span className="font-medium">"{v.judul}"</span>
                       </p>
@@ -291,7 +323,7 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
                           {STATUS_MAP[v.status] ?? v.status}
                         </Badge>
                         <span className="text-[11px] text-text-muted">
-                          {formatDistanceToNow(new Date(v.updated_at), { addSuffix: true, locale: localeId })}
+                          {safeDistanceToNow(v.updated_at)}
                         </span>
                       </div>
                     </div>
