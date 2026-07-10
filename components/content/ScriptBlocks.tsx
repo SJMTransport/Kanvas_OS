@@ -233,48 +233,61 @@ function ScriptBlockCard({
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
-      textareaRef.current.style.height = Math.max(80, textareaRef.current.scrollHeight) + 'px'
+      textareaRef.current.style.height = Math.max(48, textareaRef.current.scrollHeight) + 'px'
     }
   }, [block.content])
 
   return (
-    <div className="border border-border rounded-lg overflow-hidden mb-3 bg-white">
-      <div className="flex items-center gap-2 px-3 py-2 bg-subtle border-b border-border">
-        <button
-          {...dragHandleProps}
-          className="cursor-grab active:cursor-grabbing text-text-muted hover:text-text-secondary p-0.5 touch-none"
-        >
-          <GripVertical className="w-4 h-4" />
-        </button>
-        <input
-          type="text"
-          value={block.label}
-          onChange={(e) => onUpdate(block.id, { label: e.target.value })}
-          className="flex-1 bg-transparent font-semibold text-sm text-text-primary border-none outline-none hover:bg-white hover:px-2 rounded transition-all"
-        />
-        {words > 0 && (
-          <span className="text-xs text-text-muted shrink-0">{words} kata</span>
-        )}
+    <div className="flex items-start gap-4 py-3 border-b border-border/50 last:border-b-0 group">
+      {/* Sisi Kiri: Label & Meta Info */}
+      <div className="w-40 shrink-0 space-y-1">
+        <div className="flex items-center gap-1">
+          <button
+            {...dragHandleProps}
+            className="cursor-grab active:cursor-grabbing text-text-muted hover:text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity p-0.5 touch-none"
+            title="Tarik untuk urutkan"
+          >
+            <GripVertical className="w-3.5 h-3.5" />
+          </button>
+          <input
+            type="text"
+            value={block.label}
+            onChange={(e) => onUpdate(block.id, { label: e.target.value })}
+            className="flex-1 bg-transparent font-semibold text-xs text-text-primary border-none outline-none focus:bg-white focus:px-1 rounded transition-all truncate"
+            title="Klik untuk ubah nama section"
+          />
+        </div>
+        <div className="pl-5 flex flex-col text-[10px] text-text-muted">
+          <span>{words} kata</span>
+          {words > 0 && <span>{durationText(words)}</span>}
+        </div>
+      </div>
+
+      {/* Sisi Kanan: Input Script & Tombol Aksi */}
+      <div className="flex-1 flex items-start gap-2">
+        <div className="flex-1 border border-border/80 hover:border-border rounded-lg bg-white shadow-sm overflow-hidden focus-within:ring-1 focus-within:ring-accent/30 focus-within:border-accent transition-all">
+          <textarea
+            ref={textareaRef}
+            value={block.content}
+            onChange={(e) => onUpdate(block.id, { content: e.target.value })}
+            placeholder={PLACEHOLDERS[block.type] || 'Tulis di sini...'}
+            rows={1}
+            className="w-full px-3 py-2 text-xs text-text-primary resize-none border-none outline-none leading-relaxed bg-transparent min-h-[48px]"
+            onInput={(e) => {
+              const t = e.target as HTMLTextAreaElement
+              t.style.height = 'auto'
+              t.style.height = Math.max(48, t.scrollHeight) + 'px'
+            }}
+          />
+        </div>
         <button
           onClick={() => onDelete(block.id)}
-          className="text-text-muted hover:text-error transition-colors ml-1 p-0.5"
+          className="text-text-muted hover:text-error opacity-0 group-hover:opacity-100 transition-all p-1.5 rounded hover:bg-subtle shrink-0 mt-1"
+          title="Hapus section"
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
-      <textarea
-        ref={textareaRef}
-        value={block.content}
-        onChange={(e) => onUpdate(block.id, { content: e.target.value })}
-        placeholder={PLACEHOLDERS[block.type] || 'Tulis di sini...'}
-        rows={3}
-        className="w-full px-4 py-3 text-sm text-text-primary resize-none border-none outline-none leading-relaxed bg-white min-h-[80px]"
-        onInput={(e) => {
-          const t = e.target as HTMLTextAreaElement
-          t.style.height = 'auto'
-          t.style.height = Math.max(80, t.scrollHeight) + 'px'
-        }}
-      />
     </div>
   )
 }

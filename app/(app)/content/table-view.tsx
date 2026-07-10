@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
 import { ChevronUp, ChevronDown, Video, ImageIcon, Trash2, GripVertical } from 'lucide-react'
+import { formatNumber } from '@/lib/utils/formatters'
 import {
   DndContext, DragEndEvent, PointerSensor, useSensor, useSensors, closestCenter,
 } from '@dnd-kit/core'
@@ -72,6 +73,9 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, activ
   const style = { transform: CSS.Transform.toString(transform), transition }
 
   const scheduledPlatforms = video.video_platform_schedules?.map((s) => s.platform as Platform) ?? []
+  const perfRecords = video.video_performance ?? []
+  const totalViews = perfRecords.reduce((sum, d) => sum + (Number(d.views) || 0), 0)
+  const totalLikes = perfRecords.reduce((sum, d) => sum + (Number(d.likes) || 0), 0)
 
   return (
     <tr
@@ -138,6 +142,16 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, activ
           })}
         </div>
       </td>
+      <td className="px-3 py-2.5">
+        {totalViews > 0 ? (
+          <div className="flex flex-col text-xs font-mono">
+            <span className="font-semibold text-text-primary">👁️ {formatNumber(totalViews)}</span>
+            <span className="text-[10px] text-text-muted">❤️ {formatNumber(totalLikes)}</span>
+          </div>
+        ) : (
+          <span className="text-text-muted/50 font-mono text-xs">-</span>
+        )}
+      </td>
       <td className="px-3 py-2.5 text-xs text-text-muted whitespace-nowrap">
         {video.status === 'live' ? (
           (() => {
@@ -174,7 +188,7 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, activ
 
 export function TableView({ videos: initialVideos, loading, sortBy, sortDir, page, onSort, onPageChange, onRowClick, total, pageSize, activePlatformFilter }: Props) {
   const totalPages = Math.ceil(total / pageSize)
-  const [videos, setVideos] = useState(initialVideos)
+  const [localVideos, setLocalVideos] = useState<VideoWithSchedules[] | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const queryClient = useQueryClient()
 
@@ -184,14 +198,15 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
     const { error } = await supabase.from('videos').delete().eq('id', video.id)
     if (error) { toast.error('Gagal menghapus: ' + error.message); return }
     toast.success('Konten dihapus')
-    setVideos((prev) => prev.filter((v) => v.id !== video.id))
     queryClient.invalidateQueries({ queryKey: ['videos'] })
   }
 
-  // Sync only when initialVideos reference changes (new page/filter/fetch)
+  // When initialVideos changes (like new fetch or page refetch), reset local reordered state
   useEffect(() => {
-    if (!loading) setVideos(initialVideos)
+    setLocalVideos(null)
   }, [initialVideos])
+
+  const videos = localVideos ?? initialVideos
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
@@ -201,7 +216,7 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
     // Use current page offset so sort_order stays globally consistent across pages
     const offset = page * pageSize
     const reordered = arrayMove(videos, oldIdx, newIdx)
-    setVideos(reordered)
+    setLocalVideos(reordered)
     const supabase = createClient()
     const { error } = await Promise.all(
       reordered.map((v, i) =>
@@ -223,6 +238,7 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
               <Th col="judul" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Judul</Th>
               <Th col="status" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Status</Th>
               <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Platform</Th>
+              <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Performa</Th>
               <Th col="updated_at" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Update / Tayang</Th>
               <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-10">{''}</Th>
             </tr>

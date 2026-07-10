@@ -66,6 +66,8 @@ export function CalendarView() {
         .filter((e) => e.videos?.workspace_id === workspaceId)
     },
     enabled: !!workspaceId,
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 
   function togglePlatform(p: Platform) {

@@ -5,21 +5,19 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
 import { useRouter, useParams } from 'next/navigation'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
-  ArrowLeft, Plus, Trash2, Check, ExternalLink, Loader2, FileText,
+  ArrowLeft, Plus, Trash2, Check, ExternalLink, Loader2, FileText, Video,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { getStatusBadgeClass, STATUS_CONFIG } from '@/lib/utils/status'
-import { getPlatformDot } from '@/lib/utils/platform'
+import { getPlatformDot, getPlatformBadge } from '@/lib/utils/platform'
 import { formatNumber } from '@/lib/utils/formatters'
 import { ScriptBlocks, type ScriptBlock } from '@/components/content/ScriptBlocks'
 import type { VideoStatus, Platform } from '@/lib/types'
@@ -29,74 +27,67 @@ const PLATFORMS: Platform[] = ['tiktok', 'instagram', 'youtube', 'facebook']
 const PLATFORM_LABELS: Record<Platform, string> = {
   tiktok: 'TikTok', instagram: 'Instagram', youtube: 'YouTube', facebook: 'Facebook',
 }
+const ALL_STATUSES: VideoStatus[] = ['ide', 'scripting', 'produksi', 'editing', 'scheduled', 'live', 'archived']
 
-// ─── InlineField ─────────────────────────────────────────────────────────────
+// ─── Status Stepper ─────────────────────────────────────────────────────────
 
-function InlineField({ label, value, onSave, type = 'text', options }: {
-  label: string
-  value: string | null | undefined
-  onSave: (v: string) => void
-  type?: 'text' | 'date' | 'select' | 'textarea'
-  options?: { value: string; label: string }[]
-}) {
-  const [editing, setEditing] = useState(false)
-  const [val, setVal] = useState(value ?? '')
-
-  useEffect(() => { setVal(value ?? '') }, [value])
-
-  function handleBlur() {
-    setEditing(false)
-    if (val !== (value ?? '')) onSave(val)
-  }
-
-  if (type === 'select' && options) {
-    return (
-      <div className="flex flex-col gap-1">
-        <Label className="text-xs text-text-muted">{label}</Label>
-        <Select value={val} onValueChange={(v) => { setVal(v); onSave(v) }}>
-          <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-          <SelectContent>{options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-    )
-  }
-
-  if (type === 'textarea') {
-    return (
-      <div className="flex flex-col gap-1">
-        <Label className="text-xs text-text-muted">{label}</Label>
-        {editing
-          ? <Textarea value={val} onChange={(e) => setVal(e.target.value)} onBlur={handleBlur} autoFocus rows={3} className="text-sm" />
-          : (
-            <div
-              className="text-sm text-text-primary min-h-[2rem] px-2 py-1.5 rounded-md hover:bg-subtle cursor-pointer whitespace-pre-wrap"
-              onClick={() => setEditing(true)}
-            >
-              {val || <span className="text-text-muted">Klik untuk edit</span>}
-            </div>
-          )}
-      </div>
-    )
-  }
-
+function StatusStepper({ currentStatus, onStatusChange }: { currentStatus: VideoStatus; onStatusChange: (s: VideoStatus) => void }) {
+  const currentIndex = ALL_STATUSES.indexOf(currentStatus)
   return (
-    <div className="flex flex-col gap-1">
-      <Label className="text-xs text-text-muted">{label}</Label>
-      {editing
-        ? <Input type={type} value={val} onChange={(e) => setVal(e.target.value)} onBlur={handleBlur} autoFocus className="h-8 text-sm" />
-        : (
-          <div
-            className="text-sm text-text-primary min-h-[2rem] px-2 py-1.5 rounded-md hover:bg-subtle cursor-pointer"
-            onClick={() => setEditing(true)}
-          >
-            {val || <span className="text-text-muted">Klik untuk edit</span>}
-          </div>
-        )}
+    <div className="w-full bg-white border border-border rounded-xl p-4 shadow-sm mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-semibold text-text-secondary">Tahapan Alur Konten</span>
+        <span className="text-xs text-accent font-semibold uppercase">
+          Status: {STATUS_CONFIG[currentStatus]?.label ?? currentStatus}
+        </span>
+      </div>
+      <div className="relative flex items-center justify-between px-2">
+        {/* Progress Line */}
+        <div className="absolute left-6 right-6 top-3 h-0.5 bg-border -z-10" />
+        <div 
+          className="absolute left-6 top-3 h-0.5 bg-accent transition-all duration-300 -z-10" 
+          style={{ width: `${(currentIndex / (ALL_STATUSES.length - 1)) * 100}%` }}
+        />
+        
+        {ALL_STATUSES.map((status, index) => {
+          const isCompleted = index <= currentIndex
+          const isActive = status === currentStatus
+          const config = STATUS_CONFIG[status]
+          return (
+            <button
+              key={status}
+              onClick={() => onStatusChange(status)}
+              className="flex flex-col items-center group cursor-pointer focus:outline-none"
+            >
+              <div 
+                className={cn(
+                  "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all duration-300",
+                  isActive 
+                    ? "bg-accent border-accent text-white scale-110 shadow-sm"
+                    : isCompleted
+                      ? "bg-accent/10 border-accent text-accent"
+                      : "bg-white border-border text-text-muted hover:border-text-secondary"
+                )}
+              >
+                {isCompleted && !isActive ? "✓" : index + 1}
+              </div>
+              <span 
+                className={cn(
+                  "text-[10px] mt-1.5 font-medium transition-colors duration-300 hidden md:block",
+                  isActive ? "text-accent font-bold" : "text-text-muted group-hover:text-text-primary"
+                )}
+              >
+                {config?.label ?? status}
+              </span>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
 
-// ─── Info Tab ─────────────────────────────────────────────────────────────────
+// ─── Suggestion Tema Select ──────────────────────────────────────────────────
 
 function TemaSelect({ temas, onChange, workspaceId }: { temas: string[]; onChange: (v: string[]) => void; workspaceId: string | null }) {
   const [input, setInput] = useState('')
@@ -154,18 +145,18 @@ function TemaSelect({ temas, onChange, workspaceId }: { temas: string[]; onChang
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           placeholder={temas.length === 0 ? 'Tambah tema...' : ''}
-          className="flex-1 min-w-[80px] outline-none text-sm bg-transparent placeholder:text-text-muted"
+          className="flex-1 min-w-[80px] outline-none text-xs bg-transparent placeholder:text-text-muted"
         />
       </div>
       {open && (filtered.length > 0 || (input.trim() && !temas.includes(input.trim()))) && (
         <div className="absolute z-50 mt-1 w-full bg-white border border-border rounded-md shadow-md max-h-40 overflow-y-auto">
           {filtered.map((s) => (
-            <button key={s} type="button" onMouseDown={() => addTema(s)} className="w-full text-left px-3 py-1.5 text-sm hover:bg-subtle">
+            <button key={s} type="button" onMouseDown={() => addTema(s)} className="w-full text-left px-3 py-1.5 text-xs hover:bg-subtle">
               {s}
             </button>
           ))}
           {input.trim() && !temas.includes(input.trim()) && !suggestions.includes(input.trim()) && (
-            <button type="button" onMouseDown={() => addTema(input)} className="w-full text-left px-3 py-1.5 text-sm hover:bg-subtle text-accent">
+            <button type="button" onMouseDown={() => addTema(input)} className="w-full text-left px-3 py-1.5 text-xs hover:bg-subtle text-accent">
               + Buat &quot;{input.trim()}&quot;
             </button>
           )}
@@ -174,6 +165,8 @@ function TemaSelect({ temas, onChange, workspaceId }: { temas: string[]; onChang
     </div>
   )
 }
+
+// ─── Info Tab ────────────────────────────────────────────────────────────────
 
 function InfoTab({ video }: { video: VideoWithSchedules }) {
   const queryClient = useQueryClient()
@@ -192,8 +185,6 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
     google_drive_link: video.google_drive_link ?? '',
     caption_default: video.caption_default ?? '',
   })
-
-
 
   function set(field: string, value: string) {
     setForm((f) => ({ ...f, [field]: value }))
@@ -227,54 +218,41 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
     }
   }
 
-  const STATUS_OPTIONS = ['ide', 'scripting', 'produksi', 'editing', 'scheduled', 'live', 'archived']
   const FORMAT_OPTIONS = ['Short Video', 'Long Video', 'Reels', 'Live']
   const isFoto = (video as any).content_type === 'foto'
 
   return (
     <div className="space-y-4">
-      <div className="space-y-1.5">
-        <Label className="text-xs text-text-muted">No. Video</Label>
-        <div className="flex items-center rounded-md border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
-          <span className="pl-3 pr-1 text-sm text-text-muted font-mono select-none">VID-</span>
-          <Input
-            type="text"
-            value={form.no_video}
-            onChange={(e) => set('no_video', e.target.value.replace(/\D/g, ''))}
-            placeholder="001"
-            className="border-0 shadow-none focus-visible:ring-0 pl-1 text-sm font-mono"
-          />
-        </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-xs text-text-muted">Judul</Label>
-        <Input value={form.judul} onChange={(e) => set('judul', e.target.value)} className="text-sm" />
-      </div>
-
-      <div className={isFoto ? '' : 'grid grid-cols-2 gap-4'}>
+      <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <Label className="text-xs text-text-muted">Status</Label>
-          <Select value={form.status} onValueChange={(v) => set('status', v)}>
-            <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {STATUS_OPTIONS.map((s) => (
-                <SelectItem key={s} value={s}>{STATUS_CONFIG[s as VideoStatus]?.label ?? s}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label className="text-xs text-text-muted">No. Video</Label>
+          <div className="flex items-center h-9 rounded-md border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
+            <span className="pl-3 pr-1 text-xs text-text-muted font-mono select-none">VID-</span>
+            <Input
+              type="text"
+              value={form.no_video}
+              onChange={(e) => set('no_video', e.target.value.replace(/\D/g, ''))}
+              placeholder="001"
+              className="border-0 shadow-none focus-visible:ring-0 pl-1 text-xs font-mono h-8"
+            />
+          </div>
         </div>
         {!isFoto && (
           <div className="space-y-1.5">
             <Label className="text-xs text-text-muted">Format</Label>
             <Select value={form.format} onValueChange={(v) => set('format', v)}>
-              <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {FORMAT_OPTIONS.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                {FORMAT_OPTIONS.map((f) => <SelectItem key={f} value={f} className="text-xs">{f}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
         )}
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs text-text-muted">Judul Konten</Label>
+        <Input value={form.judul} onChange={(e) => set('judul', e.target.value)} className="text-xs h-9" />
       </div>
 
       <div className="space-y-1.5">
@@ -285,60 +263,210 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
       {isFoto ? (
         <div className="space-y-1.5">
           <Label className="text-xs text-text-muted">Deadline Posting</Label>
-          <Input type="date" value={form.deadline_posting} onChange={(e) => set('deadline_posting', e.target.value)} className="text-sm" />
+          <Input type="date" value={form.deadline_posting} onChange={(e) => set('deadline_posting', e.target.value)} className="text-xs h-9" />
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label className="text-xs text-text-muted">Tanggal Shooting</Label>
-            <Input type="date" value={form.tanggal_shooting} onChange={(e) => set('tanggal_shooting', e.target.value)} className="text-sm" />
+            <Input type="date" value={form.tanggal_shooting} onChange={(e) => set('tanggal_shooting', e.target.value)} className="text-xs h-9" />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs text-text-muted">Deadline Posting</Label>
-            <Input type="date" value={form.deadline_posting} onChange={(e) => set('deadline_posting', e.target.value)} className="text-sm" />
+            <Input type="date" value={form.deadline_posting} onChange={(e) => set('deadline_posting', e.target.value)} className="text-xs h-9" />
           </div>
         </div>
       )}
 
-      {!isFoto && (
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs text-text-muted">Storage Bahan</Label>
-            <Input value={form.storage_bahan} onChange={(e) => set('storage_bahan', e.target.value)} placeholder="Link folder..." className="text-sm" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs text-text-muted">Storage Video</Label>
-            <Input value={form.storage_video} onChange={(e) => set('storage_video', e.target.value)} placeholder="Link folder..." className="text-sm" />
-          </div>
-        </div>
-      )}
-
-      <div className="space-y-1.5">
-        <Label className="text-xs text-text-muted">Google Drive</Label>
-        <Input value={form.google_drive_link} onChange={(e) => set('google_drive_link', e.target.value)} placeholder="https://drive.google.com/..." className="text-sm" />
-      </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-xs text-text-muted">Caption Default</Label>
-        <Textarea value={form.caption_default} onChange={(e) => set('caption_default', e.target.value)} rows={3} className="text-sm" />
-      </div>
-
-      <Button onClick={handleSave} disabled={saving} className="w-full gap-2">
-        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+      <Button onClick={handleSave} disabled={saving} className="w-full gap-2 h-9 text-xs mt-2 bg-accent hover:bg-accent/90">
+        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
         {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
       </Button>
     </div>
   )
 }
 
-// ─── Schedule Tab ─────────────────────────────────────────────────────────────
+// ─── Production Assets Panel (Drive Links & Caption) ─────────────────────────
 
-function ScheduleTab({ video }: { video: VideoWithSchedules }) {
+function ProductionAssets({ video }: { video: VideoWithSchedules }) {
+  const queryClient = useQueryClient()
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({
+    storage_bahan: video.storage_bahan ?? '',
+    storage_video: video.storage_video ?? '',
+    google_drive_link: video.google_drive_link ?? '',
+    caption_default: video.caption_default ?? '',
+  })
+
+  function set(field: string, value: string) {
+    setForm((f) => ({ ...f, [field]: value }))
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('videos')
+      .update({
+        storage_bahan: form.storage_bahan || null,
+        storage_video: form.storage_video || null,
+        google_drive_link: form.google_drive_link || null,
+        caption_default: form.caption_default || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', video.id)
+    setSaving(false)
+    if (error) {
+      toast.error(error.message)
+    } else {
+      toast.success('Aset produksi disimpan!')
+      queryClient.invalidateQueries({ queryKey: ['video-detail', video.id] })
+    }
+  }
+
+  const isFoto = (video as any).content_type === 'foto'
+
+  return (
+    <div className="space-y-4">
+      {!isFoto && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-text-muted">Folder Bahan</Label>
+            <Input value={form.storage_bahan} onChange={(e) => set('storage_bahan', e.target.value)} placeholder="Link folder..." className="text-xs h-9" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-text-muted">Folder Video</Label>
+            <Input value={form.storage_video} onChange={(e) => set('storage_video', e.target.value)} placeholder="Link folder..." className="text-xs h-9" />
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-1.5">
+        <Label className="text-xs text-text-muted">Google Drive Link</Label>
+        <Input value={form.google_drive_link} onChange={(e) => set('google_drive_link', e.target.value)} placeholder="https://drive.google.com/..." className="text-xs h-9" />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs text-text-muted">Caption Default</Label>
+        <Textarea value={form.caption_default} onChange={(e) => set('caption_default', e.target.value)} rows={3} className="text-xs resize-none" placeholder="Tulis caption default di sini..." />
+      </div>
+
+      <Button onClick={handleSave} disabled={saving} variant="secondary" className="w-full gap-2 h-9 text-xs">
+        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+        {saving ? 'Menyimpan...' : 'Simpan Aset'}
+      </Button>
+    </div>
+  )
+}
+
+// ─── Platform Performance Inline Form ────────────────────────────────────────
+
+function PlatformPerformanceForm({ 
+  platform, 
+  videoId, 
+  existingRecord, 
+  onSaveSuccess 
+}: { 
+  platform: Platform
+  videoId: string
+  existingRecord?: any
+  onSaveSuccess: () => void 
+}) {
+  const [views, setViews] = useState(existingRecord?.views?.toString() ?? '')
+  const [likes, setLikes] = useState(existingRecord?.likes?.toString() ?? '')
+  const [comments, setComments] = useState(existingRecord?.comments?.toString() ?? '')
+  const [shares, setShares] = useState(existingRecord?.shares?.toString() ?? '')
+  const [saves, setSaves] = useState(existingRecord?.saves?.toString() ?? '')
+  const [saving, setSaving] = useState(false)
+
+  async function handleSave() {
+    if (!views) {
+      toast.error('Views wajib diisi untuk menyimpan performa')
+      return
+    }
+    setSaving(true)
+    try {
+      const supabase = createClient()
+      const payload = {
+        video_id: videoId,
+        platform,
+        recorded_at: new Date().toISOString().split('T')[0],
+        views: Number(views) || 0,
+        likes: Number(likes) || 0,
+        comments: Number(comments) || 0,
+        shares: Number(shares) || 0,
+        saves: Number(saves) || 0,
+      }
+      const { error } = await supabase
+        .from('video_performance')
+        .upsert(payload, { onConflict: 'video_id,platform,recorded_at' })
+      if (error) throw error
+      toast.success('Metrik performa berhasil disimpan!')
+      onSaveSuccess()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal menyimpan performa')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const showSaves = platform === 'tiktok' || platform === 'instagram'
+
+  return (
+    <div className="mt-3 p-3 bg-accent-light/10 rounded-lg border border-accent/10 space-y-2">
+      <p className="text-[10px] font-bold text-accent uppercase tracking-wider">Update Metrik Performa</p>
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+        <div className="space-y-1">
+          <Label className="text-[9px] text-text-secondary">Views *</Label>
+          <Input type="number" value={views} onChange={(e) => setViews(e.target.value)} className="h-7 text-xs px-2" placeholder="0" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-[9px] text-text-secondary">Likes</Label>
+          <Input type="number" value={likes} onChange={(e) => setLikes(e.target.value)} className="h-7 text-xs px-2" placeholder="0" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-[9px] text-text-secondary">Comments</Label>
+          <Input type="number" value={comments} onChange={(e) => setComments(e.target.value)} className="h-7 text-xs px-2" placeholder="0" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-[9px] text-text-secondary">Shares</Label>
+          <Input type="number" value={shares} onChange={(e) => setShares(e.target.value)} className="h-7 text-xs px-2" placeholder="0" />
+        </div>
+        {showSaves && (
+          <div className="space-y-1">
+            <Label className="text-[9px] text-text-secondary">Saves</Label>
+            <Input type="number" value={saves} onChange={(e) => setSaves(e.target.value)} className="h-7 text-xs px-2" placeholder="0" />
+          </div>
+        )}
+      </div>
+      <Button size="sm" onClick={handleSave} disabled={saving} className="h-7 text-xs w-full bg-accent hover:bg-accent/90 mt-1">
+        {saving ? 'Menyimpan...' : 'Simpan Metrik Performa'}
+      </Button>
+    </div>
+  )
+}
+
+// ─── Distribution Tab ────────────────────────────────────────────────────────
+
+function DistributionTab({ 
+  video, 
+  activePlatform, 
+  setActivePlatform,
+  perfRecords,
+  refetchPerformance
+}: { 
+  video: VideoWithSchedules 
+  activePlatform: Platform
+  setActivePlatform: (p: Platform) => void
+  perfRecords: any[]
+  refetchPerformance: () => void
+}) {
   const queryClient = useQueryClient()
   const { workspaceId } = useWorkspace()
   const [adding, setAdding] = useState<Platform | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '' })
+  const [urlPostInputs, setUrlPostInputs] = useState<Record<string, string>>({})
 
   const { data: schedules } = useQuery({
     queryKey: ['schedules-video', video.id],
@@ -413,8 +541,6 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
     queryClient.invalidateQueries({ queryKey: ['schedules'] })
   }
 
-  const [urlPostInputs, setUrlPostInputs] = useState<Record<string, string>>({})
-
   async function markPosted(id: string, url: string) {
     const trimmed = url.trim()
     if (!trimmed) return
@@ -427,7 +553,7 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
     if (error) { toast.error('Gagal menyimpan: ' + error.message); return }
     queryClient.invalidateQueries({ queryKey: ['schedules-video', video.id] })
     queryClient.invalidateQueries({ queryKey: ['schedules'] })
-    toast.success('Status diupdate!')
+    toast.success('Jadwal ditandai telah tayang!')
   }
 
   return (
@@ -435,26 +561,36 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
       {PLATFORMS.map((platform) => {
         const platformSchedules = (schedules ?? []).filter((s: { platform: string }) => s.platform === platform)
         const platformAccounts = (socialAccounts ?? []).filter((a: { platform: string }) => a.platform === platform)
+        const isSelected = activePlatform === platform
+        const platformPerf = perfRecords.find((p) => p.platform === platform)
 
         return (
-          <div key={platform} className="border border-border rounded-lg overflow-hidden">
+          <div 
+            key={platform} 
+            className={cn(
+              "border rounded-lg overflow-hidden transition-all duration-200 cursor-pointer",
+              isSelected ? "border-accent shadow-sm ring-1 ring-accent/20 bg-white" : "border-border hover:border-text-muted/45 bg-white"
+            )}
+            onClick={() => setActivePlatform(platform)}
+          >
             <div className="flex items-center justify-between px-3 py-2 bg-surface border-b border-border">
               <div className="flex items-center gap-2">
                 <div className={cn('w-2.5 h-2.5 rounded-full', getPlatformDot(platform))} />
-                <span className="text-sm font-semibold text-text-primary">{PLATFORM_LABELS[platform]}</span>
+                <span className="text-xs font-semibold text-text-primary">{PLATFORM_LABELS[platform]}</span>
               </div>
               {platformSchedules.length === 0 && (
-                <Button size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={() => {
+                <Button size="sm" variant="secondary" className="h-6 text-[10px] gap-1" onClick={(e) => {
+                  e.stopPropagation()
                   if (platform === adding) { setAdding(null); setEditingId(null) }
                   else { setAdding(platform); setEditingId(null); setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '' }) }
                 }}>
-                  <Plus className="w-3 h-3" /> Jadwal
+                  <Plus className="w-2.5 h-2.5" /> Jadwal
                 </Button>
               )}
             </div>
 
             {adding === platform && (
-              <div className="p-3 bg-accent-light/30 border-b border-border space-y-2">
+              <div className="p-3 bg-accent-light/10 border-b border-border space-y-2" onClick={(e) => e.stopPropagation()}>
                 {platformAccounts.length > 0 && (
                   <div>
                     <Label className="text-xs">Akun</Label>
@@ -485,13 +621,13 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
                   <Textarea className="mt-1 text-xs" rows={2} placeholder="Kosongkan untuk pakai caption default" value={form.caption_override} onChange={(e) => setForm((f) => ({ ...f, caption_override: e.target.value }))} />
                 </div>
                 <div className="flex gap-2">
-                  <Button size="sm" className="flex-1 h-8 text-xs" onClick={() => addSchedule(platform)}>{editingId ? 'Update Jadwal' : 'Simpan Jadwal'}</Button>
+                  <Button size="sm" className="flex-1 h-8 text-xs bg-accent hover:bg-accent/90" onClick={() => addSchedule(platform)}>{editingId ? 'Update Jadwal' : 'Simpan Jadwal'}</Button>
                   <Button size="sm" variant="secondary" className="h-8 text-xs" onClick={() => { setAdding(null); setEditingId(null); setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '' }) }}>Batal</Button>
                 </div>
               </div>
             )}
 
-            <div className="divide-y divide-border">
+            <div className="divide-y divide-border" onClick={(e) => e.stopPropagation()}>
               {platformSchedules.length === 0 && adding !== platform && (
                 <p className="px-3 py-3 text-xs text-text-muted">Belum ada jadwal</p>
               )}
@@ -500,36 +636,49 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
                 url_post?: string; social_account_id?: string | null; caption_override?: string | null
                 social_accounts?: { handle: string } | null
               }) => (
-                <div key={s.id} className="px-3 py-2.5 space-y-1">
+                <div key={s.id} className="px-3 py-2.5 space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-medium text-text-primary">
+                    <p className="text-xs font-semibold text-text-primary">
                       📅 {s.tanggal_tayang}{s.jam_post ? ` · 🕐 ${s.jam_post.slice(0, 5)}` : ''}
                     </p>
                     <div className="flex items-center gap-1.5">
-                      <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full font-medium',
+                      <span className={cn('text-[9px] px-1.5 py-0.5 rounded-full font-medium',
                         s.status === 'posted' ? 'bg-green-100 text-success' : s.status === 'failed' ? 'bg-red-100 text-error' : 'bg-accent-light text-accent')}>
                         {s.status === 'posted' ? 'Tayang' : s.status === 'failed' ? 'Gagal' : 'Terjadwal'}
                       </span>
-                      <button onClick={() => startEdit(s)} className="text-[11px] text-accent hover:underline">Edit</button>
-                      <button onClick={() => deleteSchedule(s.id)} className="text-[11px] text-error hover:underline">Hapus</button>
+                      <button onClick={() => startEdit(s)} className="text-[10px] text-accent hover:underline">Edit</button>
+                      <button onClick={() => deleteSchedule(s.id)} className="text-[10px] text-error hover:underline">Hapus</button>
                     </div>
                   </div>
-                  {s.social_accounts && <p className="text-[11px] text-text-muted">@{s.social_accounts.handle}</p>}
-                  {s.url_post
-                    ? <a href={s.url_post} target="_blank" rel="noopener noreferrer" className="text-[11px] text-accent flex items-center gap-1"><ExternalLink className="w-3 h-3" />Lihat postingan</a>
-                    : s.status !== 'posted' && (
-                      <div className="flex gap-1.5 mt-1">
-                        <Input
-                          type="url"
-                          placeholder="URL post (setelah tayang)"
-                          className="h-7 text-xs flex-1"
-                          value={urlPostInputs[s.id] ?? ''}
-                          onChange={(e) => setUrlPostInputs((prev) => ({ ...prev, [s.id]: e.target.value }))}
-                          onKeyDown={(e) => { if (e.key === 'Enter') markPosted(s.id, urlPostInputs[s.id] ?? '') }}
-                        />
-                        <Button size="sm" className="h-7 text-xs" onClick={() => markPosted(s.id, urlPostInputs[s.id] ?? '')}>Simpan</Button>
-                      </div>
-                    )}
+                  {s.social_accounts && <p className="text-[10px] text-text-muted mt-0.5">@{s.social_accounts.handle}</p>}
+                  
+                  {s.url_post ? (
+                    <div className="space-y-2">
+                      <a href={s.url_post} target="_blank" rel="noopener noreferrer" className="text-[10px] text-accent flex items-center gap-1 hover:underline">
+                        <ExternalLink className="w-3 h-3" /> Lihat postingan
+                      </a>
+                      
+                      {/* Integrated Performance Form */}
+                      <PlatformPerformanceForm
+                        platform={platform}
+                        videoId={video.id}
+                        existingRecord={platformPerf}
+                        onSaveSuccess={refetchPerformance}
+                      />
+                    </div>
+                  ) : s.status !== 'posted' && (
+                    <div className="flex gap-1.5 mt-1">
+                      <Input
+                        type="url"
+                        placeholder="URL post (setelah tayang)"
+                        className="h-7 text-xs flex-1"
+                        value={urlPostInputs[s.id] ?? ''}
+                        onChange={(e) => setUrlPostInputs((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === 'Enter') markPosted(s.id, urlPostInputs[s.id] ?? '') }}
+                      />
+                      <Button size="sm" className="h-7 text-xs bg-accent hover:bg-accent/90" onClick={() => markPosted(s.id, urlPostInputs[s.id] ?? '')}>Tayang</Button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -552,7 +701,7 @@ function ScriptTab({ video }: { video: VideoWithSchedules }) {
       .update({ script_blocks: blocks, updated_at: new Date().toISOString() })
       .eq('id', video.id)
     if (error) toast.error(error.message)
-    else queryClient.invalidateQueries({ queryKey: ['video', video.id] })
+    else queryClient.invalidateQueries({ queryKey: ['video-detail', video.id] })
   }
 
   return (
@@ -610,106 +759,97 @@ function ChecklistSection({ title, table, videoId }: {
   const done = items.filter((i: { completed: boolean }) => i.completed).length
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <h4 className="text-sm font-semibold text-text-primary">{title}</h4>
-        <span className="text-xs text-text-muted">{done}/{items.length}</span>
+    <div className="border border-border rounded-lg overflow-hidden bg-white shadow-sm">
+      <div className="flex items-center justify-between px-3 py-2 bg-surface border-b border-border">
+        <h4 className="text-xs font-semibold text-text-primary">{title}</h4>
+        <span className="text-[10px] text-text-muted font-medium">{done}/{items.length} selesai</span>
       </div>
-      <div className="border border-border rounded-lg divide-y divide-border overflow-hidden">
+      <div className="divide-y divide-border">
         {items.map((item: { id: string; title: string; completed: boolean }) => (
-          <div key={item.id} className="flex items-center gap-2 px-3 py-2 hover:bg-surface group">
+          <div key={item.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-subtle group">
             <button
               onClick={() => toggle(item.id, item.completed)}
-              className={cn('w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors',
+              className={cn('w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-colors',
                 item.completed ? 'bg-success border-success' : 'border-border hover:border-accent')}
             >
               {item.completed && <Check className="w-2.5 h-2.5 text-white" />}
             </button>
-            <span className={cn('flex-1 text-sm', item.completed && 'line-through text-text-muted')}>{item.title}</span>
-            <button onClick={() => deleteItem(item.id)} className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-error transition-all">
-              <Trash2 className="w-3.5 h-3.5" />
+            <span className={cn('flex-1 text-xs', item.completed && 'line-through text-text-muted')}>{item.title}</span>
+            <button onClick={() => deleteItem(item.id)} className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-error transition-all p-0.5">
+              <Trash2 className="w-3 h-3" />
             </button>
           </div>
         ))}
-        <div className="flex items-center gap-2 px-3 py-2">
-          <Input
+        <div className="flex items-center gap-2 px-3 py-1 bg-subtle/40">
+          <input
             placeholder="Tambah item..."
             value={newItem}
             onChange={(e) => setNewItem(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addItem()}
-            className="h-7 text-sm border-0 shadow-none px-0 focus:ring-0"
+            className="flex-1 bg-transparent border-0 outline-none text-xs h-7 placeholder:text-text-muted/60"
           />
-          <Button size="sm" variant="ghost" onClick={addItem} disabled={!newItem.trim() || adding} className="h-7 w-7 p-0">
-            {adding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-          </Button>
+          <button onClick={addItem} disabled={!newItem.trim() || adding} className="h-5 w-5 rounded hover:bg-subtle flex items-center justify-center text-text-muted">
+            <Plus className="w-3 h-3" />
+          </button>
         </div>
       </div>
     </div>
   )
 }
 
-// ─── Performance Tab ──────────────────────────────────────────────────────────
+// ─── Preview Card Visualizer ──────────────────────────────────────────────────
 
-function PerformanceTab({ video }: { video: VideoWithSchedules }) {
-  const { data: perf, isLoading } = useQuery({
-    queryKey: ['performance', video.id],
-    queryFn: async () => {
-      const supabase = createClient()
-      const { data } = await supabase.from('video_performance').select('*').eq('video_id', video.id).order('recorded_at', { ascending: false })
-      return data ?? []
-    },
-  })
+function PreviewCard({ platform, data, video }: { platform: Platform; data: any; video: any }) {
+  const views = Number(data?.views ?? 0)
+  const likes = Number(data?.likes ?? 0)
+  const comments = Number(data?.comments ?? 0)
+  const shares = Number(data?.shares ?? 0)
+  const saves = Number(data?.saves ?? 0)
 
-  if (isLoading) return <Skeleton className="h-32 w-full" />
-  if (!perf || perf.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-text-muted text-sm">Belum ada data performa.</p>
-        <p className="text-xs text-text-muted mt-1">Input data di halaman Performa →</p>
-        <Button variant="secondary" size="sm" className="mt-4" disabled>Generate PDF Report</Button>
-      </div>
-    )
-  }
-
-  const byPlatform = PLATFORMS.map((p) => ({
-    platform: p,
-    data: perf.filter((d: { platform: string }) => d.platform === p)[0] ?? null,
-  }))
+  const showSaves = platform === 'tiktok' || platform === 'instagram'
 
   return (
-    <div className="space-y-4">
-      {byPlatform.filter((bp) => bp.data).map(({ platform, data: d }) => (
-        <div key={platform} className="border border-border rounded-lg overflow-hidden">
-          <div className="flex items-center gap-2 px-3 py-2 bg-surface border-b border-border">
-            <div className={cn('w-2.5 h-2.5 rounded-full', getPlatformDot(platform))} />
-            <span className="text-sm font-semibold">{PLATFORM_LABELS[platform]}</span>
-            {d && <span className="text-xs text-text-muted ml-auto">{d.recorded_at}</span>}
-          </div>
-          {d && (
-            <div className="grid grid-cols-3 divide-x divide-border">
-              {[
-                { label: 'Views', value: d.views },
-                { label: 'Likes', value: d.likes },
-                { label: 'Comments', value: d.comments },
-              ].map(({ label, value }) => (
-                <div key={label} className="p-3 text-center">
-                  <p className="font-heading text-lg font-bold text-text-primary">{formatNumber(value ?? 0)}</p>
-                  <p className="text-[11px] text-text-muted">{label}</p>
-                </div>
-              ))}
-            </div>
+    <div className="border border-border rounded-xl overflow-hidden bg-white shadow-sm">
+      <div className="h-1 bg-accent" />
+      <div className="p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <span className={cn('text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider', getPlatformBadge(platform))}>
+            {PLATFORM_LABELS[platform]}
+          </span>
+          <span className="text-[10px] text-text-muted">Live Preview Card</span>
+        </div>
+        <div className="aspect-video bg-subtle rounded-lg overflow-hidden flex items-center justify-center border border-border/20">
+          {video?.thumbnail_url ? (
+            <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <Video className="w-8 h-8 text-border" />
           )}
         </div>
-      ))}
-      <Button variant="secondary" className="w-full" disabled>
-        <FileText className="w-4 h-4 mr-2" />
-        Generate PDF Report (Sesi berikutnya)
-      </Button>
+        <p className="font-heading font-bold text-text-primary text-xs line-clamp-2 leading-snug">{video?.judul}</p>
+        <div className="grid grid-cols-4 gap-1 pt-2.5 border-t border-border/40 text-center">
+          <div>
+            <p className="font-heading font-bold text-text-primary text-[11px]">{formatNumber(views)}</p>
+            <p className="text-[8px] text-text-muted uppercase">Views</p>
+          </div>
+          <div>
+            <p className="font-heading font-bold text-text-primary text-[11px]">{formatNumber(likes)}</p>
+            <p className="text-[8px] text-text-muted uppercase">Likes</p>
+          </div>
+          <div>
+            <p className="font-heading font-bold text-text-primary text-[11px]">{formatNumber(comments)}</p>
+            <p className="text-[8px] text-text-muted uppercase">Komentar</p>
+          </div>
+          <div>
+            <p className="font-heading font-bold text-text-primary text-[11px]">{formatNumber(showSaves ? saves : shares)}</p>
+            <p className="text-[8px] text-text-muted uppercase">{showSaves ? 'Saves' : 'Shares'}</p>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Main Content Detail Page ──────────────────────────────────────────────────
 
 export default function ContentDetailPage() {
   const router = useRouter()
@@ -717,8 +857,10 @@ export default function ContentDetailPage() {
   const id = params?.id ?? ''
   const queryClient = useQueryClient()
 
-  const [isEditingTitle, setIsEditingTitle] = useState(false)
-  const [titleValue, setTitleValue] = useState('')
+  const [activePlatform, setActivePlatform] = useState<Platform>('tiktok')
+  const [platformData, setPlatformData] = useState<Record<Platform, any>>({ tiktok: {}, instagram: {}, youtube: {}, facebook: {} })
+  const [exporting, setExporting] = useState(false)
+  const [exportProgress, setExportProgress] = useState(0)
 
   const { data: video, isLoading } = useQuery<VideoWithSchedules>({
     queryKey: ['video-detail', id],
@@ -733,36 +875,78 @@ export default function ContentDetailPage() {
       if (error) throw error
       return data as unknown as VideoWithSchedules
     },
+    staleTime: 0,
+    refetchOnMount: 'always',
+  })
+
+  // Get Video Performance Records
+  const { data: perfRecords = [], refetch: refetchPerformance } = useQuery({
+    queryKey: ['performance', id],
+    enabled: !!id,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('video_performance')
+        .select('*')
+        .eq('video_id', id)
+        .order('recorded_at', { ascending: false })
+      return data ?? []
+    },
   })
 
   useEffect(() => {
-    if (video?.judul) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setTitleValue(video.judul)
+    if (perfRecords) {
+      const map: Record<Platform, any> = { tiktok: {}, instagram: {}, youtube: {}, facebook: {} }
+      perfRecords.forEach((d: any) => {
+        const p = d.platform as Platform
+        map[p] = d
+      })
+      setPlatformData(map)
     }
-  }, [video?.judul])
+  }, [perfRecords])
 
-  async function handleTitleSave() {
-    setIsEditingTitle(false)
-    if (video && titleValue.trim() && titleValue !== video.judul) {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from('videos')
-        .update({ judul: titleValue.trim(), updated_at: new Date().toISOString() })
-        .eq('id', video.id)
-      
-      if (error) {
-        toast.error(error.message)
-      } else {
-        toast.success('Judul berhasil diubah!')
-        queryClient.invalidateQueries({ queryKey: ['videos'] })
-        queryClient.invalidateQueries({ queryKey: ['video-detail', video.id] })
-      }
+  async function handleStatusChange(newStatus: VideoStatus) {
+    if (!video) return
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('videos')
+      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .eq('id', video.id)
+    
+    if (error) {
+      toast.error(error.message)
+    } else {
+      toast.success(`Status diubah ke ${STATUS_CONFIG[newStatus]?.label ?? newStatus}`)
+      queryClient.invalidateQueries({ queryKey: ['videos'] })
+      queryClient.invalidateQueries({ queryKey: ['video-detail', video.id] })
+    }
+  }
+
+  async function handleExportAll() {
+    setExporting(true)
+    try {
+      const { pdf } = await import('@react-pdf/renderer')
+      const { VideoReportPDF } = await import('@/components/pdf/VideoReportPDF')
+      const { createElement } = await import('react')
+      setExportProgress(25)
+
+      const doc = createElement(VideoReportPDF, { video, platformData } as any)
+      setExportProgress(60)
+      const blob = await pdf(doc as any).toBlob()
+      setExportProgress(100)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a'); a.href = url; a.download = `report-${video?.judul?.slice(0, 30) ?? 'video'}.pdf`; a.click()
+      URL.revokeObjectURL(url)
+      toast.success('PDF berhasil di-download!')
+    } catch (err) {
+      toast.error('Gagal generate PDF')
+    } finally {
+      setExporting(false); setExportProgress(0)
     }
   }
 
   if (isLoading) return (
-    <div className="max-w-4xl mx-auto px-6 py-6 space-y-4">
+    <div className="max-w-6xl mx-auto px-6 py-6 space-y-4">
       <Skeleton className="h-8 w-48" />
       <Skeleton className="h-6 w-64" />
       <Skeleton className="h-10 w-full" />
@@ -771,7 +955,7 @@ export default function ContentDetailPage() {
   )
 
   if (!video) return (
-    <div className="max-w-4xl mx-auto px-6 py-6 text-center">
+    <div className="max-w-6xl mx-auto px-6 py-6 text-center">
       <p className="text-text-muted">Video tidak ditemukan.</p>
       <Button variant="secondary" size="sm" className="mt-4" onClick={() => router.back()}>
         ← Kembali
@@ -779,88 +963,117 @@ export default function ContentDetailPage() {
     </div>
   )
 
+  const totalViews = Object.values(platformData).reduce((sum, d: any) => sum + (Number(d?.views) || 0), 0)
+  const totalLikes = Object.values(platformData).reduce((sum, d: any) => sum + (Number(d?.likes) || 0), 0)
+  const totalComments = Object.values(platformData).reduce((sum, d: any) => sum + (Number(d?.comments) || 0), 0)
+
   return (
-    <div className="max-w-4xl mx-auto px-6 py-6">
-      {/* Header */}
-      <div className="mb-6">
-        <button
-          onClick={() => router.back()}
-          className="flex items-center gap-1.5 text-sm text-text-muted hover:text-text-primary transition-colors mb-3"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Kembali
-        </button>
-        <div className="flex items-start gap-3">
-          <div className="flex-1 min-w-0">
-            {isEditingTitle ? (
-              <Input
-                value={titleValue}
-                onChange={(e) => setTitleValue(e.target.value)}
-                onBlur={handleTitleSave}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleTitleSave()
-                  if (e.key === 'Escape') {
-                    setTitleValue(video.judul ?? '')
-                    setIsEditingTitle(false)
-                  }
-                }}
-                autoFocus
-                className="font-heading font-bold text-2xl text-text-primary leading-snug h-10 w-full px-2"
-              />
-            ) : (
-              <h1
-                onClick={() => setIsEditingTitle(true)}
-                className="font-heading font-bold text-2xl text-text-primary leading-snug hover:bg-subtle px-2 py-1 -ml-2 rounded cursor-pointer transition-colors"
-                title="Klik untuk edit judul"
-              >
-                {video.judul || <span className="text-text-muted italic">Ketik judul...</span>}
-              </h1>
-            )}
-            <div className="mt-2 flex items-center gap-2 flex-wrap">
-              <span className={cn('inline-flex text-xs px-2.5 py-0.5 rounded-full border font-medium', getStatusBadgeClass(video.status as VideoStatus))}>
-                {STATUS_CONFIG[video.status as VideoStatus]?.label ?? video.status}
+    <div className="max-w-6xl mx-auto px-6 py-6 font-sans">
+      {/* Top Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+        <div>
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors mb-2"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Kembali ke Daftar Konten
+          </button>
+          <h1 className="font-heading font-bold text-xl text-text-primary leading-tight">
+            {video.judul || <span className="text-text-muted italic">Ketik judul...</span>}
+          </h1>
+          <div className="mt-1 flex items-center gap-2 flex-wrap">
+            <span className={cn('inline-flex text-[10px] px-2 py-0.5 rounded-full border font-medium uppercase tracking-wider', getStatusBadgeClass(video.status as VideoStatus))}>
+              {STATUS_CONFIG[video.status as VideoStatus]?.label ?? video.status}
+            </span>
+            {video.format && (
+              <span className="text-[10px] text-text-muted bg-surface px-2 py-0.5 rounded-full border border-border font-medium">
+                {video.format}
               </span>
-              {video.format && (
-                <span className="text-xs text-text-muted bg-surface px-2 py-0.5 rounded-full border border-border">
-                  {video.format}
-                </span>
-              )}
+            )}
+          </div>
+        </div>
+
+        {/* Dashboard KPI Mini Summary Card */}
+        {totalViews > 0 && (
+          <div className="flex items-center gap-4 bg-emerald-50/70 border border-emerald-100 rounded-xl px-4 py-2.5 shadow-sm shrink-0">
+            <div className="text-center">
+              <p className="font-heading font-bold text-emerald-800 text-sm">{formatNumber(totalViews)}</p>
+              <p className="text-[9px] text-emerald-600 font-bold uppercase tracking-wider">Views</p>
             </div>
+            <div className="w-px h-6 bg-emerald-200/60" />
+            <div className="text-center">
+              <p className="font-heading font-bold text-emerald-800 text-sm">{formatNumber(totalLikes)}</p>
+              <p className="text-[9px] text-emerald-600 font-bold uppercase tracking-wider">Likes</p>
+            </div>
+            <div className="w-px h-6 bg-emerald-200/60" />
+            <div className="text-center">
+              <p className="font-heading font-bold text-emerald-800 text-sm">{formatNumber(totalComments)}</p>
+              <p className="text-[9px] text-emerald-600 font-bold uppercase tracking-wider">Comments</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Stepper Status */}
+      <StatusStepper currentStatus={video.status as VideoStatus} onStatusChange={handleStatusChange} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
+        {/* Kolom Kiri: Detail Perencanaan & Editor Script */}
+        <div className="space-y-6">
+          <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
+            <h3 className="font-heading font-semibold text-text-primary text-sm border-b border-border pb-2.5 mb-4">Detail Perencanaan</h3>
+            <InfoTab key={video.id} video={video} />
+          </div>
+          <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
+            <h3 className="font-heading font-semibold text-text-primary text-sm border-b border-border pb-2.5 mb-2">Editor Script</h3>
+            <ScriptTab video={video} />
+          </div>
+        </div>
+
+        {/* Kolom Kanan: Distribusi, Preview, Aset, Checklist & Laporan */}
+        <div className="space-y-6">
+          <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
+            <h3 className="font-heading font-semibold text-text-primary text-sm border-b border-border pb-2.5 mb-4">Saluran Distribusi (Platform)</h3>
+            <DistributionTab 
+              video={video} 
+              activePlatform={activePlatform} 
+              setActivePlatform={setActivePlatform} 
+              perfRecords={perfRecords}
+              refetchPerformance={refetchPerformance}
+            />
+          </div>
+
+          <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
+            <h3 className="font-heading font-semibold text-text-primary text-sm border-b border-border pb-2.5 mb-4 font-sans flex items-center gap-1.5">
+              <span>Preview:</span>
+              <span className="text-accent capitalize">{activePlatform}</span>
+            </h3>
+            <PreviewCard platform={activePlatform} data={platformData[activePlatform] ?? {}} video={video} />
+          </div>
+
+          <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
+            <h3 className="font-heading font-semibold text-text-primary text-sm border-b border-border pb-2.5 mb-4">Aset Produksi</h3>
+            <ProductionAssets video={video} />
+          </div>
+
+          <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
+            <h3 className="font-heading font-semibold text-text-primary text-sm border-b border-border pb-2.5 mb-4">Checklist</h3>
+            <div className="space-y-4">
+              <ChecklistSection title="Shooting Checklist" table="shooting_checklists" videoId={video.id} />
+              <ChecklistSection title="Editing Checklist" table="editing_checklists" videoId={video.id} />
+            </div>
+          </div>
+
+          <div className="bg-white border border-border rounded-xl p-5 shadow-sm space-y-3">
+            <h3 className="font-heading font-semibold text-text-primary text-sm border-b border-border pb-2.5 mb-3">Laporan Video</h3>
+            <Button variant="secondary" className="w-full gap-2 h-9 text-xs font-semibold" onClick={handleExportAll} disabled={exporting}>
+              {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+              Unduh Laporan 4 Platform (PDF)
+            </Button>
           </div>
         </div>
       </div>
-
-      {/* Tabs */}
-      <Tabs defaultValue="info">
-        <TabsList className="w-full justify-start overflow-x-auto rounded-lg mb-6">
-          <TabsTrigger value="info" className="text-sm">Info</TabsTrigger>
-          <TabsTrigger value="jadwal" className="text-sm">Jadwal Platform</TabsTrigger>
-          {(video as any).content_type !== 'foto' && <TabsTrigger value="script" className="text-sm">Script</TabsTrigger>}
-          <TabsTrigger value="checklist" className="text-sm">Checklist</TabsTrigger>
-          <TabsTrigger value="performa" className="text-sm">Performa</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="info" className="mt-0">
-          <InfoTab key={video.id} video={video} />
-        </TabsContent>
-        <TabsContent value="jadwal" className="mt-0">
-          <ScheduleTab video={video} />
-        </TabsContent>
-        {(video as any).content_type !== 'foto' && (
-          <TabsContent value="script" className="mt-0">
-            <ScriptTab video={video} />
-          </TabsContent>
-        )}
-        <TabsContent value="checklist" className="mt-0">
-          <div className="space-y-6">
-            <ChecklistSection title="Shooting Checklist" table="shooting_checklists" videoId={video.id} />
-            <ChecklistSection title="Editing Checklist" table="editing_checklists" videoId={video.id} />
-          </div>
-        </TabsContent>
-        <TabsContent value="performa" className="mt-0">
-          <PerformanceTab video={video} />
-        </TabsContent>
-      </Tabs>
     </div>
   )
 }

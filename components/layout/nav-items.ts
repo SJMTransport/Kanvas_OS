@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, CalendarDays, Video, BarChart2,
+  LayoutDashboard, CalendarDays, Video,
   Handshake, Image, Settings, Lightbulb, type LucideIcon
 } from 'lucide-react'
 
@@ -20,7 +20,6 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Video Banking', href: '/content' },
     ],
   },
-  { label: 'Performa', href: '/performance', icon: BarChart2 },
   {
     label: 'Incubator',
     icon: Lightbulb,
