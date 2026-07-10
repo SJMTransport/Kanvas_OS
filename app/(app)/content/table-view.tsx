@@ -91,10 +91,14 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, activ
       </td>
       <td className="px-3 py-2.5 text-xs">
         {video.no_video ? (
-          <span className="font-semibold text-text-primary font-mono">{video.no_video}</span>
+          <span className={cn("font-mono", video.no_video === 'VID-000' ? "text-text-muted/60" : "font-semibold text-text-primary")}>
+            {video.no_video}
+          </span>
         ) : (
           <span className="text-text-muted/60 font-mono">
-            VID-{String(page * pageSize + index + 1).padStart(3, '0')}
+            {video.status === 'scheduled' || video.status === 'live'
+              ? `VID-${String(page * pageSize + index + 1).padStart(3, '0')}`
+              : 'VID-000'}
           </span>
         )}
       </td>
