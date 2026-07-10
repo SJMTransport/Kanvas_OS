@@ -194,6 +194,23 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
     caption_default: video.caption_default ?? '',
   })
 
+  useEffect(() => {
+    setForm({
+      no_upload: video.no_upload != null ? String(video.no_upload) : '',
+      no_video: video.no_video ?? '',
+      judul: video.judul ?? '',
+      status: video.status ?? '',
+      format: video.format ?? '',
+      tanggal_shooting: video.tanggal_shooting ?? '',
+      deadline_posting: video.deadline_posting ?? '',
+      storage_bahan: video.storage_bahan ?? '',
+      storage_video: video.storage_video ?? '',
+      google_drive_link: video.google_drive_link ?? '',
+      caption_default: video.caption_default ?? '',
+    })
+    setTemas(video.temas ?? (video.tema ? [video.tema] : []))
+  }, [video])
+
   function set(field: string, value: string) {
     setForm((f) => ({ ...f, [field]: value }))
   }
@@ -723,6 +740,10 @@ export default function ContentDetailPage() {
   const router = useRouter()
   const params = useParams<{ id: string }>()
   const id = params?.id ?? ''
+  const queryClient = useQueryClient()
+
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [titleValue, setTitleValue] = useState('')
 
   const { data: video, isLoading } = useQuery<VideoWithSchedules>({
     queryKey: ['video-detail', id],
@@ -738,6 +759,31 @@ export default function ContentDetailPage() {
       return data as unknown as VideoWithSchedules
     },
   })
+
+  useEffect(() => {
+    if (video?.judul) {
+      setTitleValue(video.judul)
+    }
+  }, [video?.judul])
+
+  async function handleTitleSave() {
+    setIsEditingTitle(false)
+    if (video && titleValue.trim() && titleValue !== video.judul) {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('videos')
+        .update({ judul: titleValue.trim(), updated_at: new Date().toISOString() })
+        .eq('id', video.id)
+      
+      if (error) {
+        toast.error(error.message)
+      } else {
+        toast.success('Judul berhasil diubah!')
+        queryClient.invalidateQueries({ queryKey: ['videos'] })
+        queryClient.invalidateQueries({ queryKey: ['video-detail', video.id] })
+      }
+    }
+  }
 
   if (isLoading) return (
     <div className="max-w-4xl mx-auto px-6 py-6 space-y-4">
@@ -770,7 +816,30 @@ export default function ContentDetailPage() {
         </button>
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
-            <h1 className="font-heading font-bold text-2xl text-text-primary leading-snug">{video.judul}</h1>
+            {isEditingTitle ? (
+              <Input
+                value={titleValue}
+                onChange={(e) => setTitleValue(e.target.value)}
+                onBlur={handleTitleSave}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleTitleSave()
+                  if (e.key === 'Escape') {
+                    setTitleValue(video.judul ?? '')
+                    setIsEditingTitle(false)
+                  }
+                }}
+                autoFocus
+                className="font-heading font-bold text-2xl text-text-primary leading-snug h-10 w-full px-2"
+              />
+            ) : (
+              <h1
+                onClick={() => setIsEditingTitle(true)}
+                className="font-heading font-bold text-2xl text-text-primary leading-snug hover:bg-subtle px-2 py-1 -ml-2 rounded cursor-pointer transition-colors"
+                title="Klik untuk edit judul"
+              >
+                {video.judul || <span className="text-text-muted italic">Ketik judul...</span>}
+              </h1>
+            )}
             <div className="mt-2 flex items-center gap-2 flex-wrap">
               <span className={cn('inline-flex text-xs px-2.5 py-0.5 rounded-full border font-medium', getStatusBadgeClass(video.status as VideoStatus))}>
                 {STATUS_CONFIG[video.status as VideoStatus]?.label ?? video.status}
