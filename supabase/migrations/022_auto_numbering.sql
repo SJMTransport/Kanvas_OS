@@ -28,6 +28,7 @@ CREATE TRIGGER trigger_auto_assign_no_upload
   EXECUTE FUNCTION public.auto_assign_no_upload();
 
 -- Stored procedure to calibrate/re-sequence all progressive videos in a workspace
+-- Numbering starts from 1 starting from the BOTTOM-most video (highest sort_order DESC)
 CREATE OR REPLACE FUNCTION public.calibrate_workspace_videos(ws_id UUID)
 RETURNS VOID AS $$
 DECLARE
@@ -37,12 +38,12 @@ BEGIN
   -- Disable the trigger temporarily to prevent it from interfering with manual calibration values
   ALTER TABLE public.videos DISABLE TRIGGER trigger_auto_assign_no_upload;
 
-  -- Renumber all non-ide videos in order of created_at
+  -- Renumber all non-ide videos in order of sort_order DESC (from the bottom up)
   FOR v_rec IN 
     SELECT id 
     FROM public.videos 
     WHERE workspace_id = ws_id AND status != 'ide' 
-    ORDER BY created_at ASC
+    ORDER BY sort_order DESC NULLS LAST, created_at DESC
   LOOP
     UPDATE public.videos 
     SET no_video = 'VID-' || LPAD(v_counter::text, 3, '0') 

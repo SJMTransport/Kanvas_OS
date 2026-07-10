@@ -12,9 +12,10 @@ import { AddVideoSheet } from './add-video-sheet'
 import { ImportExcelDialog } from './import-excel-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { LayoutList, Columns, Search, Upload, Plus, X, ChevronDown } from 'lucide-react'
+import { LayoutList, Columns, Search, Upload, Plus, X, ChevronDown, ListOrdered, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { STATUS_ORDER, STATUS_CONFIG } from '@/lib/utils/status'
+import { toast } from 'sonner'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -51,6 +52,26 @@ export default function ContentPage() {
   const [contentTypeFilter, setContentTypeFilter] = useState<ContentType[] | 'all'>('all')
   const [addOpen, setAddOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [numberingSaving, setNumberingSaving] = useState(false)
+
+  async function handleNumbering() {
+    if (!workspaceId) return
+    if (!confirm('Apakah Anda yakin ingin mengurutkan nomor video (VID-XXX) mulai dari 1 dari baris paling bawah ke atas?')) return
+    
+    setNumberingSaving(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.rpc('calibrate_workspace_videos', { ws_id: workspaceId })
+      if (error) throw error
+      toast.success('Nomor video berhasil diurutkan!')
+      videosQuery.refetch()
+      allVideosQuery.refetch()
+    } catch (err: any) {
+      toast.error('Gagal mengurutkan nomor: ' + (err.message ?? err))
+    } finally {
+      setNumberingSaving(false)
+    }
+  }
 
   const { data: workspaceTemas = [] } = useQuery<string[]>({
     queryKey: ['workspace-temas', workspaceId],
@@ -377,6 +398,21 @@ export default function ContentPage() {
             <Columns className="w-4 h-4" />
           </button>
         </div>
+
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="h-8 gap-1.5 text-xs border-border bg-white text-text-primary hover:bg-subtle" 
+          onClick={handleNumbering}
+          disabled={numberingSaving || !workspaceId}
+        >
+          {numberingSaving ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <ListOrdered className="w-3.5 h-3.5" />
+          )}
+          <span>Numbering</span>
+        </Button>
 
         <Button variant="secondary" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setImportOpen(true)}>
           <Upload className="w-3.5 h-3.5" />
