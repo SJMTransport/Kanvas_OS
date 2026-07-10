@@ -26,10 +26,6 @@ export interface ScriptBlock {
 
 const DEFAULT_BLOCKS: ScriptBlock[] = [
   { id: crypto.randomUUID(), type: 'hook', label: 'Hook', content: '', order: 0 },
-  { id: crypto.randomUUID(), type: 'body', label: 'Body', content: '', order: 1 },
-  { id: crypto.randomUUID(), type: 'cta', label: 'CTA (Call to Action)', content: '', order: 2 },
-  { id: crypto.randomUUID(), type: 'insight', label: 'Insight / Director\'s Note', content: '', order: 3 },
-  { id: crypto.randomUUID(), type: 'on_screen', label: 'On-Screen Text', content: '', order: 4 },
 ]
 
 const PLACEHOLDERS: Record<string, string> = {
@@ -172,12 +168,7 @@ export function ScriptBlocks({ videoId, videoTitle, initialBlocks, onSave }: Scr
         </SortableContext>
       </DndContext>
 
-      <button
-        onClick={() => addBlock('custom', 'Section Baru')}
-        className="mt-2 w-full border border-dashed border-border rounded-lg py-2.5 text-sm text-text-muted hover:border-accent hover:text-accent transition-colors"
-      >
-        + Tambah Section
-      </button>
+      <AddSectionDropdown onAdd={addBlock} fullWidth />
 
       {fullScriptOpen && (
         <FullScriptPortal
@@ -292,7 +283,7 @@ function ScriptBlockCard({
   )
 }
 
-function AddSectionDropdown({ onAdd }: { onAdd: (type: string, customLabel?: string) => void }) {
+function AddSectionDropdown({ onAdd, fullWidth = false }: { onAdd: (type: string, customLabel?: string) => void; fullWidth?: boolean }) {
   const [open, setOpen] = useState(false)
   const [customLabel, setCustomLabel] = useState('')
   const [showCustom, setShowCustom] = useState(false)
@@ -308,15 +299,22 @@ function AddSectionDropdown({ onAdd }: { onAdd: (type: string, customLabel?: str
   }, [open])
 
   return (
-    <div className="relative" ref={ref}>
+    <div className={cn("relative", fullWidth ? "w-full" : "")} ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary"
+        className={cn(
+          fullWidth
+            ? "w-full border border-dashed border-border rounded-lg py-2 text-sm text-text-muted hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-1.5"
+            : "inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary"
+        )}
       >
-        <Plus className="w-4 h-4" /> Section
+        <Plus className="w-4 h-4" /> Tambah Section
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-border rounded-lg shadow-lg z-30 py-1">
+        <div className={cn(
+          "absolute bg-white border border-border rounded-lg shadow-lg z-30 py-1 w-52",
+          fullWidth ? "left-1/2 -translate-x-1/2 bottom-full mb-1" : "right-0 top-full mt-1"
+        )}>
           {SECTION_PRESETS.map((p) => (
             <button
               key={p.type}
