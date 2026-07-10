@@ -111,7 +111,7 @@ function getGreetingEmoji() {
 
 export function DashboardClient({ userName, role, todaySchedules, pipeline, followups, overdueInvoices, recentVideos }: Props) {
   const router = useRouter()
-  const firstName = userName.split(' ')[0]
+  const firstName = (userName || 'Kreator').split(' ')[0]
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-8">

@@ -28,8 +28,8 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
         </div>
 
         <div className="flex gap-3 justify-center">
-          <Button onClick={reset} variant="default">Coba Lagi</Button>
-          <Button onClick={() => router.push('/dashboard')} variant="secondary">Ke Dashboard</Button>
+          <Button onClick={() => { reset(); window.location.reload(); }} variant="default">Coba Lagi</Button>
+          <Button onClick={() => { window.location.href = '/dashboard'; }} variant="secondary">Ke Dashboard</Button>
         </div>
       </div>
     </div>

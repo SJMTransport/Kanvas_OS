@@ -51,7 +51,7 @@ export default function DashboardPage() {
       )
 
       return {
-        userName: (user?.user_metadata?.full_name as string) ?? user?.email ?? 'Kreator',
+        userName: (user?.user_metadata?.full_name as string) || user?.email || 'Kreator',
         todaySchedules: filteredSchedules,
         pipeline: { total: totalVideos ?? 0, scheduled: scheduledCount ?? 0, live: liveCount ?? 0, draft: draftCount ?? 0 },
         followups: followups ?? [],

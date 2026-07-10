@@ -24,7 +24,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
             {error.digest && <p className="text-[10px] text-red-500 font-mono mt-2 pt-1 border-t border-red-100/50">Digest: {error.digest}</p>}
           </div>
 
-          <Button onClick={reset}>Coba Lagi</Button>
+          <Button onClick={() => { reset(); window.location.reload(); }}>Coba Lagi</Button>
         </div>
       </body>
     </html>
