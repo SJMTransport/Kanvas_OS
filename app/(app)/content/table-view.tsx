@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import { ChevronUp, ChevronDown, Video, ImageIcon, Trash2, GripVertical } from 'lucide-react'
-import { formatNumber } from '@/lib/utils/formatters'
+import { ChevronUp, ChevronDown, Video, Trash2, GripVertical } from 'lucide-react'
 import {
   DndContext, DragEndEvent, PointerSensor, useSensor, useSensors, closestCenter,
 } from '@dnd-kit/core'
@@ -73,9 +72,6 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, activ
   const style = { transform: CSS.Transform.toString(transform), transition }
 
   const scheduledPlatforms = video.video_platform_schedules?.map((s) => s.platform as Platform) ?? []
-  const perfRecords = video.video_performance ?? []
-  const totalViews = perfRecords.reduce((sum, d) => sum + (Number(d.views) || 0), 0)
-  const totalLikes = perfRecords.reduce((sum, d) => sum + (Number(d.likes) || 0), 0)
 
   return (
     <tr
@@ -106,17 +102,11 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, activ
           </span>
         )}
       </td>
-      <td className="px-3 py-2.5">
-        <div className="w-10 h-10 rounded-md overflow-hidden bg-subtle flex items-center justify-center shrink-0">
-          {video.thumbnail_url
-            ? <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover" />
-            : (video as any).content_type === 'foto'
-              ? <ImageIcon className="w-4 h-4 text-border" />
-              : <Video className="w-4 h-4 text-border" />}
-        </div>
-      </td>
       <td className="px-3 py-2.5 max-w-[200px]">
         <p className="font-medium text-text-primary text-sm truncate">{video.judul}</p>
+      </td>
+      <td className="px-3 py-2.5 text-xs text-text-secondary max-w-[150px] truncate">
+        {video.temas && video.temas.length > 0 ? video.temas.join(', ') : video.tema ?? '-'}
       </td>
       <td className="px-3 py-2.5">
         <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium border', getStatusBadgeClass(video.status as VideoStatus))}>
@@ -127,13 +117,16 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, activ
         <div className="flex items-center gap-1">
           {PLATFORMS.map((p) => {
             const scheduled = scheduledPlatforms.includes(p)
+            const isActiveFilterSet = activePlatformFilter && activePlatformFilter.length > 0
+            const isFocused = !isActiveFilterSet || activePlatformFilter.includes(p)
+            const isLit = scheduled && isFocused
             return (
               <div
                 key={p}
                 title={`${p}${scheduled ? ' (terjadwal)' : ''}`}
                 className={cn(
-                  'w-5 h-5 rounded-full text-[8px] font-bold flex items-center justify-center',
-                  scheduled ? getPlatformBadge(p) : 'bg-border text-text-muted'
+                  'w-5 h-5 rounded-full text-[8px] font-bold flex items-center justify-center transition-all',
+                  isLit ? getPlatformBadge(p) : 'bg-border text-text-muted/45'
                 )}
               >
                 {p[0].toUpperCase()}
@@ -142,36 +135,36 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, activ
           })}
         </div>
       </td>
-      <td className="px-3 py-2.5">
-        {totalViews > 0 ? (
-          <div className="flex flex-col text-xs font-mono">
-            <span className="font-semibold text-text-primary">👁️ {formatNumber(totalViews)}</span>
-            <span className="text-[10px] text-text-muted">❤️ {formatNumber(totalLikes)}</span>
-          </div>
-        ) : (
-          <span className="text-text-muted/50 font-mono text-xs">-</span>
-        )}
-      </td>
       <td className="px-3 py-2.5 text-xs text-text-muted whitespace-nowrap">
-        {video.status === 'live' ? (
-          (() => {
+        {(() => {
+          const isLiveOrScheduled = video.status === 'live' || video.status === 'scheduled'
+          if (isLiveOrScheduled) {
             const schedules = video.video_platform_schedules ?? []
             const targetSchedules = activePlatformFilter && activePlatformFilter.length > 0
               ? schedules.filter((s) => activePlatformFilter.includes(s.platform as Platform))
               : schedules
             if (targetSchedules.length > 0) {
               const sorted = [...targetSchedules].sort((a, b) => a.tanggal_tayang.localeCompare(b.tanggal_tayang))
+              const icon = video.status === 'live' ? '🚀' : '📅'
+              const textClass = video.status === 'live' ? 'text-emerald-600 font-medium' : 'text-accent font-medium'
               return (
-                <span className="text-emerald-600 font-medium flex items-center gap-1" title="Tanggal Tayang (Live)">
-                  <span>🚀</span> {format(new Date(sorted[0].tanggal_tayang), 'd MMM', { locale: localeId })}
+                <span className={cn("flex items-center gap-1.5", textClass)} title={video.status === 'live' ? "Tanggal Tayang (Live)" : "Tanggal Tayang (Scheduled)"}>
+                  <span>{icon}</span> {format(new Date(sorted[0].tanggal_tayang), 'd MMM', { locale: localeId })}
                 </span>
               )
             }
-            return format(new Date(video.updated_at), 'd MMM', { locale: localeId })
-          })()
-        ) : (
-          format(new Date(video.updated_at), 'd MMM', { locale: localeId })
-        )}
+            return <span className="text-text-muted/40 font-mono">-</span>
+          } else {
+            if (video.deadline_posting) {
+              return (
+                <span className="text-text-secondary flex items-center gap-1.5" title="Tanggal Target (Deadline)">
+                  <span>🎯</span> {format(new Date(video.deadline_posting), 'd MMM', { locale: localeId })}
+                </span>
+              )
+            }
+            return <span className="text-text-muted/40 font-mono">-</span>
+          }
+        })()}
       </td>
       <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
         <button
@@ -234,13 +227,12 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
             <tr>
               <th className="w-6 px-2" />
               <Th col="no_video" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-28">No. Video</Th>
-              <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-12">Thumb</Th>
               <Th col="judul" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Judul</Th>
+              <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-40">Tema</Th>
               <Th col="status" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Status</Th>
               <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Platform</Th>
-              <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Performa</Th>
-              <Th col="updated_at" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Update / Tayang</Th>
-              <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-10">{''}</Th>
+              <Th col="updated_at" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-36">Tanggal</Th>
+              <th className="w-10" />
             </tr>
           </thead>
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

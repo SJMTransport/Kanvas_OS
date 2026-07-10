@@ -193,6 +193,7 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
   async function handleSave() {
     setSaving(true)
     const supabase = createClient()
+    const isLiveOrScheduled = video.status === 'live' || video.status === 'scheduled'
     const payload: Record<string, unknown> = {
       no_video: form.no_video ? `VID-${form.no_video.padStart(3, '0')}` : null,
       judul: form.judul || null,
@@ -201,7 +202,7 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
       temas,
       tema: temas[0] ?? null,
       tanggal_shooting: form.tanggal_shooting || null,
-      deadline_posting: form.deadline_posting || null,
+      deadline_posting: isLiveOrScheduled ? null : (form.deadline_posting || null),
       storage_bahan: form.storage_bahan || null,
       storage_video: form.storage_video || null,
       google_drive_link: form.google_drive_link || null,
@@ -220,6 +221,7 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
 
   const FORMAT_OPTIONS = ['Short Video', 'Long Video', 'Reels', 'Live']
   const isFoto = (video as any).content_type === 'foto'
+  const isLiveOrScheduled = video.status === 'live' || video.status === 'scheduled'
 
   return (
     <div className="space-y-4">
@@ -261,20 +263,24 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
       </div>
 
       {isFoto ? (
-        <div className="space-y-1.5">
-          <Label className="text-xs text-text-muted">Deadline Posting</Label>
-          <Input type="date" value={form.deadline_posting} onChange={(e) => set('deadline_posting', e.target.value)} className="text-xs h-9" />
-        </div>
+        !isLiveOrScheduled && (
+          <div className="space-y-1.5">
+            <Label className="text-xs text-text-muted">Tanggal Target (Deadline)</Label>
+            <Input type="date" value={form.deadline_posting} onChange={(e) => set('deadline_posting', e.target.value)} className="text-xs h-9" />
+          </div>
+        )
       ) : (
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label className="text-xs text-text-muted">Tanggal Shooting</Label>
             <Input type="date" value={form.tanggal_shooting} onChange={(e) => set('tanggal_shooting', e.target.value)} className="text-xs h-9" />
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs text-text-muted">Deadline Posting</Label>
-            <Input type="date" value={form.deadline_posting} onChange={(e) => set('deadline_posting', e.target.value)} className="text-xs h-9" />
-          </div>
+          {!isLiveOrScheduled && (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-text-muted">Tanggal Target (Deadline)</Label>
+              <Input type="date" value={form.deadline_posting} onChange={(e) => set('deadline_posting', e.target.value)} className="text-xs h-9" />
+            </div>
+          )}
         </div>
       )}
 
@@ -908,9 +914,17 @@ export default function ContentDetailPage() {
   async function handleStatusChange(newStatus: VideoStatus) {
     if (!video) return
     const supabase = createClient()
+    const isLiveOrScheduled = newStatus === 'live' || newStatus === 'scheduled'
+    const payload: Record<string, any> = {
+      status: newStatus,
+      updated_at: new Date().toISOString(),
+    }
+    if (isLiveOrScheduled) {
+      payload.deadline_posting = null
+    }
     const { error } = await supabase
       .from('videos')
-      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .update(payload)
       .eq('id', video.id)
     
     if (error) {
