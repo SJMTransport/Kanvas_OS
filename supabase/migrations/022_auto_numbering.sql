@@ -1,19 +1,19 @@
--- Trigger function to automatically assign no_upload on status transitions
+-- Trigger function to automatically assign no_video on status transitions
 CREATE OR REPLACE FUNCTION public.auto_assign_no_upload()
 RETURNS TRIGGER AS $$
 DECLARE
   next_num INT;
 BEGIN
-  -- If status changes to something other than 'ide' and no_upload is null
-  IF NEW.status != 'ide' AND NEW.no_upload IS NULL THEN
-    SELECT COALESCE(MAX(no_upload), 0) + 1 INTO next_num
+  -- If status changes to something other than 'ide' and no_video is null
+  IF NEW.status != 'ide' AND NEW.no_video IS NULL THEN
+    SELECT COALESCE(MAX(NULLIF(regexp_replace(no_video, '\D', '', 'g'), '')::integer), 0) + 1 INTO next_num
     FROM public.videos
     WHERE workspace_id = NEW.workspace_id AND status != 'ide';
     
-    NEW.no_upload := next_num;
+    NEW.no_video := 'VID-' || LPAD(next_num::text, 3, '0');
   -- If status is changed back to 'ide', clear the number
   ELSIF NEW.status = 'ide' THEN
-    NEW.no_upload := NULL;
+    NEW.no_video := NULL;
   END IF;
   
   RETURN NEW;
@@ -45,7 +45,7 @@ BEGIN
     ORDER BY created_at ASC
   LOOP
     UPDATE public.videos 
-    SET no_upload = v_counter 
+    SET no_video = 'VID-' || LPAD(v_counter::text, 3, '0') 
     WHERE id = v_rec.id;
     
     v_counter := v_counter + 1;

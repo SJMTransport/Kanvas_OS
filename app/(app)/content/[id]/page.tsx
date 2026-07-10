@@ -181,8 +181,7 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
   const [saving, setSaving] = useState(false)
   const [temas, setTemas] = useState<string[]>(video.temas ?? (video.tema ? [video.tema] : []))
   const [form, setForm] = useState({
-    no_upload: video.no_upload != null ? String(video.no_upload) : '',
-    no_video: video.no_video ?? '',
+    no_video: video.no_video ? video.no_video.replace(/^VID-/, '') : '',
     judul: video.judul ?? '',
     status: video.status ?? '',
     format: video.format ?? '',
@@ -194,22 +193,7 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
     caption_default: video.caption_default ?? '',
   })
 
-  useEffect(() => {
-    setForm({
-      no_upload: video.no_upload != null ? String(video.no_upload) : '',
-      no_video: video.no_video ?? '',
-      judul: video.judul ?? '',
-      status: video.status ?? '',
-      format: video.format ?? '',
-      tanggal_shooting: video.tanggal_shooting ?? '',
-      deadline_posting: video.deadline_posting ?? '',
-      storage_bahan: video.storage_bahan ?? '',
-      storage_video: video.storage_video ?? '',
-      google_drive_link: video.google_drive_link ?? '',
-      caption_default: video.caption_default ?? '',
-    })
-    setTemas(video.temas ?? (video.tema ? [video.tema] : []))
-  }, [video])
+
 
   function set(field: string, value: string) {
     setForm((f) => ({ ...f, [field]: value }))
@@ -219,8 +203,7 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
     setSaving(true)
     const supabase = createClient()
     const payload: Record<string, unknown> = {
-      no_upload: form.no_upload ? Number(form.no_upload) : null,
-      no_video: form.no_video || null,
+      no_video: form.no_video ? `VID-${form.no_video.padStart(3, '0')}` : null,
       judul: form.judul || null,
       status: form.status || null,
       format: form.format || null,
@@ -250,24 +233,16 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label className="text-xs text-text-muted">No. Upload (#)</Label>
+      <div className="space-y-1.5">
+        <Label className="text-xs text-text-muted">No. Video</Label>
+        <div className="flex items-center rounded-md border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
+          <span className="pl-3 pr-1 text-sm text-text-muted font-mono select-none">VID-</span>
           <Input
-            type="number"
-            value={form.no_upload}
-            onChange={(e) => set('no_upload', e.target.value)}
-            placeholder="1, 2, 3..."
-            className="text-sm"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs text-text-muted">No. Video</Label>
-          <Input
+            type="text"
             value={form.no_video}
-            onChange={(e) => set('no_video', e.target.value)}
-            placeholder="VID-001..."
-            className="text-sm"
+            onChange={(e) => set('no_video', e.target.value.replace(/\D/g, ''))}
+            placeholder="001"
+            className="border-0 shadow-none focus-visible:ring-0 pl-1 text-sm font-mono"
           />
         </div>
       </div>
@@ -762,6 +737,7 @@ export default function ContentDetailPage() {
 
   useEffect(() => {
     if (video?.judul) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTitleValue(video.judul)
     }
   }, [video?.judul])
@@ -865,7 +841,7 @@ export default function ContentDetailPage() {
         </TabsList>
 
         <TabsContent value="info" className="mt-0">
-          <InfoTab video={video} />
+          <InfoTab key={video.id} video={video} />
         </TabsContent>
         <TabsContent value="jadwal" className="mt-0">
           <ScheduleTab video={video} />

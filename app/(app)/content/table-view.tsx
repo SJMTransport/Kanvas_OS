@@ -90,10 +90,12 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, activ
         </button>
       </td>
       <td className="px-3 py-2.5 text-xs">
-        {video.no_upload != null ? (
-          <span className="font-semibold text-text-primary">#{video.no_upload}</span>
+        {video.no_video ? (
+          <span className="font-semibold text-text-primary font-mono">{video.no_video}</span>
         ) : (
-          <span className="text-text-muted/60">{page * pageSize + index + 1}</span>
+          <span className="text-text-muted/60 font-mono">
+            VID-{String(page * pageSize + index + 1).padStart(3, '0')}
+          </span>
         )}
       </td>
       <td className="px-3 py-2.5">
@@ -107,7 +109,6 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, activ
       </td>
       <td className="px-3 py-2.5 max-w-[200px]">
         <p className="font-medium text-text-primary text-sm truncate">{video.judul}</p>
-        {video.no_video && <p className="text-[11px] text-text-muted">{video.no_video}</p>}
       </td>
       <td className="px-3 py-2.5">
         <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium border', getStatusBadgeClass(video.status as VideoStatus))}>
@@ -213,7 +214,7 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
           <thead className="sticky top-0 bg-white border-b border-border z-10">
             <tr>
               <th className="w-6 px-2" />
-              <Th col="no_upload" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-10">#</Th>
+              <Th col="no_video" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-28">No. Video</Th>
               <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-12">Thumb</Th>
               <Th col="judul" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Judul</Th>
               <Th col="status" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Status</Th>

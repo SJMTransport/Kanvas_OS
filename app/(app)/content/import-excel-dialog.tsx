@@ -13,7 +13,6 @@ import { cn } from '@/lib/utils'
 
 // Column mapping: Excel header → DB field
 const COLUMN_MAP: Record<string, string> = {
-  'no upload': 'no_upload',
   'no video': 'no_video',
   'judul': 'judul',
   'format': 'format',
@@ -128,7 +127,15 @@ export function ImportExcelDialog({ open, onOpenChange }: Props) {
         }
         Object.entries(mapping).forEach(([col, field]) => {
           const val = row[col]
-          if (field === 'no_upload') rec.no_upload = val ? Number(val) || null : null
+          if (field === 'no_video') {
+            const strVal = val ? String(val).trim() : ''
+            if (strVal) {
+              const digits = strVal.replace(/\D/g, '')
+              rec.no_video = digits ? `VID-${digits.padStart(3, '0')}` : strVal
+            } else {
+              rec.no_video = null
+            }
+          }
           else if (field === 'is_endorsement') rec.is_endorsement = parseBool(val)
           else if (field === 'is_video_request') rec.is_video_request = parseBool(val)
           else if (field === 'tanggal_shooting' || field === 'deadline_posting') rec[field] = parseExcelDate(val)
@@ -240,7 +247,7 @@ export function ImportExcelDialog({ open, onOpenChange }: Props) {
                     >
                       <option value="">[Abaikan]</option>
                       {Object.entries({
-                        no_upload: 'No Upload', no_video: 'No Video', judul: 'Judul', format: 'Format',
+                        no_video: 'No Video', judul: 'Judul', format: 'Format',
                         tema: 'Tema', nama_alat: 'Nama Alat', storage_bahan: 'Storage Bahan',
                         storage_video: 'Storage Video', tanggal_shooting: 'Tanggal Shooting',
                         is_endorsement: 'Endorsement', deadline_posting: 'Deadline Posting',

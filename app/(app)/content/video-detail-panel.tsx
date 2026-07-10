@@ -78,7 +78,7 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
   async function save(field: string, value: string) {
     const supabase = createClient()
     const parsed: Record<string, unknown> = {}
-    if (field === 'no_upload') parsed[field] = value ? Number(value) : null
+    if (field === 'no_video') parsed[field] = value ? `VID-${value.replace(/\D/g, '').padStart(3, '0')}` : null
     else if (field === 'is_endorsement' || field === 'is_video_request') parsed[field] = value === 'true'
     else parsed[field] = value || null
 
