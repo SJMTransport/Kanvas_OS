@@ -28,7 +28,7 @@ import type { VideoWithSchedules } from '@/lib/hooks/useVideos'
 import type { VideoStatus, ContentType, Platform } from '@/lib/types'
 
 type ViewMode = 'table' | 'kanban'
-const PAGE_SIZE = 25
+const PAGE_SIZE = 10000
 
 export default function ContentPage() {
   const router = useRouter()
@@ -176,8 +176,7 @@ export default function ContentPage() {
     pageSize: 500,
   })
 
-  // Total count for pagination (rough: if we got full page, there might be more)
-  const total = videosQuery.data?.length === PAGE_SIZE ? (page + 2) * PAGE_SIZE : (page * PAGE_SIZE) + (videosQuery.data?.length ?? 0)
+  const total = videosQuery.data?.length ?? 0
 
   function handleRowClick(video: VideoWithSchedules) {
     router.push('/content/' + video.id)

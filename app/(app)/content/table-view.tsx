@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import { ChevronUp, ChevronDown, Video, ImageIcon, ChevronLeft, ChevronRight, Trash2, GripVertical } from 'lucide-react'
+import { ChevronUp, ChevronDown, Video, ImageIcon, Trash2, GripVertical } from 'lucide-react'
 import {
   DndContext, DragEndEvent, PointerSensor, useSensor, useSensors, closestCenter,
 } from '@dnd-kit/core'
@@ -262,29 +262,12 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
         )}
       </div>
 
-      {/* Pagination */}
+      {/* Total Count */}
       {total > 0 && (
         <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-white">
           <p className="text-xs text-text-muted">
-            {page * pageSize + 1}–{Math.min((page + 1) * pageSize, total)} dari {total} video
+            Menampilkan {total} video
           </p>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => onPageChange(page - 1)}
-              disabled={page === 0}
-              className="p-1.5 rounded hover:bg-subtle disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="text-xs text-text-secondary px-2">{page + 1} / {totalPages || 1}</span>
-            <button
-              onClick={() => onPageChange(page + 1)}
-              disabled={page >= totalPages - 1}
-              className="p-1.5 rounded hover:bg-subtle disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
         </div>
       )}
     </div>
