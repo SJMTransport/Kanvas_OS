@@ -12,10 +12,17 @@ import { AddVideoSheet } from './add-video-sheet'
 import { ImportExcelDialog } from './import-excel-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { LayoutList, Columns, Search, Upload, Plus, X } from 'lucide-react'
+import { LayoutList, Columns, Search, Upload, Plus, X, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { STATUS_ORDER } from '@/lib/utils/status'
+import { STATUS_ORDER, STATUS_CONFIG } from '@/lib/utils/status'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
 import type { VideoWithSchedules } from '@/lib/hooks/useVideos'
 import type { VideoStatus, ContentType, Platform } from '@/lib/types'
 
@@ -36,12 +43,12 @@ export default function ContentPage() {
     initialStatusParam ? (initialStatusParam.split(',') as VideoStatus[]) : 'all'
   )
   const [monthCurrent, setMonthCurrent] = useState(initialMonthParam === 'current')
-  const [platformFilter, setPlatformFilter] = useState<Platform | 'all'>('all')
+  const [platformFilter, setPlatformFilter] = useState<Platform[] | 'all'>('all')
   const [sortBy, setSortBy] = useState('sort_order')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [page, setPage] = useState(0)
-  const [temaFilter, setTemaFilter] = useState<string | null>(null)
-  const [contentTypeFilter, setContentTypeFilter] = useState<ContentType | null>(null)
+  const [temaFilter, setTemaFilter] = useState<string[] | 'all'>('all')
+  const [contentTypeFilter, setContentTypeFilter] = useState<ContentType[] | 'all'>('all')
   const [addOpen, setAddOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
 
@@ -76,12 +83,61 @@ export default function ContentPage() {
     setPage(0)
   }
 
+  const handleStatusChange = (status: VideoStatus, checked: boolean) => {
+    setStatusFilter((prev) => {
+      if (checked) {
+        return prev === 'all' ? [status] : [...prev, status]
+      } else {
+        if (prev === 'all') return 'all'
+        const next = prev.filter((s) => s !== status)
+        return next.length === 0 ? 'all' : next
+      }
+    })
+    setMonthCurrent(false)
+  }
+
+  const handlePlatformChange = (p: Platform, checked: boolean) => {
+    setPlatformFilter((prev) => {
+      if (checked) {
+        return prev === 'all' ? [p] : [...prev, p]
+      } else {
+        if (prev === 'all') return 'all'
+        const next = prev.filter((x) => x !== p)
+        return next.length === 0 ? 'all' : next
+      }
+    })
+  }
+
+  const handleTemaChange = (t: string, checked: boolean) => {
+    setTemaFilter((prev) => {
+      if (checked) {
+        return prev === 'all' ? [t] : [...prev, t]
+      } else {
+        if (prev === 'all') return 'all'
+        const next = prev.filter((x) => x !== t)
+        return next.length === 0 ? 'all' : next
+      }
+    })
+  }
+
+  const handleContentTypeChange = (type: ContentType, checked: boolean) => {
+    setContentTypeFilter((prev) => {
+      if (checked) {
+        return prev === 'all' ? [type] : [...prev, type]
+      } else {
+        if (prev === 'all') return 'all'
+        const next = prev.filter((x) => x !== type)
+        return next.length === 0 ? 'all' : next
+      }
+    })
+  }
+
   const videosQuery = useVideos({
     status: statusFilter === 'all' ? null : statusFilter,
-    contentType: contentTypeFilter,
+    contentType: contentTypeFilter === 'all' ? null : contentTypeFilter,
     platform: platformFilter === 'all' ? null : platformFilter,
     search: search || undefined,
-    tema: temaFilter,
+    tema: temaFilter === 'all' ? null : temaFilter,
     monthCurrent,
     sortBy,
     sortDir,
@@ -111,18 +167,38 @@ export default function ContentPage() {
 
   function clearFilters() {
     setStatusFilter('all')
-    setContentTypeFilter(null)
+    setContentTypeFilter('all')
     setPlatformFilter('all')
+    setTemaFilter('all')
     setMonthCurrent(false)
     router.replace('/content')
   }
 
   const statusFilterLabel = statusFilter === 'all'
-    ? null
+    ? 'Semua Status'
     : statusFilter.length === 1
-      ? statusFilter[0].charAt(0).toUpperCase() + statusFilter[0].slice(1)
-      : `${statusFilter.length} status`
-  const hasActiveFilter = statusFilter !== 'all' || monthCurrent || !!contentTypeFilter || platformFilter !== 'all'
+      ? STATUS_CONFIG[statusFilter[0]]?.label ?? statusFilter[0]
+      : `${statusFilter.length} Status`
+
+  const platformFilterLabel = platformFilter === 'all'
+    ? 'Semua Platform'
+    : platformFilter.length === 1
+      ? platformFilter[0].charAt(0).toUpperCase() + platformFilter[0].slice(1)
+      : `${platformFilter.length} Platform`
+
+  const temaFilterLabel = temaFilter === 'all'
+    ? 'Semua Tema'
+    : temaFilter.length === 1
+      ? temaFilter[0]
+      : `${temaFilter.length} Tema`
+
+  const contentTypeFilterLabel = contentTypeFilter === 'all'
+    ? 'Semua Tipe'
+    : contentTypeFilter.length === 1
+      ? (contentTypeFilter[0] === 'video' ? '🎬 Video' : '🖼️ Foto')
+      : `${contentTypeFilter.length} Tipe`
+
+  const hasActiveFilter = statusFilter !== 'all' || platformFilter !== 'all' || temaFilter !== 'all' || contentTypeFilter !== 'all' || monthCurrent
 
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] min-h-0">
@@ -145,58 +221,150 @@ export default function ContentPage() {
         </div>
 
         {/* Status filter */}
-        <Select
-          value={statusFilter === 'all' ? 'all' : statusFilter.length === 1 ? statusFilter[0] : 'multi'}
-          onValueChange={(v) => { setStatusFilter(v === 'all' ? 'all' : [v as VideoStatus]); setMonthCurrent(false) }}
-        >
-          <SelectTrigger className="h-8 text-sm w-36">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua Status</SelectItem>
-            {statusFilter !== 'all' && statusFilter.length > 1 && <SelectItem value="multi" disabled>{statusFilter.length} status</SelectItem>}
-            {STATUS_ORDER.map((s) => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 text-sm min-w-36 justify-between font-normal border-border bg-white hover:bg-subtle text-text-primary">
+              <span className="truncate">{statusFilterLabel}</span>
+              <ChevronDown className="ml-1 w-3.5 h-3.5 shrink-0 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-48">
+            <DropdownMenuLabel>Pilih Status</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuCheckboxItem
+              checked={statusFilter === 'all'}
+              onCheckedChange={(checked) => checked && setStatusFilter('all')}
+            >
+              Semua Status
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuSeparator />
+            {STATUS_ORDER.map((s) => {
+              const checked = statusFilter !== 'all' && statusFilter.includes(s)
+              return (
+                <DropdownMenuCheckboxItem
+                  key={s}
+                  checked={checked}
+                  onCheckedChange={(checked) => handleStatusChange(s, checked)}
+                >
+                  {STATUS_CONFIG[s]?.label ?? s}
+                </DropdownMenuCheckboxItem>
+              )
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* Tema filter */}
         {workspaceTemas.length > 0 && (
-          <Select value={temaFilter ?? 'all'} onValueChange={(v) => setTemaFilter(v === 'all' ? null : v)}>
-            <SelectTrigger className="h-8 text-sm w-36">
-              <SelectValue placeholder="Tema" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Tema</SelectItem>
-              {workspaceTemas.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 text-sm min-w-36 justify-between font-normal border-border bg-white hover:bg-subtle text-text-primary">
+                <span className="truncate">{temaFilterLabel}</span>
+                <ChevronDown className="ml-1 w-3.5 h-3.5 shrink-0 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-48 max-h-72 overflow-y-auto">
+              <DropdownMenuLabel>Pilih Tema</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem
+                checked={temaFilter === 'all'}
+                onCheckedChange={(checked) => checked && setTemaFilter('all')}
+              >
+                Semua Tema
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuSeparator />
+              {workspaceTemas.map((t) => {
+                const checked = temaFilter !== 'all' && temaFilter.includes(t)
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={t}
+                    checked={checked}
+                    onCheckedChange={(checked) => handleTemaChange(t, checked)}
+                  >
+                    {t}
+                  </DropdownMenuCheckboxItem>
+                )
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
 
         {/* Content type filter */}
-        <Select value={contentTypeFilter ?? 'all'} onValueChange={(v) => setContentTypeFilter(v === 'all' ? null : v as ContentType)}>
-          <SelectTrigger className="h-8 text-sm w-32">
-            <SelectValue placeholder="Tipe" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua Tipe</SelectItem>
-            <SelectItem value="video">🎬 Video</SelectItem>
-            <SelectItem value="foto">🖼️ Foto</SelectItem>
-          </SelectContent>
-        </Select>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 text-sm min-w-32 justify-between font-normal border-border bg-white hover:bg-subtle text-text-primary">
+              <span className="truncate">{contentTypeFilterLabel}</span>
+              <ChevronDown className="ml-1 w-3.5 h-3.5 shrink-0 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-40">
+            <DropdownMenuLabel>Pilih Tipe</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuCheckboxItem
+              checked={contentTypeFilter === 'all'}
+              onCheckedChange={(checked) => checked && setContentTypeFilter('all')}
+            >
+              Semua Tipe
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuCheckboxItem
+              checked={contentTypeFilter !== 'all' && contentTypeFilter.includes('video')}
+              onCheckedChange={(checked) => handleContentTypeChange('video', checked)}
+            >
+              🎬 Video
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={contentTypeFilter !== 'all' && contentTypeFilter.includes('foto')}
+              onCheckedChange={(checked) => handleContentTypeChange('foto', checked)}
+            >
+              🖼️ Foto
+            </DropdownMenuCheckboxItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* Platform filter */}
-        <Select value={platformFilter} onValueChange={(v) => setPlatformFilter(v as Platform | 'all')}>
-          <SelectTrigger className="h-8 text-sm w-36">
-            <SelectValue placeholder="Platform" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua Platform</SelectItem>
-            <SelectItem value="tiktok">🎵 TikTok</SelectItem>
-            <SelectItem value="instagram">📸 Instagram</SelectItem>
-            <SelectItem value="youtube">📺 YouTube</SelectItem>
-            <SelectItem value="facebook">👥 Facebook</SelectItem>
-          </SelectContent>
-        </Select>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 text-sm min-w-36 justify-between font-normal border-border bg-white hover:bg-subtle text-text-primary">
+              <span className="truncate">{platformFilterLabel}</span>
+              <ChevronDown className="ml-1 w-3.5 h-3.5 shrink-0 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-44">
+            <DropdownMenuLabel>Pilih Platform</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuCheckboxItem
+              checked={platformFilter === 'all'}
+              onCheckedChange={(checked) => checked && setPlatformFilter('all')}
+            >
+              Semua Platform
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuCheckboxItem
+              checked={platformFilter !== 'all' && platformFilter.includes('tiktok')}
+              onCheckedChange={(checked) => handlePlatformChange('tiktok', checked)}
+            >
+              🎵 TikTok
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={platformFilter !== 'all' && platformFilter.includes('instagram')}
+              onCheckedChange={(checked) => handlePlatformChange('instagram', checked)}
+            >
+              📸 Instagram
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={platformFilter !== 'all' && platformFilter.includes('youtube')}
+              onCheckedChange={(checked) => handlePlatformChange('youtube', checked)}
+            >
+              📺 YouTube
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={platformFilter !== 'all' && platformFilter.includes('facebook')}
+              onCheckedChange={(checked) => handlePlatformChange('facebook', checked)}
+            >
+              👥 Facebook
+            </DropdownMenuCheckboxItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <div className="flex-1" />
 
@@ -222,21 +390,26 @@ export default function ContentPage() {
 
       {/* Active filter chip */}
       {hasActiveFilter && (
-        <div className="bg-white border-b border-border px-4 py-1.5 flex items-center gap-2">
+        <div className="bg-white border-b border-border px-4 py-1.5 flex items-center gap-2 flex-wrap">
           <span className="text-[11px] text-text-muted">Filter aktif:</span>
           {statusFilter !== 'all' && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent-light text-accent text-[11px] rounded-full font-medium">
               Status: {statusFilterLabel}
             </span>
           )}
-          {contentTypeFilter && (
+          {temaFilter !== 'all' && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent-light text-accent text-[11px] rounded-full font-medium">
-              Tipe: {contentTypeFilter === 'video' ? '🎬 Video' : '🖼️ Foto'}
+              Tema: {temaFilterLabel}
+            </span>
+          )}
+          {contentTypeFilter !== 'all' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent-light text-accent text-[11px] rounded-full font-medium">
+              Tipe: {contentTypeFilterLabel}
             </span>
           )}
           {platformFilter !== 'all' && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent-light text-accent text-[11px] rounded-full font-medium capitalize">
-              Platform: {platformFilter}
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent-light text-accent text-[11px] rounded-full font-medium">
+              Platform: {platformFilterLabel}
             </span>
           )}
           {monthCurrent && (

@@ -17,11 +17,11 @@ const VIDEO_LIST_COLUMNS = `
 `
 
 interface UseVideosOptions {
-  status?: VideoStatus | VideoStatus[] | null
-  contentType?: ContentType | null
-  platform?: Platform | null
+  status?: VideoStatus[] | null
+  contentType?: ContentType[] | null
+  platform?: Platform[] | null
   search?: string
-  tema?: string | null
+  tema?: string[] | null
   monthCurrent?: boolean
   sortBy?: string
   sortDir?: 'asc' | 'desc'
@@ -40,7 +40,7 @@ export function useVideos(opts: UseVideosOptions = {}) {
       const supabase = createClient()
       
       let selectCols = VIDEO_LIST_COLUMNS
-      if (platform) {
+      if (platform && platform.length > 0) {
         selectCols = `
           *,
           video_platform_schedules!inner(platform, tanggal_tayang, status)
@@ -52,14 +52,19 @@ export function useVideos(opts: UseVideosOptions = {}) {
         .select(selectCols)
         .eq('workspace_id', workspaceId)
 
-      if (status) {
-        if (Array.isArray(status)) q = q.in('status', status)
-        else q = q.eq('status', status)
+      if (status && status.length > 0) {
+        q = q.in('status', status)
       }
-      if (contentType) q = q.eq('content_type', contentType)
-      if (platform) q = q.eq('video_platform_schedules.platform', platform)
+      if (contentType && contentType.length > 0) {
+        q = q.in('content_type', contentType)
+      }
+      if (platform && platform.length > 0) {
+        q = q.in('video_platform_schedules.platform', platform)
+      }
       if (search) q = q.ilike('judul', `%${search}%`)
-      if (tema) q = q.contains('temas', [tema])
+      if (tema && tema.length > 0) {
+        q = q.ov('temas', tema)
+      }
       if (monthCurrent) {
         const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0, 0, 0, 0)
         q = q.gte('updated_at', startOfMonth.toISOString())

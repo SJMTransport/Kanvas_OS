@@ -173,6 +173,27 @@ export default function SettingsPage() {
     enabled: !!workspaceId,
   })
 
+  // ---- Calibration ----
+  const [calibrating, setCalibrating] = useState(false)
+
+  async function handleCalibrate() {
+    if (!workspaceId) return
+    if (!confirm('Apakah Anda yakin ingin menyusun ulang (rekap) seluruh nomor urut video di workspace ini? Tindakan ini akan mengatur ulang nomor urut (#) berdasarkan tanggal pembuatan video.')) return
+    
+    setCalibrating(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.rpc('calibrate_workspace_videos', { ws_id: workspaceId })
+      if (error) throw error
+      toast.success('Kalibrasi nomor urut berhasil!')
+      queryClient.invalidateQueries({ queryKey: ['videos'] })
+    } catch (err: any) {
+      toast.error('Gagal menjalankan kalibrasi: ' + (err.message ?? err))
+    } finally {
+      setCalibrating(false)
+    }
+  }
+
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
       <div className="mb-6">
@@ -187,6 +208,7 @@ export default function SettingsPage() {
           <TabsTrigger value="billing">Billing Info</TabsTrigger>
           <TabsTrigger value="sosmed">Akun Sosmed</TabsTrigger>
           <TabsTrigger value="tim">Tim</TabsTrigger>
+          <TabsTrigger value="data">Data Konten</TabsTrigger>
         </TabsList>
 
         {/* Profil */}
@@ -354,6 +376,35 @@ export default function SettingsPage() {
                 <InviteForm workspaceId={workspaceId ?? ''} onInvited={() => queryClient.invalidateQueries({ queryKey: ['members', workspaceId] })} />
               </div>
             )}
+          </div>
+        </TabsContent>
+
+        {/* Data Konten / Kalibrasi */}
+        <TabsContent value="data">
+          <div className="bg-white border border-border rounded-xl p-5 space-y-4">
+            <div>
+              <h3 className="font-heading text-lg font-bold text-text-primary">Kalibrasi Nomor Urut Konten</h3>
+              <p className="text-sm text-text-secondary mt-1">
+                Gunakan fitur ini untuk merapikan kembali (rekap) nomor urut upload (<span className="font-mono">#</span>) pada halaman Konten. 
+                Sistem akan memindai seluruh video progresif (selain status Ide) di workspace ini, lalu memberikan nomor baru berurutan rapat dari 1 sampai N berdasarkan waktu pembuatannya.
+              </p>
+            </div>
+            
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3.5 text-xs text-amber-800 space-y-1">
+              <p className="font-semibold">⚠️ PERHATIAN</p>
+              <p>
+                Tindakan ini bersifat permanen di database. Nomor urut video yang sudah ada mungkin akan bergeser untuk diselaraskan dengan tanggal pembuatan asli video tersebut.
+              </p>
+            </div>
+
+            <Button 
+              onClick={handleCalibrate} 
+              disabled={calibrating || !workspaceId} 
+              className="bg-amber-600 hover:bg-amber-700 text-white border-transparent"
+            >
+              {calibrating && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Jalankan Rekap & Kalibrasi
+            </Button>
           </div>
         </TabsContent>
       </Tabs>

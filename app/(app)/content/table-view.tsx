@@ -34,7 +34,7 @@ interface Props {
   onRowClick: (video: VideoWithSchedules) => void
   total: number
   pageSize: number
-  activePlatformFilter?: Platform | null
+  activePlatformFilter?: Platform[] | null
 }
 
 function SortIcon({ col, sortBy, sortDir }: { col: string; sortBy: string; sortDir: string }) {
@@ -66,7 +66,7 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, activ
   pageSize: number
   onRowClick: (v: VideoWithSchedules) => void
   onDelete: (v: VideoWithSchedules) => void
-  activePlatformFilter?: Platform | null
+  activePlatformFilter?: Platform[] | null
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: video.id })
   const style = { transform: CSS.Transform.toString(transform), transition }
@@ -137,8 +137,8 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, activ
         {video.status === 'live' ? (
           (() => {
             const schedules = video.video_platform_schedules ?? []
-            const targetSchedules = activePlatformFilter
-              ? schedules.filter((s) => s.platform === activePlatformFilter)
+            const targetSchedules = activePlatformFilter && activePlatformFilter.length > 0
+              ? schedules.filter((s) => activePlatformFilter.includes(s.platform as Platform))
               : schedules
             if (targetSchedules.length > 0) {
               const sorted = [...targetSchedules].sort((a, b) => a.tanggal_tayang.localeCompare(b.tanggal_tayang))
