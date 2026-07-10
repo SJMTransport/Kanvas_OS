@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from './useWorkspace'
-import type { VideoStatus, ContentType, Video } from '@/lib/types'
+import type { VideoStatus, ContentType, Video, Platform } from '@/lib/types'
 
 export interface VideoWithSchedules extends Video {
   video_platform_schedules: { platform: string; tanggal_tayang: string; status: string }[]
@@ -19,6 +19,7 @@ const VIDEO_LIST_COLUMNS = `
 interface UseVideosOptions {
   status?: VideoStatus | VideoStatus[] | null
   contentType?: ContentType | null
+  platform?: Platform | null
   search?: string
   tema?: string | null
   monthCurrent?: boolean
@@ -30,16 +31,25 @@ interface UseVideosOptions {
 
 export function useVideos(opts: UseVideosOptions = {}) {
   const { workspaceId } = useWorkspace()
-  const { status, contentType, search, tema, monthCurrent, sortBy = 'sort_order', sortDir = 'asc', page = 0, pageSize = 25 } = opts
+  const { status, contentType, platform, search, tema, monthCurrent, sortBy = 'sort_order', sortDir = 'asc', page = 0, pageSize = 25 } = opts
 
   return useQuery<VideoWithSchedules[]>({
-    queryKey: ['videos', workspaceId, status, contentType, search, tema, monthCurrent, sortBy, sortDir, page],
+    queryKey: ['videos', workspaceId, status, contentType, platform, search, tema, monthCurrent, sortBy, sortDir, page],
     queryFn: async () => {
       if (!workspaceId) return []
       const supabase = createClient()
+      
+      let selectCols = VIDEO_LIST_COLUMNS
+      if (platform) {
+        selectCols = `
+          *,
+          video_platform_schedules!inner(platform, tanggal_tayang, status)
+        `
+      }
+
       let q = supabase
         .from('videos')
-        .select(VIDEO_LIST_COLUMNS)
+        .select(selectCols)
         .eq('workspace_id', workspaceId)
 
       if (status) {
@@ -47,6 +57,7 @@ export function useVideos(opts: UseVideosOptions = {}) {
         else q = q.eq('status', status)
       }
       if (contentType) q = q.eq('content_type', contentType)
+      if (platform) q = q.eq('video_platform_schedules.platform', platform)
       if (search) q = q.ilike('judul', `%${search}%`)
       if (tema) q = q.contains('temas', [tema])
       if (monthCurrent) {

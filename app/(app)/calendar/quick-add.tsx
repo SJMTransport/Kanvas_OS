@@ -11,6 +11,7 @@ import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Switch } from '@/components/ui/switch'
 import type { Platform } from '@/lib/types'
 
 const PLATFORMS: Platform[] = ['tiktok', 'instagram', 'youtube', 'facebook']
@@ -30,6 +31,7 @@ export function QuickAdd({ defaultDate, onSuccess, onCancel }: Props) {
   const [time, setTime] = useState('09:00')
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
+  const [markAsScheduled, setMarkAsScheduled] = useState(false)
 
   const { data: videos } = useQuery({
     queryKey: ['videos-search', workspaceId, search],
@@ -83,8 +85,10 @@ export function QuickAdd({ defaultDate, onSuccess, onCancel }: Props) {
       })
       if (error) throw error
 
-      // Update video status to scheduled
-      await supabase.from('videos').update({ status: 'scheduled' }).eq('id', videoId)
+      // Only update video status to scheduled if markAsScheduled is checked
+      if (markAsScheduled) {
+        await supabase.from('videos').update({ status: 'scheduled' }).eq('id', videoId)
+      }
 
       queryClient.invalidateQueries({ queryKey: ['schedules'] })
       toast.success('Jadwal berhasil ditambahkan!')
@@ -104,7 +108,7 @@ export function QuickAdd({ defaultDate, onSuccess, onCancel }: Props) {
         <Input
           placeholder="Ketik judul video..."
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setVideoId('') }}
+          onChange={(e) => { setSearch(e.target.value); setVideoId(''); setMarkAsScheduled(false) }}
         />
         {videos && videos.length > 0 && !videoId && (
           <div className="border border-border rounded-md bg-white shadow-sm max-h-40 overflow-y-auto">
@@ -112,7 +116,11 @@ export function QuickAdd({ defaultDate, onSuccess, onCancel }: Props) {
               <button
                 key={v.id}
                 className="w-full text-left px-3 py-2 text-sm hover:bg-subtle transition-colors"
-                onClick={() => { setVideoId(v.id); setSearch(v.judul) }}
+                onClick={() => {
+                  setVideoId(v.id)
+                  setSearch(v.judul)
+                  setMarkAsScheduled(v.status === 'scheduled' || v.status === 'live')
+                }}
               >
                 <span className="font-medium">{v.judul}</span>
                 <span className="text-text-muted ml-2 text-xs">{v.status}</span>
@@ -158,6 +166,24 @@ export function QuickAdd({ defaultDate, onSuccess, onCancel }: Props) {
         <Label>Tanggal</Label>
         <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
       </div>
+
+      {videoId && (
+        <div className="flex items-center justify-between border border-border rounded-lg p-3 bg-surface">
+          <div className="space-y-0.5 pr-2">
+            <Label htmlFor="mark-scheduled" className="text-xs font-semibold text-text-primary cursor-pointer">
+              Tandai Siap Tayang
+            </Label>
+            <p className="text-[10px] text-text-muted leading-tight">
+              Ubah status video menjadi "Scheduled" (Siap Posting)
+            </p>
+          </div>
+          <Switch
+            id="mark-scheduled"
+            checked={markAsScheduled}
+            onCheckedChange={setMarkAsScheduled}
+          />
+        </div>
+      )}
 
       <div className="flex gap-2 pt-1">
         <Button className="flex-1" onClick={handleSave} disabled={saving || !videoId || allScheduled}>

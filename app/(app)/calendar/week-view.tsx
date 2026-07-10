@@ -62,19 +62,25 @@ export function WeekView({ activeDate, events, onEventClick }: Props) {
               const dayEvents = getEventsForDayHour(day, hour)
               return (
                 <div key={day.toISOString()} className="border-l border-border/50 p-0.5 space-y-0.5">
-                  {dayEvents.map((ev) => (
-                    <button
-                      key={ev.id}
-                      className={cn(
-                        'w-full text-left text-[10px] px-1.5 py-1 rounded truncate hover:opacity-80 transition-opacity',
-                        getPlatformChipClass(ev.platform)
-                      )}
-                      onClick={() => onEventClick(ev)}
-                    >
-                      {ev.jam_post && <span className="opacity-70 mr-1">{ev.jam_post.slice(0, 5)}</span>}
-                      {ev.videos?.judul ?? 'Video'}
-                    </button>
-                  ))}
+                  {dayEvents.map((ev) => {
+                    const isTarget = ev.videos && !['scheduled', 'live'].includes(ev.videos.status)
+                    return (
+                      <button
+                        key={ev.id}
+                        className={cn(
+                          'w-full text-left text-[10px] px-1.5 py-1 rounded truncate hover:opacity-80 transition-opacity',
+                          getPlatformChipClass(ev.platform),
+                          isTarget && 'border-dashed opacity-65 italic'
+                        )}
+                        onClick={() => onEventClick(ev)}
+                        title={`${ev.platform} · ${ev.videos?.judul ?? ''}${isTarget ? ' (Target/Reminder)' : ''}`}
+                      >
+                        {isTarget && <span className="mr-0.5 text-[8px]">🎯</span>}
+                        {ev.jam_post && <span className="opacity-70 mr-1">{ev.jam_post.slice(0, 5)}</span>}
+                        {ev.videos?.judul ?? 'Video'}
+                      </button>
+                    )
+                  })}
                 </div>
               )
             })}

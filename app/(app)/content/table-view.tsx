@@ -34,6 +34,7 @@ interface Props {
   onRowClick: (video: VideoWithSchedules) => void
   total: number
   pageSize: number
+  activePlatformFilter?: Platform | null
 }
 
 function SortIcon({ col, sortBy, sortDir }: { col: string; sortBy: string; sortDir: string }) {
@@ -58,12 +59,14 @@ function Th({ children, col, sortBy, sortDir, onSort, className }: {
   )
 }
 
-function SortableRow({ video, onRowClick, onDelete, sortBy, sortDir }: {
+function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, activePlatformFilter }: {
   video: VideoWithSchedules
+  index: number
+  page: number
+  pageSize: number
   onRowClick: (v: VideoWithSchedules) => void
   onDelete: (v: VideoWithSchedules) => void
-  sortBy: string
-  sortDir: string
+  activePlatformFilter?: Platform | null
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: video.id })
   const style = { transform: CSS.Transform.toString(transform), transition }
@@ -86,7 +89,13 @@ function SortableRow({ video, onRowClick, onDelete, sortBy, sortDir }: {
           <GripVertical className="w-3.5 h-3.5" />
         </button>
       </td>
-      <td className="px-3 py-2.5 text-xs text-text-muted">{video.no_upload ?? '—'}</td>
+      <td className="px-3 py-2.5 text-xs">
+        {video.no_upload != null ? (
+          <span className="font-semibold text-text-primary">#{video.no_upload}</span>
+        ) : (
+          <span className="text-text-muted/60">{page * pageSize + index + 1}</span>
+        )}
+      </td>
       <td className="px-3 py-2.5">
         <div className="w-10 h-10 rounded-md overflow-hidden bg-subtle flex items-center justify-center shrink-0">
           {video.thumbnail_url
@@ -125,7 +134,25 @@ function SortableRow({ video, onRowClick, onDelete, sortBy, sortDir }: {
         </div>
       </td>
       <td className="px-3 py-2.5 text-xs text-text-muted whitespace-nowrap">
-        {format(new Date(video.updated_at), 'd MMM', { locale: localeId })}
+        {video.status === 'live' ? (
+          (() => {
+            const schedules = video.video_platform_schedules ?? []
+            const targetSchedules = activePlatformFilter
+              ? schedules.filter((s) => s.platform === activePlatformFilter)
+              : schedules
+            if (targetSchedules.length > 0) {
+              const sorted = [...targetSchedules].sort((a, b) => a.tanggal_tayang.localeCompare(b.tanggal_tayang))
+              return (
+                <span className="text-emerald-600 font-medium flex items-center gap-1" title="Tanggal Tayang (Live)">
+                  <span>🚀</span> {format(new Date(sorted[0].tanggal_tayang), 'd MMM', { locale: localeId })}
+                </span>
+              )
+            }
+            return format(new Date(video.updated_at), 'd MMM', { locale: localeId })
+          })()
+        ) : (
+          format(new Date(video.updated_at), 'd MMM', { locale: localeId })
+        )}
       </td>
       <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
         <button
@@ -140,7 +167,7 @@ function SortableRow({ video, onRowClick, onDelete, sortBy, sortDir }: {
   )
 }
 
-export function TableView({ videos: initialVideos, loading, sortBy, sortDir, page, onSort, onPageChange, onRowClick, total, pageSize }: Props) {
+export function TableView({ videos: initialVideos, loading, sortBy, sortDir, page, onSort, onPageChange, onRowClick, total, pageSize, activePlatformFilter }: Props) {
   const totalPages = Math.ceil(total / pageSize)
   const [videos, setVideos] = useState(initialVideos)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
@@ -191,7 +218,7 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
               <Th col="judul" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Judul</Th>
               <Th col="status" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Status</Th>
               <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Platform</Th>
-              <Th col="updated_at" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Update</Th>
+              <Th col="updated_at" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Update / Tayang</Th>
               <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-10">{''}</Th>
             </tr>
           </thead>
@@ -206,8 +233,17 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
                         ))}
                       </tr>
                     ))
-                  : videos.map((v) => (
-                      <SortableRow key={v.id} video={v} onRowClick={onRowClick} onDelete={handleDelete} sortBy={sortBy} sortDir={sortDir} />
+                  : videos.map((v, index) => (
+                      <SortableRow
+                        key={v.id}
+                        video={v}
+                        index={index}
+                        page={page}
+                        pageSize={pageSize}
+                        onRowClick={onRowClick}
+                        onDelete={handleDelete}
+                        activePlatformFilter={activePlatformFilter}
+                      />
                     ))}
               </tbody>
             </SortableContext>

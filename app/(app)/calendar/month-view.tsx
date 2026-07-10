@@ -25,6 +25,9 @@ function EventChip({ ev, onEventClick }: { ev: ScheduleEvent; onEventClick: (e: 
     id: ev.id,
     data: { scheduleId: ev.id },
   })
+
+  const isTarget = ev.videos && !['scheduled', 'live'].includes(ev.videos.status)
+
   return (
     <button
       ref={setNodeRef}
@@ -34,11 +37,13 @@ function EventChip({ ev, onEventClick }: { ev: ScheduleEvent; onEventClick: (e: 
       className={cn(
         'w-full text-left text-[10px] px-1.5 py-0.5 rounded truncate leading-tight transition-opacity hover:opacity-80 cursor-grab active:cursor-grabbing touch-none',
         isDragging && 'shadow-lg ring-2 ring-amber-300',
-        getPlatformChipClass(ev.platform)
+        getPlatformChipClass(ev.platform),
+        isTarget && 'border-dashed opacity-65 italic'
       )}
       onClick={(e) => { e.stopPropagation(); onEventClick(ev) }}
-      title={`${ev.platform} · ${ev.videos?.judul ?? ''}`}
+      title={`${ev.platform} · ${ev.videos?.judul ?? ''}${isTarget ? ' (Target/Reminder)' : ''}`}
     >
+      {isTarget && <span className="mr-0.5 text-[8px]">🎯</span>}
       {ev.jam_post && <span className="mr-1 opacity-70">{ev.jam_post.slice(0, 5)}</span>}
       {ev.videos?.judul ?? 'Video'}
     </button>

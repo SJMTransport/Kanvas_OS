@@ -17,7 +17,7 @@ import { LayoutList, Columns, Search, Upload, Plus, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { STATUS_ORDER } from '@/lib/utils/status'
 import type { VideoWithSchedules } from '@/lib/hooks/useVideos'
-import type { VideoStatus, ContentType } from '@/lib/types'
+import type { VideoStatus, ContentType, Platform } from '@/lib/types'
 
 type ViewMode = 'table' | 'kanban'
 const PAGE_SIZE = 25
@@ -36,6 +36,7 @@ export default function ContentPage() {
     initialStatusParam ? (initialStatusParam.split(',') as VideoStatus[]) : 'all'
   )
   const [monthCurrent, setMonthCurrent] = useState(initialMonthParam === 'current')
+  const [platformFilter, setPlatformFilter] = useState<Platform | 'all'>('all')
   const [sortBy, setSortBy] = useState('sort_order')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [page, setPage] = useState(0)
@@ -78,6 +79,7 @@ export default function ContentPage() {
   const videosQuery = useVideos({
     status: statusFilter === 'all' ? null : statusFilter,
     contentType: contentTypeFilter,
+    platform: platformFilter === 'all' ? null : platformFilter,
     search: search || undefined,
     tema: temaFilter,
     monthCurrent,
@@ -105,11 +107,12 @@ export default function ContentPage() {
   }
 
   // Reset page on filter changes
-  useEffect(() => { setPage(0) }, [search, statusFilter, temaFilter, contentTypeFilter, monthCurrent])
+  useEffect(() => { setPage(0) }, [search, statusFilter, temaFilter, contentTypeFilter, platformFilter, monthCurrent])
 
   function clearFilters() {
     setStatusFilter('all')
     setContentTypeFilter(null)
+    setPlatformFilter('all')
     setMonthCurrent(false)
     router.replace('/content')
   }
@@ -119,7 +122,7 @@ export default function ContentPage() {
     : statusFilter.length === 1
       ? statusFilter[0].charAt(0).toUpperCase() + statusFilter[0].slice(1)
       : `${statusFilter.length} status`
-  const hasActiveFilter = statusFilter !== 'all' || monthCurrent || !!contentTypeFilter
+  const hasActiveFilter = statusFilter !== 'all' || monthCurrent || !!contentTypeFilter || platformFilter !== 'all'
 
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] min-h-0">
@@ -181,6 +184,20 @@ export default function ContentPage() {
           </SelectContent>
         </Select>
 
+        {/* Platform filter */}
+        <Select value={platformFilter} onValueChange={(v) => setPlatformFilter(v as Platform | 'all')}>
+          <SelectTrigger className="h-8 text-sm w-36">
+            <SelectValue placeholder="Platform" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Semua Platform</SelectItem>
+            <SelectItem value="tiktok">🎵 TikTok</SelectItem>
+            <SelectItem value="instagram">📸 Instagram</SelectItem>
+            <SelectItem value="youtube">📺 YouTube</SelectItem>
+            <SelectItem value="facebook">👥 Facebook</SelectItem>
+          </SelectContent>
+        </Select>
+
         <div className="flex-1" />
 
         {/* View toggle */}
@@ -217,6 +234,11 @@ export default function ContentPage() {
               Tipe: {contentTypeFilter === 'video' ? '🎬 Video' : '🖼️ Foto'}
             </span>
           )}
+          {platformFilter !== 'all' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent-light text-accent text-[11px] rounded-full font-medium capitalize">
+              Platform: {platformFilter}
+            </span>
+          )}
           {monthCurrent && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent-light text-accent text-[11px] rounded-full font-medium">
               Bulan ini
@@ -242,6 +264,7 @@ export default function ContentPage() {
             onRowClick={handleRowClick}
             total={total}
             pageSize={PAGE_SIZE}
+            activePlatformFilter={platformFilter === 'all' ? null : platformFilter}
           />
         ) : (
           <KanbanView

@@ -45,32 +45,41 @@ export function ListView({ events, onEventClick }: Props) {
               {format(date, 'EEEE, d MMMM', { locale: localeId })}
             </h3>
             <div className="bg-white border border-border rounded-xl divide-y divide-border">
-              {dayEvents.map((ev) => (
-                <button
-                  key={ev.id}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface transition-colors text-left"
-                  onClick={() => onEventClick(ev)}
-                >
-                  <span className="text-sm text-text-muted w-12 shrink-0 font-mono">
-                    {ev.jam_post ? ev.jam_post.slice(0, 5) : '—'}
-                  </span>
-                  <div className={cn('w-2 h-2 rounded-full shrink-0', getPlatformDot(ev.platform))} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-text-primary truncate">
-                      {ev.videos?.judul ?? 'Video'}
-                    </p>
-                    <p className="text-xs text-text-muted capitalize">{ev.platform}</p>
-                  </div>
-                  <span className={cn(
-                    'text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0',
-                    ev.status === 'posted' ? 'bg-green-100 text-success' :
-                    ev.status === 'failed' ? 'bg-red-100 text-error' :
-                    'bg-accent-light text-accent'
-                  )}>
-                    {ev.status === 'posted' ? 'Tayang' : ev.status === 'failed' ? 'Gagal' : 'Terjadwal'}
-                  </span>
-                </button>
-              ))}
+              {dayEvents.map((ev) => {
+                const isTarget = ev.videos && !['scheduled', 'live'].includes(ev.videos.status)
+                return (
+                  <button
+                    key={ev.id}
+                    className={cn(
+                      'w-full flex items-center gap-3 px-4 py-3 hover:bg-surface transition-colors text-left',
+                      isTarget && 'opacity-80 bg-subtle/30'
+                    )}
+                    onClick={() => onEventClick(ev)}
+                  >
+                    <span className="text-sm text-text-muted w-12 shrink-0 font-mono">
+                      {ev.jam_post ? ev.jam_post.slice(0, 5) : '—'}
+                    </span>
+                    <div className={cn('w-2 h-2 rounded-full shrink-0', getPlatformDot(ev.platform))} />
+                    <div className="flex-1 min-w-0">
+                      <p className={cn('text-sm font-medium text-text-primary truncate', isTarget && 'italic font-normal')}>
+                        {isTarget && <span className="mr-1">🎯</span>}
+                        {ev.videos?.judul ?? 'Video'}
+                      </p>
+                      <p className="text-xs text-text-muted capitalize">
+                        {ev.platform} {isTarget && '· Target Reminder'}
+                      </p>
+                    </div>
+                    <span className={cn(
+                      'text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0',
+                      ev.status === 'posted' ? 'bg-green-100 text-success' :
+                      ev.status === 'failed' ? 'bg-red-100 text-error' :
+                      isTarget ? 'bg-muted text-text-muted border border-border' : 'bg-accent-light text-accent'
+                    )}>
+                      {ev.status === 'posted' ? 'Tayang' : ev.status === 'failed' ? 'Gagal' : isTarget ? 'Target' : 'Terjadwal'}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           </div>
         )
