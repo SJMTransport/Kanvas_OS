@@ -28,13 +28,21 @@ CREATE TRIGGER trigger_auto_assign_no_upload
   EXECUTE FUNCTION public.auto_assign_no_upload();
 
 -- Stored procedure to calibrate/re-sequence all progressive videos in a workspace
--- Numbering starts from 1 starting from the BOTTOM-most video (highest sort_order DESC)
+-- SECURITY DEFINER is used to allow authenticated users to temporarily disable/enable the trigger
 CREATE OR REPLACE FUNCTION public.calibrate_workspace_videos(ws_id UUID)
 RETURNS VOID AS $$
 DECLARE
   v_rec RECORD;
   v_counter INT := 1;
 BEGIN
+  -- Security check: Ensure the caller (auth.uid()) is a member of the target workspace
+  IF NOT EXISTS (
+    SELECT 1 FROM public.workspace_members
+    WHERE workspace_id = ws_id AND user_id = auth.uid()
+  ) THEN
+    RAISE EXCEPTION 'Unauthorized: Caller is not a member of this workspace';
+  END IF;
+
   -- Disable the trigger temporarily to prevent it from interfering with manual calibration values
   ALTER TABLE public.videos DISABLE TRIGGER trigger_auto_assign_no_upload;
 
@@ -55,4 +63,4 @@ BEGIN
   -- Re-enable the trigger
   ALTER TABLE public.videos ENABLE TRIGGER trigger_auto_assign_no_upload;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
