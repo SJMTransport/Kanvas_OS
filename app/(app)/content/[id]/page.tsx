@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
@@ -878,7 +878,6 @@ export default function ContentDetailPage() {
   const queryClient = useQueryClient()
 
   const [activePlatform, setActivePlatform] = useState<Platform>('tiktok')
-  const [platformData, setPlatformData] = useState<Record<Platform, any>>({ tiktok: {}, instagram: {}, youtube: {}, facebook: {} })
   const [exporting, setExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState(0)
 
@@ -914,15 +913,15 @@ export default function ContentDetailPage() {
     },
   })
 
-  useEffect(() => {
+  const platformData = useMemo<Record<Platform, any>>(() => {
+    const map: Record<Platform, any> = { tiktok: {}, instagram: {}, youtube: {}, facebook: {} }
     if (perfRecords) {
-      const map: Record<Platform, any> = { tiktok: {}, instagram: {}, youtube: {}, facebook: {} }
       perfRecords.forEach((d: any) => {
         const p = d.platform as Platform
         map[p] = d
       })
-      setPlatformData(map)
     }
+    return map
   }, [perfRecords])
 
   async function handleStatusChange(newStatus: VideoStatus) {
