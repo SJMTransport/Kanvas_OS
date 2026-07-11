@@ -29,14 +29,15 @@ interface UseVideosOptions {
   sortDir?: 'asc' | 'desc'
   page?: number
   pageSize?: number
+  pilarKonten?: string[] | null
 }
 
 export function useVideos(opts: UseVideosOptions = {}) {
   const { workspaceId } = useWorkspace()
-  const { status, contentType, platform, search, tema, monthCurrent, sortBy = 'sort_order', sortDir = 'asc', page = 0, pageSize = 25 } = opts
+  const { status, contentType, platform, search, tema, monthCurrent, sortBy = 'sort_order', sortDir = 'asc', page = 0, pageSize = 25, pilarKonten } = opts
 
   return useQuery<VideoWithSchedules[]>({
-    queryKey: ['videos', workspaceId, status, contentType, platform, search, tema, monthCurrent, sortBy, sortDir, page],
+    queryKey: ['videos', workspaceId, status, contentType, platform, search, tema, monthCurrent, sortBy, sortDir, page, pilarKonten],
     queryFn: async () => {
       if (!workspaceId) return []
       const supabase = createClient()
@@ -66,6 +67,9 @@ export function useVideos(opts: UseVideosOptions = {}) {
       if (search) q = q.ilike('judul', `%${search}%`)
       if (tema && tema.length > 0) {
         q = q.ov('temas', tema)
+      }
+      if (pilarKonten && pilarKonten.length > 0) {
+        q = q.in('pilar_konten', pilarKonten)
       }
       if (monthCurrent) {
         const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0, 0, 0, 0)

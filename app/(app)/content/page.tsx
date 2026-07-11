@@ -50,6 +50,7 @@ export default function ContentPage() {
   const [page, setPage] = useState(0)
   const [temaFilter, setTemaFilter] = useState<string[] | 'all'>('all')
   const [contentTypeFilter, setContentTypeFilter] = useState<ContentType[] | 'all'>('all')
+  const [pilarFilter, setPilarFilter] = useState<string[] | 'all'>('all')
   const [addOpen, setAddOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [numberingSaving, setNumberingSaving] = useState(false)
@@ -153,12 +154,25 @@ export default function ContentPage() {
     })
   }
 
+  const handlePilarChange = (pilar: string, checked: boolean) => {
+    setPilarFilter((prev) => {
+      if (checked) {
+        return prev === 'all' ? [pilar] : [...prev, pilar]
+      } else {
+        if (prev === 'all') return 'all'
+        const next = prev.filter((x) => x !== pilar)
+        return next.length === 0 ? 'all' : next
+      }
+    })
+  }
+
   const videosQuery = useVideos({
     status: statusFilter === 'all' ? null : statusFilter,
     contentType: contentTypeFilter === 'all' ? null : contentTypeFilter,
     platform: platformFilter === 'all' ? null : platformFilter,
     search: search || undefined,
     tema: temaFilter === 'all' ? null : temaFilter,
+    pilarKonten: pilarFilter === 'all' ? null : pilarFilter,
     monthCurrent,
     sortBy,
     sortDir,
@@ -183,13 +197,14 @@ export default function ContentPage() {
   }
 
   // Reset page on filter changes
-  useEffect(() => { setPage(0) }, [search, statusFilter, temaFilter, contentTypeFilter, platformFilter, monthCurrent])
+  useEffect(() => { setPage(0) }, [search, statusFilter, temaFilter, contentTypeFilter, platformFilter, monthCurrent, pilarFilter])
 
   function clearFilters() {
     setStatusFilter('all')
     setContentTypeFilter('all')
     setPlatformFilter('all')
     setTemaFilter('all')
+    setPilarFilter('all')
     setMonthCurrent(false)
     router.replace('/content')
   }
@@ -218,7 +233,13 @@ export default function ContentPage() {
       ? (contentTypeFilter[0] === 'video' ? '🎬 Video' : '🖼️ Foto')
       : `${contentTypeFilter.length} Tipe`
 
-  const hasActiveFilter = statusFilter !== 'all' || platformFilter !== 'all' || temaFilter !== 'all' || contentTypeFilter !== 'all' || monthCurrent
+  const pilarFilterLabel = pilarFilter === 'all'
+    ? 'Semua Pilar'
+    : pilarFilter.length === 1
+      ? pilarFilter[0]
+      : `${pilarFilter.length} Pilar`
+
+  const hasActiveFilter = statusFilter !== 'all' || platformFilter !== 'all' || temaFilter !== 'all' || contentTypeFilter !== 'all' || pilarFilter !== 'all' || monthCurrent
 
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] min-h-0">
@@ -307,6 +328,39 @@ export default function ContentPage() {
             </DropdownMenuContent>
           </DropdownMenu>
         )}
+
+        {/* Pilar filter */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 text-sm min-w-36 justify-between font-normal border-border bg-white hover:bg-subtle text-text-primary">
+              <span className="truncate">{pilarFilterLabel}</span>
+              <ChevronDown className="ml-1 w-3.5 h-3.5 shrink-0 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-48 bg-white border border-border">
+            <DropdownMenuLabel>Pilih Pilar Konten</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuCheckboxItem
+              checked={pilarFilter === 'all'}
+              onCheckedChange={(checked) => checked && setPilarFilter('all')}
+            >
+              Semua Pilar
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuSeparator />
+            {['Edukasi', 'Hiburan', 'Promosi', 'Inspirasi', 'Behind the Scenes'].map((p) => {
+              const checked = pilarFilter !== 'all' && pilarFilter.includes(p)
+              return (
+                <DropdownMenuCheckboxItem
+                  key={p}
+                  checked={checked}
+                  onCheckedChange={(checked) => handlePilarChange(p, checked)}
+                >
+                  {p}
+                </DropdownMenuCheckboxItem>
+              )
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* Content type filter */}
         <DropdownMenu>
@@ -445,6 +499,11 @@ export default function ContentPage() {
           {platformFilter !== 'all' && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent-light text-accent text-[11px] rounded-full font-medium">
               Platform: {platformFilterLabel}
+            </span>
+          )}
+          {pilarFilter !== 'all' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent-light text-accent text-[11px] rounded-full font-medium">
+              Pilar: {pilarFilterLabel}
             </span>
           )}
           {monthCurrent && (

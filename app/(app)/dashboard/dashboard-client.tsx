@@ -59,6 +59,7 @@ interface Props {
   followups: Followup[]
   overdueInvoices: OverdueInvoice[]
   recentVideos: RecentVideo[]
+  pilarVideos?: string[]
 }
 
 function safeDate(value: string | null | undefined): Date | null {
@@ -109,9 +110,30 @@ function getGreetingEmoji() {
   return '🌙'
 }
 
-export function DashboardClient({ userName, role, todaySchedules, pipeline, followups, overdueInvoices, recentVideos }: Props) {
+export function DashboardClient({ userName, role, todaySchedules, pipeline, followups, overdueInvoices, recentVideos, pilarVideos = [] }: Props) {
   const router = useRouter()
   const firstName = (userName || 'Kreator').split(' ')[0]
+
+  // Calculate content pillar distribution
+  const pillarsCount: Record<string, number> = {
+    'Edukasi': 0,
+    'Hiburan': 0,
+    'Promosi': 0,
+    'Inspirasi': 0,
+    'Behind the Scenes': 0
+  }
+  let totalPillarsCount = 0
+  pilarVideos.forEach(p => {
+    if (p in pillarsCount) {
+      pillarsCount[p]++
+      totalPillarsCount++
+    }
+  })
+
+  const pilarPercentages = Object.entries(pillarsCount).map(([name, count]) => {
+    const percentage = totalPillarsCount > 0 ? Math.round((count / totalPillarsCount) * 100) : 0
+    return { name, count, percentage }
+  }).sort((a, b) => b.count - a.count)
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-8">
@@ -207,6 +229,54 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
             )
           })}
         </div>
+      </div>
+
+      {/* Section 3.5 — Distribusi Pilar Konten */}
+      <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
+        <h2 className="font-heading font-semibold text-text-primary mb-4 flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-accent" />
+          Distribusi Pilar Konten
+        </h2>
+        {totalPillarsCount === 0 ? (
+          <p className="text-xs text-text-muted italic py-2">Belum ada data pilar konten. Silakan tentukan pilar konten pada detail perencanaan video Anda.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3.5">
+              {pilarPercentages.map((item) => {
+                const colors: Record<string, string> = {
+                  'Edukasi': 'bg-blue-500',
+                  'Hiburan': 'bg-purple-500',
+                  'Promosi': 'bg-rose-500',
+                  'Inspirasi': 'bg-amber-500',
+                  'Behind the Scenes': 'bg-teal-500',
+                }
+                const color = colors[item.name] || 'bg-accent'
+                return (
+                  <div key={item.name} className="space-y-1">
+                    <div className="flex justify-between text-xs font-medium">
+                      <span className="text-text-primary">{item.name}</span>
+                      <span className="text-text-muted">{item.count} video ({item.percentage}%)</span>
+                    </div>
+                    <div className="w-full bg-subtle h-2.5 rounded-full overflow-hidden">
+                      <div
+                        className={cn("h-full rounded-full transition-all duration-500", color)}
+                        style={{ width: `${item.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            {/* Pie Chart Mock Visualization */}
+            <div className="flex items-center justify-center p-4 bg-subtle rounded-xl border border-border/40">
+              <div className="text-center space-y-2">
+                <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Top Pilar Bulan Ini</p>
+                <p className="text-2xl font-bold text-accent font-heading">{pilarPercentages[0]?.name ?? '-'}</p>
+                <p className="text-xs text-text-secondary">Pilar ini menyusun {pilarPercentages[0]?.percentage ?? 0}% dari total pustaka konten Anda</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

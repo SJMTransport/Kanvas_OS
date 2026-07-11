@@ -108,6 +108,30 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, activ
       <td className="px-3 py-2.5 text-xs text-text-secondary max-w-[150px] truncate">
         {video.temas && video.temas.length > 0 ? video.temas.join(', ') : video.tema ?? '-'}
       </td>
+      <td className="px-3 py-2.5 text-xs text-text-secondary max-w-[120px] truncate">
+        {video.pilar_konten ? (
+          <span className="font-semibold text-accent">{video.pilar_konten}</span>
+        ) : (
+          <span className="text-text-muted/30 font-mono">-</span>
+        )}
+      </td>
+      <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+        {video.google_drive_link ? (
+          <a
+            href={video.google_drive_link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center w-6.5 h-6.5 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-600 hover:text-emerald-700 transition-colors shadow-sm"
+            title="Buka Google Drive"
+          >
+            <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+              <path d="M19.43 12.98l-6.7-11.53c-.3-.5-.8-.8-1.4-.8h.02c-.6 0-1.1.3-1.4.8L3.25 12.98c-.3.5-.3 1.1 0 1.6l3.35 5.76c.3.5.8.8 1.4.8h13.4c.6 0 1.1-.3 1.4-.8l3.35-5.76c.3-.5.3-1.1 0-1.6zm-10.4-8.98h2l5.7 9.8h-2zM8.82 17.5l-2.85-4.9 5.7-9.8 2.85 4.9zm11.36 0h-13.4l2.85-4.9h13.4z" />
+            </svg>
+          </a>
+        ) : (
+          <span className="text-text-muted/20 text-xs font-mono">-</span>
+        )}
+      </td>
       <td className="px-3 py-2.5">
         <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium border', getStatusBadgeClass(video.status as VideoStatus))}>
           {STATUS_CONFIG[video.status as VideoStatus]?.label ?? video.status}
@@ -136,35 +160,33 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, activ
         </div>
       </td>
       <td className="px-3 py-2.5 text-xs text-text-muted whitespace-nowrap">
-        {(() => {
-          const isLiveOrScheduled = video.status === 'live' || video.status === 'scheduled'
-          if (isLiveOrScheduled) {
-            const schedules = video.video_platform_schedules ?? []
-            const targetSchedules = activePlatformFilter && activePlatformFilter.length > 0
-              ? schedules.filter((s) => activePlatformFilter.includes(s.platform as Platform))
-              : schedules
-            if (targetSchedules.length > 0) {
-              const sorted = [...targetSchedules].sort((a, b) => a.tanggal_tayang.localeCompare(b.tanggal_tayang))
-              const icon = video.status === 'live' ? '🚀' : '📅'
-              const textClass = video.status === 'live' ? 'text-emerald-600 font-medium' : 'text-accent font-medium'
-              return (
-                <span className={cn("flex items-center gap-1.5", textClass)} title={video.status === 'live' ? "Tanggal Tayang (Live)" : "Tanggal Tayang (Scheduled)"}>
-                  <span>{icon}</span> {format(new Date(sorted[0].tanggal_tayang), 'd MMM', { locale: localeId })}
-                </span>
-              )
+        <div className="flex flex-col gap-0.5">
+          {video.deadline_posting && (
+            <span className="text-text-secondary flex items-center gap-1" title="Tanggal Target (Deadline)">
+              <span className="text-[10px]">🎯</span> {format(new Date(video.deadline_posting), 'd MMM', { locale: localeId })}
+            </span>
+          )}
+          {(() => {
+            const isLiveOrScheduled = video.status === 'live' || video.status === 'scheduled'
+            if (isLiveOrScheduled) {
+              const schedules = video.video_platform_schedules ?? []
+              const targetSchedules = activePlatformFilter && activePlatformFilter.length > 0
+                ? schedules.filter((s) => activePlatformFilter.includes(s.platform as Platform))
+                : schedules
+              if (targetSchedules.length > 0) {
+                const sorted = [...targetSchedules].sort((a, b) => a.tanggal_tayang.localeCompare(b.tanggal_tayang))
+                const icon = video.status === 'live' ? '🚀' : '📅'
+                const textClass = video.status === 'live' ? 'text-emerald-600 font-medium' : 'text-accent font-medium'
+                return (
+                  <span className={cn("flex items-center gap-1", textClass)} title={video.status === 'live' ? "Tanggal Tayang (Live)" : "Tanggal Tayang (Scheduled)"}>
+                    <span>{icon}</span> {format(new Date(sorted[0].tanggal_tayang), 'd MMM', { locale: localeId })}
+                  </span>
+                )
+              }
             }
-            return <span className="text-text-muted/40 font-mono">-</span>
-          } else {
-            if (video.deadline_posting) {
-              return (
-                <span className="text-text-secondary flex items-center gap-1.5" title="Tanggal Target (Deadline)">
-                  <span>🎯</span> {format(new Date(video.deadline_posting), 'd MMM', { locale: localeId })}
-                </span>
-              )
-            }
-            return <span className="text-text-muted/40 font-mono">-</span>
-          }
-        })()}
+            return !video.deadline_posting ? <span className="text-text-muted/40 font-mono">-</span> : null
+          })()}
+        </div>
       </td>
       <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
         <button
@@ -229,6 +251,8 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
               <Th col="no_video" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-28">No. Video</Th>
               <Th col="judul" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Judul</Th>
               <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-40">Tema</Th>
+              <Th col="pilar_konten" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-32">Pilar</Th>
+              <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-14 text-center">Aset</Th>
               <Th col="status" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Status</Th>
               <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Platform</Th>
               <Th col="updated_at" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-36">Tanggal</Th>

@@ -74,6 +74,7 @@ export interface Video {
   content_type: ContentType
   image_urls: string[] | null
   status: VideoStatus
+  pilar_konten: string | null
   created_at: string
   updated_at: string
 }

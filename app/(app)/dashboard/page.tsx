@@ -31,6 +31,7 @@ export default function DashboardPage() {
         supabase.from('brands').select('id, nama_brand, status, next_followup_date, industri').eq('workspace_id', workspaceId).not('status', 'in', '("selesai","cold")').lte('next_followup_date', today).order('next_followup_date', { ascending: true }).limit(5),
         supabase.from('invoices').select('id, invoice_number, total, due_date, brands(nama_brand)').eq('workspace_id', workspaceId).eq('status', 'overdue').order('due_date', { ascending: true }).limit(5),
         supabase.from('videos').select('id, judul, status, updated_at, created_by, users(full_name)').eq('workspace_id', workspaceId).order('updated_at', { ascending: false }).limit(5),
+        supabase.from('videos').select('pilar_konten').eq('workspace_id', workspaceId),
       ])
 
       const settledValue = <T,>(r: PromiseSettledResult<T>): T | undefined =>
@@ -45,6 +46,11 @@ export default function DashboardPage() {
       const followups = (settledValue(results[6]) as any)?.data ?? []
       const overdueInvoices = (settledValue(results[7]) as any)?.data ?? []
       const recentVideos = (settledValue(results[8]) as any)?.data ?? []
+      const pilarRaw = (settledValue(results[9]) as any)?.data ?? []
+
+      const pilarVideos = pilarRaw
+        .map((v: any) => v.pilar_konten)
+        .filter(Boolean) as string[]
 
       const filteredSchedules = (todaySchedules ?? []).filter(
         (s: any) => s?.videos?.workspace_id === workspaceId
@@ -57,6 +63,7 @@ export default function DashboardPage() {
         followups: followups ?? [],
         overdueInvoices: (overdueInvoices ?? []) as any[],
         recentVideos: (recentVideos ?? []) as any[],
+        pilarVideos,
       }
     },
     enabled: !!workspaceId,
@@ -98,6 +105,7 @@ export default function DashboardPage() {
       followups={data.followups as any}
       overdueInvoices={data.overdueInvoices}
       recentVideos={data.recentVideos}
+      pilarVideos={data.pilarVideos}
     />
   )
 }

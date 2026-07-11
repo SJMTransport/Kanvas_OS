@@ -184,6 +184,7 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
     storage_video: video.storage_video ?? '',
     google_drive_link: video.google_drive_link ?? '',
     caption_default: video.caption_default ?? '',
+    pilar_konten: video.pilar_konten ?? '',
   })
 
   function set(field: string, value: string) {
@@ -193,7 +194,6 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
   async function handleSave() {
     setSaving(true)
     const supabase = createClient()
-    const isLiveOrScheduled = video.status === 'live' || video.status === 'scheduled'
     const payload: Record<string, unknown> = {
       no_video: form.no_video ? `VID-${form.no_video.padStart(3, '0')}` : null,
       judul: form.judul || null,
@@ -202,11 +202,12 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
       temas,
       tema: temas[0] ?? null,
       tanggal_shooting: form.tanggal_shooting || null,
-      deadline_posting: isLiveOrScheduled ? null : (form.deadline_posting || null),
+      deadline_posting: form.deadline_posting || null,
       storage_bahan: form.storage_bahan || null,
       storage_video: form.storage_video || null,
       google_drive_link: form.google_drive_link || null,
       caption_default: form.caption_default || null,
+      pilar_konten: form.pilar_konten || null,
     }
     const { error } = await supabase.from('videos').update(payload).eq('id', video.id)
     setSaving(false)
@@ -262,25 +263,38 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
         <TemaSelect temas={temas} onChange={setTemas} workspaceId={workspaceId} />
       </div>
 
+      <div className="space-y-1.5">
+        <Label className="text-xs text-text-muted">Pilar Konten</Label>
+        <Select value={form.pilar_konten || 'none'} onValueChange={(val) => set('pilar_konten', val === 'none' ? '' : val)}>
+          <SelectTrigger className="text-xs h-9 bg-white border-border text-text-primary">
+            <SelectValue placeholder="Pilih Pilar Konten" />
+          </SelectTrigger>
+          <SelectContent className="bg-white border border-border">
+            <SelectItem value="none">Tanpa Pilar</SelectItem>
+            <SelectItem value="Edukasi">Edukasi</SelectItem>
+            <SelectItem value="Hiburan">Hiburan</SelectItem>
+            <SelectItem value="Promosi">Promosi</SelectItem>
+            <SelectItem value="Inspirasi">Inspirasi</SelectItem>
+            <SelectItem value="Behind the Scenes">Behind the Scenes</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       {isFoto ? (
-        !isLiveOrScheduled && (
-          <div className="space-y-1.5">
-            <Label className="text-xs text-text-muted">Tanggal Target (Deadline)</Label>
-            <Input type="date" value={form.deadline_posting} onChange={(e) => set('deadline_posting', e.target.value)} className="text-xs h-9" />
-          </div>
-        )
+        <div className="space-y-1.5">
+          <Label className="text-xs text-text-muted">Tanggal Target (Deadline)</Label>
+          <Input type="date" value={form.deadline_posting} onChange={(e) => set('deadline_posting', e.target.value)} className="text-xs h-9" />
+        </div>
       ) : (
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label className="text-xs text-text-muted">Tanggal Shooting</Label>
             <Input type="date" value={form.tanggal_shooting} onChange={(e) => set('tanggal_shooting', e.target.value)} className="text-xs h-9" />
           </div>
-          {!isLiveOrScheduled && (
-            <div className="space-y-1.5">
-              <Label className="text-xs text-text-muted">Tanggal Target (Deadline)</Label>
-              <Input type="date" value={form.deadline_posting} onChange={(e) => set('deadline_posting', e.target.value)} className="text-xs h-9" />
-            </div>
-          )}
+          <div className="space-y-1.5">
+            <Label className="text-xs text-text-muted">Tanggal Target (Deadline)</Label>
+            <Input type="date" value={form.deadline_posting} onChange={(e) => set('deadline_posting', e.target.value)} className="text-xs h-9" />
+          </div>
         </div>
       )}
 
@@ -914,13 +928,9 @@ export default function ContentDetailPage() {
   async function handleStatusChange(newStatus: VideoStatus) {
     if (!video) return
     const supabase = createClient()
-    const isLiveOrScheduled = newStatus === 'live' || newStatus === 'scheduled'
     const payload: Record<string, any> = {
       status: newStatus,
       updated_at: new Date().toISOString(),
-    }
-    if (isLiveOrScheduled) {
-      payload.deadline_posting = null
     }
     const { error } = await supabase
       .from('videos')
