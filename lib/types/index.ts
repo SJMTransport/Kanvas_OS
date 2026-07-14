@@ -89,6 +89,8 @@ export interface VideoPlatformSchedule {
   status: ScheduleStatus
   url_post: string | null
   caption_override: string | null
+  media_url?: string | null
+  is_story?: boolean | null
   created_at: string
   updated_at: string
 }

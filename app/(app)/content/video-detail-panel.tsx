@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
-import { X, Plus, Trash2, GripVertical, Check, ExternalLink, Loader2, FileText } from 'lucide-react'
+import { X, Plus, Trash2, GripVertical, Check, ExternalLink, Loader2, FileText, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { getStatusBadgeClass, STATUS_CONFIG } from '@/lib/utils/status'
@@ -121,7 +121,8 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
   const queryClient = useQueryClient()
   const { workspaceId } = useWorkspace()
   const [adding, setAdding] = useState<Platform | null>(null)
-  const [form, setForm] = useState({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '' })
+  const [form, setForm] = useState({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false })
+  const [mediaUploading, setMediaUploading] = useState(false)
 
   const { data: schedules, isLoading } = useQuery({
     queryKey: ['schedules-video', video.id],
@@ -143,6 +144,24 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
     enabled: !!workspaceId,
   })
 
+  async function handleUploadMedia(file: File) {
+    setMediaUploading(true)
+    try {
+      const supabase = createClient()
+      const ext = file.name.split('.').pop()
+      const path = `schedules/${video.id}/${crypto.randomUUID()}.${ext}`
+      const { error } = await supabase.storage.from('content-images').upload(path, file)
+      if (error) throw error
+      const { data: { publicUrl } } = supabase.storage.from('content-images').getPublicUrl(path)
+      setForm((f) => ({ ...f, media_url: publicUrl }))
+      toast.success('Media berhasil diunggah!')
+    } catch (err: any) {
+      toast.error('Gagal mengunggah media: ' + err.message)
+    } finally {
+      setMediaUploading(false)
+    }
+  }
+
   async function addSchedule(platform: Platform) {
     if (!form.tanggal_tayang) { toast.error('Tanggal tayang wajib diisi'); return }
     const supabase = createClient()
@@ -152,6 +171,8 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
       tanggal_tayang: form.tanggal_tayang,
       jam_post: form.jam_post || null,
       caption_override: form.caption_override || null,
+      media_url: form.media_url || null,
+      is_story: form.is_story,
       status: 'scheduled',
     })
     if (error) { toast.error(error.message); return }
@@ -159,7 +180,7 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
     queryClient.invalidateQueries({ queryKey: ['schedules-video', video.id] })
     queryClient.invalidateQueries({ queryKey: ['schedules'] })
     setAdding(null)
-    setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '' })
+    setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false })
   }
 
   async function markPosted(id: string, url: string) {
@@ -188,7 +209,7 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
             </div>
 
             {adding === platform && (
-              <div className="p-3 bg-accent-light/30 border-b border-border space-y-2">
+              <div className="p-3 bg-accent-light/30 border-b border-border space-y-3">
                 {platformAccounts.length > 0 && (
                   <div>
                     <Label className="text-xs">Akun</Label>
@@ -198,6 +219,40 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
                     </select>
                   </div>
                 )}
+
+                {/* Snapgram Toggle for Instagram/Facebook */}
+                {(platform === 'instagram' || platform === 'facebook') && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Jenis Postingan</Label>
+                    <div className="flex gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, is_story: false }))}
+                        className={cn(
+                          "flex-1 py-1 px-2.5 text-xs font-semibold rounded border transition-all text-center",
+                          !form.is_story 
+                            ? "bg-accent border-accent text-white shadow-xs" 
+                            : "bg-white border-border text-text-secondary hover:bg-subtle"
+                        )}
+                      >
+                        Post / Reels
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, is_story: true }))}
+                        className={cn(
+                          "flex-1 py-1 px-2.5 text-xs font-semibold rounded border transition-all text-center",
+                          form.is_story 
+                            ? "bg-accent border-accent text-white shadow-xs" 
+                            : "bg-white border-border text-text-secondary hover:bg-subtle"
+                        )}
+                      >
+                        📸 Snapgram
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Label className="text-xs">Tanggal *</Label>
@@ -208,11 +263,53 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
                     <Input type="time" className="h-8 text-xs mt-1" value={form.jam_post} onChange={(e) => setForm((f) => ({ ...f, jam_post: e.target.value }))} />
                   </div>
                 </div>
+
+                {/* Media upload option */}
+                <div className="space-y-1">
+                  <Label className="text-xs">Sumber Media</Label>
+                  <div className="grid grid-cols-2 gap-1.5 mt-1">
+                    <label className="flex items-center justify-center gap-1 py-1 px-2 border border-dashed border-border rounded bg-white hover:border-accent hover:bg-accent-light/5 cursor-pointer transition-colors text-[10px] font-bold text-text-secondary">
+                      {mediaUploading ? <Loader2 className="w-3 h-3 animate-spin text-accent" /> : <Upload className="w-3 h-3" />}
+                      PC File
+                      <input
+                        type="file"
+                        accept="image/*,video/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) handleUploadMedia(file)
+                        }}
+                        disabled={mediaUploading}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (video.google_drive_link) {
+                          setForm((f) => ({ ...f, media_url: video.google_drive_link || '' }))
+                          toast.success('Link Google Drive disalin!')
+                        } else {
+                          toast.error('Google Drive Link belum diisi')
+                        }
+                      }}
+                      className="flex items-center justify-center gap-1 py-1 px-2 border border-border rounded bg-white hover:border-accent hover:bg-accent-light/5 transition-colors text-[10px] font-bold text-text-secondary"
+                    >
+                      Drive Link
+                    </button>
+                  </div>
+                  {form.media_url && (
+                    <p className="text-[9px] text-emerald-600 truncate mt-1">✓ Media siap: {form.media_url}</p>
+                  )}
+                </div>
+
                 <div>
                   <Label className="text-xs">Caption Override</Label>
                   <Textarea className="mt-1 text-xs" rows={2} placeholder="Kosongkan untuk pakai caption default" value={form.caption_override} onChange={(e) => setForm((f) => ({ ...f, caption_override: e.target.value }))} />
                 </div>
-                <Button size="sm" className="w-full h-8 text-xs" onClick={() => addSchedule(platform)}>Simpan Jadwal</Button>
+                <div className="flex gap-1.5">
+                  <Button size="sm" className="flex-1 h-8 text-xs bg-accent hover:bg-accent/90" onClick={() => addSchedule(platform)}>Simpan</Button>
+                  <Button size="sm" variant="secondary" className="h-8 text-xs" onClick={() => setAdding(null)}>Batal</Button>
+                </div>
               </div>
             )}
 
@@ -220,18 +317,32 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
               {platformSchedules.length === 0 && adding !== platform && (
                 <p className="px-3 py-3 text-xs text-text-muted">Belum ada jadwal</p>
               )}
-              {platformSchedules.map((s: { id: string; tanggal_tayang: string; jam_post?: string; status: string; url_post?: string; social_accounts?: { handle: string } | null }) => (
-                <div key={s.id} className="px-3 py-2.5 space-y-1">
+              {platformSchedules.map((s: { id: string; tanggal_tayang: string; jam_post?: string; status: string; url_post?: string; social_accounts?: { handle: string } | null; is_story?: boolean | null; media_url?: string | null }) => (
+                <div key={s.id} className="px-3 py-2.5 space-y-1.5">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-medium text-text-primary">
                       📅 {s.tanggal_tayang}{s.jam_post ? ` · 🕐 ${s.jam_post.slice(0, 5)}` : ''}
                     </p>
-                    <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full font-medium',
-                      s.status === 'posted' ? 'bg-green-100 text-success' : s.status === 'failed' ? 'bg-red-100 text-error' : 'bg-accent-light text-accent')}>
-                      {s.status === 'posted' ? 'Tayang' : s.status === 'failed' ? 'Gagal' : 'Terjadwal'}
-                    </span>
+                    <div className="flex items-center gap-1">
+                      {s.is_story && (
+                        <span className="text-[8px] px-1 bg-purple-100 text-purple-700 rounded font-bold">
+                          Story
+                        </span>
+                      )}
+                      <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full font-medium',
+                        s.status === 'posted' ? 'bg-green-100 text-success' : s.status === 'failed' ? 'bg-red-100 text-error' : 'bg-accent-light text-accent')}>
+                        {s.status === 'posted' ? 'Tayang' : s.status === 'failed' ? 'Gagal' : 'Terjadwal'}
+                      </span>
+                    </div>
                   </div>
                   {s.social_accounts && <p className="text-[11px] text-text-muted">@{s.social_accounts.handle}</p>}
+                  
+                  {s.media_url && (
+                    <a href={s.media_url} target="_blank" rel="noopener noreferrer" className="text-[9px] text-accent hover:underline block truncate max-w-xs">
+                      📁 Media: {s.media_url.includes('google.com') ? 'Google Drive' : 'PC File'}
+                    </a>
+                  )}
+
                   {s.url_post
                     ? <a href={s.url_post} target="_blank" rel="noopener noreferrer" className="text-[11px] text-accent flex items-center gap-1"><ExternalLink className="w-3 h-3" />Lihat postingan</a>
                     : s.status !== 'posted' && (

@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
-  ArrowLeft, Plus, Trash2, Check, ExternalLink, Loader2, FileText, Video,
+  ArrowLeft, Plus, Trash2, Check, ExternalLink, Loader2, FileText, Video, Upload, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -485,8 +485,9 @@ function DistributionTab({
   const { workspaceId } = useWorkspace()
   const [adding, setAdding] = useState<Platform | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '' })
+  const [form, setForm] = useState({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false })
   const [urlPostInputs, setUrlPostInputs] = useState<Record<string, string>>({})
+  const [mediaUploading, setMediaUploading] = useState(false)
 
   const { data: schedules } = useQuery({
     queryKey: ['schedules-video', video.id],
@@ -508,6 +509,24 @@ function DistributionTab({
     enabled: !!workspaceId,
   })
 
+  async function handleUploadMedia(file: File) {
+    setMediaUploading(true)
+    try {
+      const supabase = createClient()
+      const ext = file.name.split('.').pop()
+      const path = `schedules/${video.id}/${crypto.randomUUID()}.${ext}`
+      const { error } = await supabase.storage.from('content-images').upload(path, file)
+      if (error) throw error
+      const { data: { publicUrl } } = supabase.storage.from('content-images').getPublicUrl(path)
+      setForm((f) => ({ ...f, media_url: publicUrl }))
+      toast.success('Media berhasil diunggah!')
+    } catch (err: any) {
+      toast.error('Gagal mengunggah media: ' + err.message)
+    } finally {
+      setMediaUploading(false)
+    }
+  }
+
   async function addSchedule(platform: Platform) {
     if (!form.tanggal_tayang) { toast.error('Tanggal tayang wajib diisi'); return }
     const supabase = createClient()
@@ -516,6 +535,8 @@ function DistributionTab({
       tanggal_tayang: form.tanggal_tayang,
       jam_post: form.jam_post || null,
       caption_override: form.caption_override || null,
+      media_url: form.media_url || null,
+      is_story: form.is_story,
     }
 
     let error
@@ -537,15 +558,17 @@ function DistributionTab({
     queryClient.invalidateQueries({ queryKey: ['schedules'] })
     setAdding(null)
     setEditingId(null)
-    setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '' })
+    setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false })
   }
 
-  function startEdit(s: { id: string; platform: string; social_account_id?: string | null; tanggal_tayang: string; jam_post?: string | null; caption_override?: string | null }) {
+  function startEdit(s: { id: string; platform: string; social_account_id?: string | null; tanggal_tayang: string; jam_post?: string | null; caption_override?: string | null; media_url?: string | null; is_story?: boolean | null }) {
     setForm({
       social_account_id: s.social_account_id ?? '',
       tanggal_tayang: s.tanggal_tayang,
       jam_post: s.jam_post ?? '',
       caption_override: s.caption_override ?? '',
+      media_url: s.media_url ?? '',
+      is_story: !!s.is_story,
     })
     setEditingId(s.id)
     setAdding(s.platform as Platform)
@@ -602,7 +625,7 @@ function DistributionTab({
                 <Button size="sm" variant="secondary" className="h-6 text-[10px] gap-1" onClick={(e) => {
                   e.stopPropagation()
                   if (platform === adding) { setAdding(null); setEditingId(null) }
-                  else { setAdding(platform); setEditingId(null); setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '' }) }
+                  else { setAdding(platform); setEditingId(null); setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false }) }
                 }}>
                   <Plus className="w-2.5 h-2.5" /> Jadwal
                 </Button>
@@ -610,7 +633,7 @@ function DistributionTab({
             </div>
 
             {adding === platform && (
-              <div className="p-3 bg-accent-light/10 border-b border-border space-y-2" onClick={(e) => e.stopPropagation()}>
+              <div className="p-3 bg-accent-light/10 border-b border-border space-y-3" onClick={(e) => e.stopPropagation()}>
                 {platformAccounts.length > 0 && (
                   <div>
                     <Label className="text-xs">Akun</Label>
@@ -626,6 +649,40 @@ function DistributionTab({
                     </select>
                   </div>
                 )}
+
+                {/* Snapgram / Story option specifically for Instagram / Facebook */}
+                {(platform === 'instagram' || platform === 'facebook') && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Jenis Postingan</Label>
+                    <div className="flex gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, is_story: false }))}
+                        className={cn(
+                          "flex-1 py-1 px-3 text-xs font-semibold rounded-md border transition-all text-center",
+                          !form.is_story 
+                            ? "bg-accent border-accent text-white shadow-sm" 
+                            : "bg-white border-border text-text-secondary hover:bg-subtle"
+                        )}
+                      >
+                        Reels / Feed / Post
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, is_story: true }))}
+                        className={cn(
+                          "flex-1 py-1 px-3 text-xs font-semibold rounded-md border transition-all text-center",
+                          form.is_story 
+                            ? "bg-accent border-accent text-white shadow-sm" 
+                            : "bg-white border-border text-text-secondary hover:bg-subtle"
+                        )}
+                      >
+                        📸 Snapgram (Story)
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Label className="text-xs">Tanggal *</Label>
@@ -636,13 +693,155 @@ function DistributionTab({
                     <Input type="time" className="h-8 text-xs mt-1" value={form.jam_post} onChange={(e) => setForm((f) => ({ ...f, jam_post: e.target.value }))} />
                   </div>
                 </div>
+
+                {/* Media Scheduling Selection */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Sumber Media (Gambar / Video)</Label>
+                  <div className="grid grid-cols-2 gap-2 mt-1">
+                    <label className="flex items-center justify-center gap-1.5 py-1.5 px-3 border border-dashed border-border rounded bg-white hover:border-accent hover:bg-accent-light/5 cursor-pointer transition-colors text-xs font-semibold text-text-secondary">
+                      {mediaUploading ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
+                      ) : (
+                        <Upload className="w-3.5 h-3.5" />
+                      )}
+                      Upload dari PC
+                      <input
+                        type="file"
+                        accept="image/*,video/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) handleUploadMedia(file)
+                        }}
+                        disabled={mediaUploading}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (video.google_drive_link) {
+                          setForm((f) => ({ ...f, media_url: video.google_drive_link || '' }))
+                          toast.success('Link Google Drive disalin sebagai media!')
+                        } else {
+                          toast.error('Google Drive Link belum diisi pada info konten')
+                        }
+                      }}
+                      className="flex items-center justify-center gap-1.5 py-1.5 px-3 border border-border rounded bg-white hover:border-accent hover:bg-accent-light/5 transition-colors text-xs font-semibold text-text-secondary"
+                    >
+                      <svg className="w-3.5 h-3.5 text-emerald-600 fill-current" viewBox="0 0 24 24">
+                        <path d="M19.43 12.98l-6.7-11.53c-.3-.5-.8-.8-1.4-.8h.02c-.6 0-1.1.3-1.4.8L3.25 12.98c-.3.5-.3 1.1 0 1.6l3.35 5.76c.3.5.8.8 1.4.8h13.4c.6 0 1.1-.3 1.4-.8l3.35-5.76c.3-.5.3-1.1 0-1.6zm-10.4-8.98h2l5.7 9.8h-2zM8.82 17.5l-2.85-4.9 5.7-9.8 2.85 4.9zm11.36 0h-13.4l2.85-4.9h13.4z" />
+                      </svg>
+                      Google Drive Video
+                    </button>
+                  </div>
+
+                  {form.media_url && (
+                    <div className="mt-2 p-2 bg-white border border-border rounded flex items-center justify-between gap-3 shadow-xs">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        {form.media_url.includes('google.com') ? (
+                          <div className="w-8 h-8 rounded bg-emerald-50 flex items-center justify-center shrink-0">
+                            <svg className="w-4 h-4 text-emerald-600 fill-current" viewBox="0 0 24 24">
+                              <path d="M19.43 12.98l-6.7-11.53c-.3-.5-.8-.8-1.4-.8h.02c-.6 0-1.1.3-1.4.8L3.25 12.98c-.3.5-.3 1.1 0 1.6l3.35 5.76c.3.5.8.8 1.4.8h13.4c.6 0 1.1-.3 1.4-.8l3.35-5.76c.3-.5.3-1.1 0-1.6zm-10.4-8.98h2l5.7 9.8h-2zM8.82 17.5l-2.85-4.9 5.7-9.8 2.85 4.9zm11.36 0h-13.4l2.85-4.9h13.4z" />
+                            </svg>
+                          </div>
+                        ) : (
+                          <div className="w-8 h-8 rounded border border-border overflow-hidden bg-subtle shrink-0">
+                            {form.media_url.endsWith('.mp4') || form.media_url.endsWith('.mov') || form.media_url.includes('video') ? (
+                              <video src={form.media_url} className="w-full h-full object-cover" muted />
+                            ) : (
+                              <img src={form.media_url} alt="" className="w-full h-full object-cover" />
+                            )}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-[10px] text-text-secondary truncate font-mono max-w-[150px]">{form.media_url}</p>
+                          <p className="text-[8px] text-text-muted">Sumber: {form.media_url.includes('google.com') ? 'Google Drive' : 'PC (Supabase)'}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, media_url: '' }))}
+                        className="text-text-muted hover:text-error transition-colors p-1"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Real-time Phone Mockup Preview */}
+                {form.media_url && (
+                  <div className="mt-2.5 p-2 bg-subtle/50 rounded-lg border border-border/60">
+                    <p className="text-[9px] font-bold text-text-secondary uppercase tracking-wider mb-2">Live Preview Mockup</p>
+                    <div className="relative w-full max-w-[160px] mx-auto aspect-[9/16] bg-zinc-950 rounded-lg overflow-hidden border border-border/80 shadow-md text-white font-sans">
+                      
+                      {/* Instagram Story / Snapgram Specific Mockup UI */}
+                      {platform === 'instagram' && form.is_story ? (
+                        <>
+                          {/* Header */}
+                          <div className="absolute top-1.5 left-1.5 right-1.5 flex items-center justify-between z-10 text-[8px] drop-shadow-md">
+                            <div className="flex items-center gap-1">
+                              <div className="w-3.5 h-3.5 rounded-full bg-accent flex items-center justify-center font-bold text-[6px] border border-white/20">
+                                SJM
+                              </div>
+                              <span className="font-semibold truncate max-w-[60px]">sjmtransportasi</span>
+                              <span className="opacity-60">10m</span>
+                            </div>
+                            <div className="flex gap-0.5">
+                              <div className="w-0.5 h-0.5 bg-white rounded-full" />
+                              <div className="w-0.5 h-0.5 bg-white rounded-full" />
+                              <div className="w-0.5 h-0.5 bg-white rounded-full" />
+                            </div>
+                          </div>
+                          {/* Progress Line */}
+                          <div className="absolute top-0.5 left-1.5 right-1.5 h-0.5 bg-white/30 rounded-full overflow-hidden z-10">
+                            <div className="h-full w-2/3 bg-white" />
+                          </div>
+                        </>
+                      ) : (
+                        /* Feed / Reels Mockup Overlay */
+                        <div className="absolute bottom-12 left-1.5 right-1.5 z-10 text-[8px] drop-shadow-md">
+                          <p className="font-semibold">@sjmtransportasi</p>
+                          <p className="opacity-90 line-clamp-1 mt-0.5 text-[7px]">{form.caption_override || video.caption_default || video.judul}</p>
+                        </div>
+                      )}
+
+                      {/* Content Media Render */}
+                      {form.media_url.includes('google.com') ? (
+                        <div className="w-full h-full flex flex-col items-center justify-center p-3 bg-zinc-900 text-center gap-1.5">
+                          <svg className="w-6 h-6 text-emerald-500 fill-current" viewBox="0 0 24 24">
+                            <path d="M19.43 12.98l-6.7-11.53c-.3-.5-.8-.8-1.4-.8h.02c-.6 0-1.1.3-1.4.8L3.25 12.98c-.3.5-.3 1.1 0 1.6l3.35 5.76c.3.5.8.8 1.4.8h13.4c.6 0 1.1-.3 1.4-.8l3.35-5.76c.3-.5.3-1.1 0-1.6zm-10.4-8.98h2l5.7 9.8h-2zM8.82 17.5l-2.85-4.9 5.7-9.8 2.85 4.9zm11.36 0h-13.4l2.85-4.9h13.4z" />
+                          </svg>
+                          <span className="text-[8px] text-zinc-300 font-medium">Link Google Drive</span>
+                          <span className="text-[6px] text-zinc-400 truncate max-w-[100px] font-mono">{form.media_url}</span>
+                        </div>
+                      ) : form.media_url.endsWith('.mp4') || form.media_url.endsWith('.mov') || form.media_url.includes('video') ? (
+                        <video src={form.media_url} className="w-full h-full object-cover animate-pulse" muted playsInline />
+                      ) : (
+                        <img src={form.media_url} alt="" className="w-full h-full object-cover" />
+                      )}
+
+                      {/* Footer */}
+                      <div className="absolute bottom-2 left-1.5 right-1.5 flex items-center justify-between z-10 text-[7px] opacity-75">
+                        <div className="border border-white/35 rounded px-1.5 py-0.5 bg-black/20 truncate max-w-[80px]">
+                          {platform === 'instagram' && form.is_story ? 'Kirim pesan...' : 'Komentar...'}
+                        </div>
+                        <div className="flex gap-1.5">
+                          <span>❤️</span>
+                          <span>✈️</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <Label className="text-xs">Caption Override</Label>
                   <Textarea className="mt-1 text-xs" rows={2} placeholder="Kosongkan untuk pakai caption default" value={form.caption_override} onChange={(e) => setForm((f) => ({ ...f, caption_override: e.target.value }))} />
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" className="flex-1 h-8 text-xs bg-accent hover:bg-accent/90" onClick={() => addSchedule(platform)}>{editingId ? 'Update Jadwal' : 'Simpan Jadwal'}</Button>
-                  <Button size="sm" variant="secondary" className="h-8 text-xs" onClick={() => { setAdding(null); setEditingId(null); setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '' }) }}>Batal</Button>
+                  <Button size="sm" variant="secondary" className="h-8 text-xs" onClick={() => { setAdding(null); setEditingId(null); setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false }) }}>Batal</Button>
                 </div>
               </div>
             )}
@@ -655,6 +854,8 @@ function DistributionTab({
                 id: string; platform: string; tanggal_tayang: string; jam_post?: string; status: string
                 url_post?: string; social_account_id?: string | null; caption_override?: string | null
                 social_accounts?: { handle: string } | null
+                is_story?: boolean | null
+                media_url?: string | null
               }) => (
                 <div key={s.id} className="px-3 py-2.5 space-y-2">
                   <div className="flex items-center justify-between">
@@ -662,6 +863,11 @@ function DistributionTab({
                       📅 {s.tanggal_tayang}{s.jam_post ? ` · 🕐 ${s.jam_post.slice(0, 5)}` : ''}
                     </p>
                     <div className="flex items-center gap-1.5">
+                      {s.is_story && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-purple-100 text-purple-700">
+                          📸 Snapgram
+                        </span>
+                      )}
                       <span className={cn('text-[9px] px-1.5 py-0.5 rounded-full font-medium',
                         s.status === 'posted' ? 'bg-green-100 text-success' : s.status === 'failed' ? 'bg-red-100 text-error' : 'bg-accent-light text-accent')}>
                         {s.status === 'posted' ? 'Tayang' : s.status === 'failed' ? 'Gagal' : 'Terjadwal'}
@@ -671,6 +877,30 @@ function DistributionTab({
                     </div>
                   </div>
                   {s.social_accounts && <p className="text-[10px] text-text-muted mt-0.5">@{s.social_accounts.handle}</p>}
+                  
+                  {s.media_url && (
+                    <div className="flex items-center gap-2 mt-1.5 p-1.5 bg-subtle rounded border border-border/30 max-w-sm">
+                      <div className="w-8 h-8 rounded border border-border/20 overflow-hidden bg-white shrink-0">
+                        {s.media_url.includes('google.com') ? (
+                          <div className="w-full h-full flex items-center justify-center bg-emerald-50">
+                            <svg className="w-3.5 h-3.5 text-emerald-600 fill-current" viewBox="0 0 24 24">
+                              <path d="M19.43 12.98l-6.7-11.53c-.3-.5-.8-.8-1.4-.8h.02c-.6 0-1.1.3-1.4.8L3.25 12.98c-.3.5-.3 1.1 0 1.6l3.35 5.76c.3.5.8.8 1.4.8h13.4c.6 0 1.1-.3 1.4-.8l3.35-5.76c.3-.5.3-1.1 0-1.6zm-10.4-8.98h2l5.7 9.8h-2zM8.82 17.5l-2.85-4.9 5.7-9.8 2.85 4.9zm11.36 0h-13.4l2.85-4.9h13.4z" />
+                            </svg>
+                          </div>
+                        ) : s.media_url.endsWith('.mp4') || s.media_url.endsWith('.mov') || s.media_url.includes('video') ? (
+                          <video src={s.media_url} className="w-full h-full object-cover" muted />
+                        ) : (
+                          <img src={s.media_url} alt="" className="w-full h-full object-cover" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[9px] text-text-muted">File Media Terjadwal:</p>
+                        <a href={s.media_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-accent font-mono truncate block hover:underline">
+                          {s.media_url.includes('google.com') ? 'Google Drive Link ↗' : 'Download Media ↗'}
+                        </a>
+                      </div>
+                    </div>
+                  )}
                   
                   {s.url_post ? (
                     <div className="space-y-2">
