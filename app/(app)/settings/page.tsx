@@ -133,32 +133,21 @@ export default function SettingsPage() {
       if (!workspaceId) return []
       const supabase = createClient()
       const { data } = await supabase.from('social_accounts').select('*').eq('workspace_id', workspaceId)
-      return (data ?? []) as { id: string; platform: string; username: string; url: string | null }[]
+      return (data ?? []) as { id: string; platform: string; username: string; display_name?: string | null; avatar_url?: string | null; url: string | null; is_connected?: boolean | null }[]
     },
     enabled: !!workspaceId,
   })
 
-  const [addingSocial, setAddingSocial] = useState(false)
-  const [newSocial, setNewSocial] = useState({ platform: 'tiktok', username: '', url: '' })
-
-  async function addSocial() {
-    if (!workspaceId || !newSocial.username) return
+  async function disconnectSocial(id: string) {
+    if (!confirm('Putuskan koneksi akun sosial media ini? Penjadwalan otomatis tidak akan berfungsi.')) return
     const supabase = createClient()
-    const { error } = await supabase.from('social_accounts').insert({ workspace_id: workspaceId, ...newSocial, url: newSocial.url || null })
-    if (error) toast.error('Gagal menambah akun')
-    else {
-      toast.success('Akun ditambahkan!')
+    const { error } = await supabase.from('social_accounts').delete().eq('id', id)
+    if (error) {
+      toast.error('Gagal memutus koneksi akun: ' + error.message)
+    } else {
       queryClient.invalidateQueries({ queryKey: ['social-accounts', workspaceId] })
-      setNewSocial({ platform: 'tiktok', username: '', url: '' })
-      setAddingSocial(false)
+      toast.success('Koneksi akun berhasil diputus')
     }
-  }
-
-  async function deleteSocial(id: string) {
-    const supabase = createClient()
-    await supabase.from('social_accounts').delete().eq('id', id)
-    queryClient.invalidateQueries({ queryKey: ['social-accounts', workspaceId] })
-    toast.success('Akun dihapus')
   }
 
   // ---- Members ----
@@ -305,51 +294,76 @@ export default function SettingsPage() {
 
         {/* Sosmed */}
         <TabsContent value="sosmed">
-          <div className="space-y-3">
-            {(socials ?? []).map((s) => (
-              <div key={s.id} className="bg-white border border-border rounded-xl p-4 flex items-center justify-between">
-                <div>
-                  <span className="text-xs font-semibold text-text-muted uppercase">{s.platform}</span>
-                  <p className="text-sm font-medium text-text-primary">@{s.username}</p>
-                  {s.url && <p className="text-xs text-text-muted truncate max-w-xs">{s.url}</p>}
-                </div>
-                <button onClick={() => deleteSocial(s.id)} className="text-error hover:text-error/80 transition-colors">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
+          <div className="space-y-4">
+            <div className="bg-subtle p-3 rounded-lg border border-border text-xs text-text-muted">
+              ℹ️ Hubungkan akun Anda menggunakan tombol di bawah agar sistem dapat mempublikasikan naskah, file video, dan gambar secara otomatis sesuai jadwal.
+            </div>
 
-            {addingSocial ? (
-              <div className="bg-white border border-border rounded-xl p-4 space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Platform</Label>
-                    <Select value={newSocial.platform} onValueChange={(v) => setNewSocial((p) => ({ ...p, platform: v }))}>
-                      <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {PLATFORM_OPTIONS.map((p) => <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[
+                { key: 'instagram', name: 'Instagram Story / Reels', logo: '📸', color: 'bg-purple-600 hover:bg-purple-700' },
+                { key: 'tiktok', name: 'TikTok Creator Platform', logo: '🎵', color: 'bg-black hover:bg-zinc-900 border border-zinc-800' },
+                { key: 'youtube', name: 'YouTube Shorts / Videos', logo: '🎥', color: 'bg-red-600 hover:bg-red-700' },
+                { key: 'facebook', name: 'Facebook Fanpage', logo: '🔵', color: 'bg-[#1877F2] hover:bg-[#166FE5]' },
+              ].map((plat) => {
+                const connected = (socials ?? []).find((s) => s.platform === plat.key)
+
+                return (
+                  <div key={plat.key} className="bg-white border border-border rounded-xl p-4 flex flex-col justify-between h-40 shadow-xs">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">{plat.logo}</span>
+                        <div>
+                          <h3 className="text-xs font-bold text-text-primary">{plat.name}</h3>
+                          {connected ? (
+                            <p className="text-[10px] text-emerald-600 font-semibold mt-0.5 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                              Terhubung (@{connected.username})
+                            </p>
+                          ) : (
+                            <p className="text-[10px] text-text-muted mt-0.5">Belum dikonfigurasi</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {connected ? (
+                      <div className="space-y-2 mt-2">
+                        <div className="flex items-center gap-2 bg-subtle/50 px-2 py-1.5 rounded border border-border/40 text-[9px] text-text-secondary truncate">
+                          {connected.avatar_url && (
+                            <img src={connected.avatar_url} alt="" className="w-4 h-4 rounded-full" />
+                          )}
+                          <span className="font-semibold">{connected.display_name || connected.username}</span>
+                          <span className="text-[8px] bg-emerald-100 text-emerald-800 rounded px-1 ml-auto font-bold uppercase tracking-wider">⚡ OAuth Active</span>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="w-full text-error hover:bg-red-50 hover:text-error h-7 text-[10px] font-semibold"
+                          onClick={() => disconnectSocial(connected.id)}
+                        >
+                          Putuskan Koneksi
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button 
+                        size="sm" 
+                        className={`w-full text-white h-8 text-[11px] font-bold ${plat.color}`}
+                        onClick={() => {
+                          if (!workspaceId) {
+                            toast.error('Workspace tidak terdeteksi')
+                            return
+                          }
+                          window.location.href = `/settings/oauth-consent?platform=${plat.key}&workspace_id=${workspaceId}`
+                        }}
+                      >
+                        Hubungkan Akun
+                      </Button>
+                    )}
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Username</Label>
-                    <Input value={newSocial.username} onChange={(e) => setNewSocial((p) => ({ ...p, username: e.target.value }))} placeholder="username" className="h-8 text-sm" />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">URL (optional)</Label>
-                  <Input value={newSocial.url} onChange={(e) => setNewSocial((p) => ({ ...p, url: e.target.value }))} placeholder="https://..." className="h-8 text-sm" />
-                </div>
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={addSocial}>Tambah</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setAddingSocial(false)}>Batal</Button>
-                </div>
-              </div>
-            ) : (
-              <Button variant="outline" size="sm" onClick={() => setAddingSocial(true)}>
-                <Plus className="w-4 h-4 mr-1" /> Tambah Akun Sosmed
-              </Button>
-            )}
+                )
+              })}
+            </div>
           </div>
         </TabsContent>
 

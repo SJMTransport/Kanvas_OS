@@ -488,12 +488,13 @@ function DistributionTab({
   const [form, setForm] = useState({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false })
   const [urlPostInputs, setUrlPostInputs] = useState<Record<string, string>>({})
   const [mediaUploading, setMediaUploading] = useState(false)
+  const [publishingId, setPublishingId] = useState<string | null>(null)
 
   const { data: schedules } = useQuery({
     queryKey: ['schedules-video', video.id],
     queryFn: async () => {
       const supabase = createClient()
-      const { data } = await supabase.from('video_platform_schedules').select('*, social_accounts(handle, display_name)').eq('video_id', video.id)
+      const { data } = await supabase.from('video_platform_schedules').select('*, social_accounts(handle, display_name, is_connected)').eq('video_id', video.id)
       return data ?? []
     },
   })
@@ -508,6 +509,26 @@ function DistributionTab({
     },
     enabled: !!workspaceId,
   })
+
+  async function handleForcePublish(scheduleId: string) {
+    setPublishingId(scheduleId)
+    try {
+      const res = await fetch(`/api/cron/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schedule_id: scheduleId })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Gagal melakukan auto-posting')
+      toast.success('Konten berhasil dipublikasikan secara otomatis!')
+      queryClient.invalidateQueries({ queryKey: ['schedules-video', video.id] })
+      queryClient.invalidateQueries({ queryKey: ['schedules'] })
+    } catch (err: any) {
+      toast.error('Gagal auto-posting: ' + err.message)
+    } finally {
+      setPublishingId(null)
+    }
+  }
 
   async function handleUploadMedia(file: File) {
     setMediaUploading(true)
@@ -853,7 +874,7 @@ function DistributionTab({
               {platformSchedules.map((s: {
                 id: string; platform: string; tanggal_tayang: string; jam_post?: string; status: string
                 url_post?: string; social_account_id?: string | null; caption_override?: string | null
-                social_accounts?: { handle: string } | null
+                social_accounts?: { handle: string; is_connected?: boolean | null } | null
                 is_story?: boolean | null
                 media_url?: string | null
               }) => (
@@ -868,10 +889,25 @@ function DistributionTab({
                           📸 Snapgram
                         </span>
                       )}
+                      {s.social_accounts?.is_connected && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-emerald-100 text-emerald-800 flex items-center gap-0.5">
+                          <span className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse" />
+                          Auto
+                        </span>
+                      )}
                       <span className={cn('text-[9px] px-1.5 py-0.5 rounded-full font-medium',
                         s.status === 'posted' ? 'bg-green-100 text-success' : s.status === 'failed' ? 'bg-red-100 text-error' : 'bg-accent-light text-accent')}>
                         {s.status === 'posted' ? 'Tayang' : s.status === 'failed' ? 'Gagal' : 'Terjadwal'}
                       </span>
+                      {s.social_accounts?.is_connected && s.status !== 'posted' && (
+                        <button
+                          disabled={publishingId === s.id}
+                          onClick={() => handleForcePublish(s.id)}
+                          className="text-[10px] text-emerald-600 font-bold hover:underline"
+                        >
+                          {publishingId === s.id ? 'Posting...' : '⚡ Posting Sekarang'}
+                        </button>
+                      )}
                       <button onClick={() => startEdit(s)} className="text-[10px] text-accent hover:underline">Edit</button>
                       <button onClick={() => deleteSchedule(s.id)} className="text-[10px] text-error hover:underline">Hapus</button>
                     </div>
