@@ -274,7 +274,7 @@ export default function IdeaPage() {
               <div
                 key={card.id}
                 onClick={() => handleCardClick(card)}
-                className="flex items-center gap-3 px-3 py-2.5 hover:bg-surface cursor-pointer transition-colors"
+                className="flex items-center gap-3 px-3 py-2.5 hover:bg-surface cursor-pointer transition-colors group/row"
               >
                 <div className="w-1 h-8 rounded-full shrink-0" style={{ background: STATUS_ACCENT[card.status] ?? '#9AA3AF' }} />
                 <span className="text-lg shrink-0">{CARD_ICONS[card.type] ?? '📎'}</span>
@@ -290,6 +290,24 @@ export default function IdeaPage() {
                 <span className="text-[10px] text-text-muted shrink-0 hidden sm:inline">
                   {formatDistanceToNow(new Date(card.created_at), { locale: localeId, addSuffix: true })}
                 </span>
+                <button
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    if (!confirm('Apakah Anda yakin ingin menghapus ide ini?')) return
+                    const supabase = createClient()
+                    const { error } = await supabase.from('idea_cards').delete().eq('id', card.id)
+                    if (error) {
+                      toast.error('Gagal menghapus ide: ' + error.message)
+                    } else {
+                      toast.success('Ide berhasil dihapus')
+                      queryClient.invalidateQueries({ queryKey: ['idea-cards', workspaceId] })
+                    }
+                  }}
+                  className="p-1 text-text-muted hover:text-error rounded hover:bg-subtle shrink-0 transition-colors opacity-0 group-hover/row:opacity-100"
+                  title="Hapus Ide"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
             ))}
           </div>

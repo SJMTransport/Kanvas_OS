@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { X, ExternalLink, Sparkles, Video, Play } from 'lucide-react'
+import { X, ExternalLink, Sparkles, Video, Play, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -145,6 +145,19 @@ export function IdeaCardModal({ card, boards, open, onOpenChange, onConvertToCon
     else queryClient.invalidateQueries({ queryKey: ['idea-cards', workspaceId] })
   }, [card, workspaceId, queryClient])
 
+  async function handleDelete() {
+    if (!confirm('Apakah Anda yakin ingin menghapus ide ini?')) return
+    const supabase = createClient()
+    const { error } = await supabase.from('idea_cards').delete().eq('id', card!.id)
+    if (error) {
+      toast.error('Gagal menghapus ide: ' + error.message)
+    } else {
+      toast.success('Ide berhasil dihapus')
+      queryClient.invalidateQueries({ queryKey: ['idea-cards', workspaceId] })
+      onOpenChange(false)
+    }
+  }
+
   if (!card) return null
   const meta = card.link_meta
   const isEmbeddable = meta?.embed_url && !meta?.open_new_tab
@@ -162,6 +175,10 @@ export function IdeaCardModal({ card, boards, open, onOpenChange, onConvertToCon
                   <Video className="w-3.5 h-3.5" /> Jadikan Konten
                 </Button>
               )}
+              {/* Delete Button */}
+              <Button size="sm" variant="ghost" className="text-text-muted hover:text-error hover:bg-red-50 p-1 h-7 w-7" onClick={handleDelete} title="Hapus Ide">
+                <Trash2 className="w-4 h-4" />
+              </Button>
               <button onClick={() => onOpenChange(false)} className="text-text-muted hover:text-text-primary p-1 rounded">
                 <X className="w-4 h-4" />
               </button>
