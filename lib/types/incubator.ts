@@ -118,6 +118,7 @@ export interface CreatorSavedContent {
   hashtags: string[] | null
   creator_username: string | null
   creator_platform: string | null
+  video_script: string | null
   created_at: string
   updated_at: string
 }

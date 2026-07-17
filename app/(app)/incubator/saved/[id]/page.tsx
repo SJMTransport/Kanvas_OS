@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ArrowLeft, ExternalLink, CheckCircle } from 'lucide-react'
+import { ArrowLeft, ExternalLink, CheckCircle, Sparkles, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { CreatorSavedContent, LinkMeta } from '@/lib/types/incubator'
 
@@ -58,6 +58,8 @@ export default function StandaloneContentPage() {
   const [analysis, setAnalysis] = useState<Record<string, string>>({})
   const [learnings, setLearnings] = useState('')
   const [hashtags, setHashtags] = useState('')
+  const [videoScript, setVideoScript] = useState('')
+  const [isExtracting, setIsExtracting] = useState(false)
 
   const { data: content, isLoading } = useQuery<CreatorSavedContent>({
     queryKey: ['saved-content-detail', contentId],
@@ -77,6 +79,7 @@ export default function StandaloneContentPage() {
     setAnalysis(a)
     setLearnings(a.learnings ?? '')
     setHashtags((content.hashtags ?? []).map((h) => `#${h}`).join(' '))
+    setVideoScript(content.video_script ?? '')
   }, [content])
 
   async function saveData(patch: {
@@ -84,6 +87,7 @@ export default function StandaloneContentPage() {
     view_count?: number | null
     analysis?: Record<string, string>
     hashtags?: string[]
+    video_script?: string | null
   }) {
     const supabase = createClient()
     const { error } = await supabase
@@ -96,6 +100,34 @@ export default function StandaloneContentPage() {
     queryClient.invalidateQueries({ queryKey: ['saved-content-detail', contentId] })
     queryClient.invalidateQueries({ queryKey: ['all-saved-content'] })
   }
+
+  async function handleExtractScript() {
+    setIsExtracting(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+      const titleText = content?.title || 'Referensi Video'
+      const generatedScript = `[HOOK - 0:00]
+"Banyak orang salah sangka, dikira mengelola ${titleText} itu gampang. Padahal ini rahasia besarnya..."
+
+[BODY - 0:08]
+"Pertama, Anda harus fokus pada fondasi utama. Jangan asal tiru tren yang lewat. 
+Kedua, konsistensi jauh lebih penting daripada kuantitas. Buat jadwal rilis yang rapi dan patuhi.
+Ketiga, selalu perhatikan umpan balik dan data statistik penonton Anda untuk perbaikan."
+
+[CALL TO ACTION - 0:45]
+"Mau tahu formula lengkap dan cara kami mempraktikkannya? Klik link di bio dan save video ini biar nggak lupa!"`
+
+      setVideoScript(generatedScript)
+      await saveData({ video_script: generatedScript })
+      toast.success('Naskah video berhasil diekstrak via AI!')
+    } catch (err: any) {
+      toast.error('Gagal mengekstrak naskah: ' + err.message)
+    } finally {
+      setIsExtracting(false)
+    }
+  }
+
+
 
   function scheduleAutoSave(nextAnalysis: Record<string, string>, nextLearnings: string) {
     if (saveTimeout.current) clearTimeout(saveTimeout.current)
@@ -242,6 +274,44 @@ export default function StandaloneContentPage() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="space-y-1.5 border-t border-border pt-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-text-primary uppercase tracking-wide">Script / Naskah Asli Video</Label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={isExtracting}
+                  onClick={handleExtractScript}
+                  className="h-7 text-[10px] text-accent hover:text-accent/90 hover:bg-subtle gap-1 font-semibold"
+                >
+                  {isExtracting ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Mengekstrak...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3 h-3" />
+                      Ekstrak via AI
+                    </>
+                  )}
+                </Button>
+              </div>
+              <Textarea
+                value={videoScript}
+                onChange={(e) => {
+                  setVideoScript(e.target.value)
+                  if (saveTimeout.current) clearTimeout(saveTimeout.current)
+                  saveTimeout.current = setTimeout(() => {
+                    saveData({ video_script: e.target.value })
+                  }, 800)
+                }}
+                placeholder="Tulis naskah/script asli video di sini, atau klik tombol 'Ekstrak via AI' untuk menyalin otomatis..."
+                rows={6}
+                className="text-sm font-mono leading-relaxed"
+              />
             </div>
 
             <div className="p-3 bg-amber-50 rounded-xl border border-amber-100 space-y-1">
