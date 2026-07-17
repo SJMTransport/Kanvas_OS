@@ -121,7 +121,7 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
   const queryClient = useQueryClient()
   const { workspaceId } = useWorkspace()
   const [adding, setAdding] = useState<Platform | null>(null)
-  const [form, setForm] = useState({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false })
+  const [form, setForm] = useState<{ social_account_id: string; tanggal_tayang: string; jam_post: string; caption_override: string; media_url: string; is_story: boolean; cross_platforms: Platform[] }>({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false, cross_platforms: [] })
   const [mediaUploading, setMediaUploading] = useState(false)
 
   const { data: schedules, isLoading } = useQuery({
@@ -165,22 +165,38 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
   async function addSchedule(platform: Platform) {
     if (!form.tanggal_tayang) { toast.error('Tanggal tayang wajib diisi'); return }
     const supabase = createClient()
-    const { error } = await supabase.from('video_platform_schedules').insert({
-      video_id: video.id, platform,
-      social_account_id: form.social_account_id || null,
-      tanggal_tayang: form.tanggal_tayang,
-      jam_post: form.jam_post || null,
-      caption_override: form.caption_override || null,
-      media_url: form.media_url || null,
-      is_story: form.is_story,
-      status: 'scheduled',
-    })
-    if (error) { toast.error(error.message); return }
-    toast.success('Jadwal ditambahkan!')
+
+    const platformsToSave = Array.from(new Set([platform, ...(form.cross_platforms || [])]))
+
+    for (const p of platformsToSave) {
+      const siblingAccount = socialAccounts?.find((a: any) => a.platform === p)
+      const pPayload = {
+        social_account_id: p === platform ? (form.social_account_id || null) : (siblingAccount ? siblingAccount.id : null),
+        tanggal_tayang: form.tanggal_tayang,
+        jam_post: form.jam_post || null,
+        caption_override: form.caption_override || null,
+        media_url: form.media_url || null,
+        is_story: p === 'instagram' ? form.is_story : false,
+        status: 'scheduled' as const,
+      }
+
+      const existing = (schedules ?? []).find((s: { platform: string }) => s.platform === p)
+      let error
+      if (existing) {
+        ({ error } = await supabase.from('video_platform_schedules').update(pPayload).eq('id', existing.id))
+      } else {
+        ({ error } = await supabase.from('video_platform_schedules').insert({
+          video_id: video.id, platform: p, ...pPayload,
+        }))
+      }
+      if (error) { toast.error(`Gagal menyimpan untuk ${p}: ${error.message}`); return }
+    }
+
+    toast.success(platformsToSave.length > 1 ? 'Jadwal disimpan untuk semua platform pilihan!' : 'Jadwal disimpan!')
     queryClient.invalidateQueries({ queryKey: ['schedules-video', video.id] })
     queryClient.invalidateQueries({ queryKey: ['schedules'] })
     setAdding(null)
-    setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false })
+    setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false, cross_platforms: [] })
   }
 
   async function markPosted(id: string, url: string) {
@@ -306,9 +322,42 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
                   <Label className="text-xs">Caption Override</Label>
                   <Textarea className="mt-1 text-xs" rows={2} placeholder="Kosongkan untuk pakai caption default" value={form.caption_override} onChange={(e) => setForm((f) => ({ ...f, caption_override: e.target.value }))} />
                 </div>
-                <div className="flex gap-1.5">
+
+                {/* Sebarkan juga ke platform lain (Multi-Post) */}
+                <div className="space-y-1.5 border-t border-border/40 pt-2">
+                  <Label className="text-[9px] text-text-secondary font-bold uppercase tracking-wider block mb-0.5">Sebarkan juga ke platform lain ⚡</Label>
+                  <div className="flex flex-wrap gap-1">
+                    {PLATFORMS.filter(p => p !== platform).map((p) => {
+                      const isCrossSelected = form.cross_platforms?.includes(p)
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => {
+                            setForm((f) => {
+                              const current = f.cross_platforms || []
+                              const next = current.includes(p) ? current.filter(x => x !== p) : [...current, p]
+                              return { ...f, cross_platforms: next }
+                            })
+                          }}
+                          className={cn(
+                            "px-2 py-0.5 text-[9px] rounded-full border transition-all font-semibold flex items-center gap-0.5",
+                            isCrossSelected
+                              ? "bg-accent border-accent text-white shadow-xs"
+                              : "bg-white border-border text-text-secondary hover:bg-subtle"
+                          )}
+                        >
+                          <span>{isCrossSelected ? '✓' : '+'}</span>
+                          <span>{PLATFORM_LABELS[p]}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex gap-1.5 pt-1">
                   <Button size="sm" className="flex-1 h-8 text-xs bg-accent hover:bg-accent/90" onClick={() => addSchedule(platform)}>Simpan</Button>
-                  <Button size="sm" variant="secondary" className="h-8 text-xs" onClick={() => setAdding(null)}>Batal</Button>
+                  <Button size="sm" variant="secondary" className="h-8 text-xs" onClick={() => { setAdding(null); setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false, cross_platforms: [] }) }}>Batal</Button>
                 </div>
               </div>
             )}

@@ -1,6 +1,7 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
 import { useRouter } from 'next/navigation'
@@ -8,8 +9,9 @@ import { formatNumber } from '@/lib/utils/formatters'
 import { getPlatformDot } from '@/lib/utils/platform'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
-import { BarChart2, Video } from 'lucide-react'
+import { BarChart2, Video, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 import type { Platform } from '@/lib/types'
 
 const PLATFORMS: Platform[] = ['tiktok', 'instagram', 'youtube', 'facebook']
@@ -17,6 +19,8 @@ const PLATFORMS: Platform[] = ['tiktok', 'instagram', 'youtube', 'facebook']
 export default function PerformancePage() {
   const router = useRouter()
   const { workspaceId } = useWorkspace()
+  const queryClient = useQueryClient()
+  const [isSyncing, setIsSyncing] = useState(false)
 
   const { data: videos, isLoading } = useQuery({
     queryKey: ['videos-performance', workspaceId],
@@ -35,11 +39,39 @@ export default function PerformancePage() {
     enabled: !!workspaceId,
   })
 
+  async function handleSyncAll() {
+    setIsSyncing(true)
+    try {
+      const res = await fetch('/api/performance/sync', { method: 'POST' })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(data.message)
+        queryClient.invalidateQueries({ queryKey: ['videos-performance', workspaceId] })
+      } else {
+        toast.error(data.message || 'Gagal sinkronisasi data')
+      }
+    } catch (err: any) {
+      toast.error('Gagal sinkronisasi: ' + err.message)
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
-      <div className="mb-6">
-        <h1 className="font-heading text-2xl font-bold text-text-primary">Performa</h1>
-        <p className="text-sm text-text-secondary mt-0.5">Input & pantau metrik video per platform</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+          <h1 className="font-heading text-2xl font-bold text-text-primary">Performa</h1>
+          <p className="text-sm text-text-secondary mt-0.5">Input & pantau metrik video per platform</p>
+        </div>
+        <Button 
+          disabled={isSyncing} 
+          onClick={handleSyncAll} 
+          className="gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white border-transparent"
+        >
+          {isSyncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BarChart2 className="w-3.5 h-3.5" />}
+          Tarik Performa Semua ⚡
+        </Button>
       </div>
 
       {isLoading ? (

@@ -485,7 +485,7 @@ function DistributionTab({
   const { workspaceId } = useWorkspace()
   const [adding, setAdding] = useState<Platform | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false })
+  const [form, setForm] = useState<{ social_account_id: string; tanggal_tayang: string; jam_post: string; caption_override: string; media_url: string; is_story: boolean; cross_platforms: Platform[] }>({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false, cross_platforms: [] })
   const [urlPostInputs, setUrlPostInputs] = useState<Record<string, string>>({})
   const [mediaUploading, setMediaUploading] = useState(false)
   const [publishingId, setPublishingId] = useState<string | null>(null)
@@ -551,35 +551,44 @@ function DistributionTab({
   async function addSchedule(platform: Platform) {
     if (!form.tanggal_tayang) { toast.error('Tanggal tayang wajib diisi'); return }
     const supabase = createClient()
-    const payload = {
-      social_account_id: form.social_account_id || null,
-      tanggal_tayang: form.tanggal_tayang,
-      jam_post: form.jam_post || null,
-      caption_override: form.caption_override || null,
-      media_url: form.media_url || null,
-      is_story: form.is_story,
+
+    const platformsToSave = editingId
+      ? [platform]
+      : Array.from(new Set([platform, ...(form.cross_platforms || [])]))
+
+    for (const p of platformsToSave) {
+      const siblingAccount = socialAccounts?.find((a: any) => a.platform === p)
+      const pPayload = {
+        social_account_id: p === platform ? (form.social_account_id || null) : (siblingAccount ? siblingAccount.id : null),
+        tanggal_tayang: form.tanggal_tayang,
+        jam_post: form.jam_post || null,
+        caption_override: form.caption_override || null,
+        media_url: form.media_url || null,
+        is_story: p === 'instagram' ? form.is_story : false,
+      }
+
+      let error
+      if (editingId && p === platform) {
+        ({ error } = await supabase.from('video_platform_schedules').update(pPayload).eq('id', editingId))
+      } else {
+        const existing = (schedules ?? []).find((s: { platform: string }) => s.platform === p)
+        if (existing) {
+          ({ error } = await supabase.from('video_platform_schedules').update(pPayload).eq('id', existing.id))
+        } else {
+          ({ error } = await supabase.from('video_platform_schedules').insert({
+            video_id: video.id, platform: p, status: 'scheduled', ...pPayload,
+          }))
+        }
+      }
+      if (error) { toast.error(`Gagal menyimpan untuk ${p}: ${error.message}`); return }
     }
 
-    let error
-    if (editingId) {
-      ({ error } = await supabase.from('video_platform_schedules').update(payload).eq('id', editingId))
-    } else {
-      const existing = (schedules ?? []).find((s: { platform: string }) => s.platform === platform)
-      if (existing) {
-        ({ error } = await supabase.from('video_platform_schedules').update(payload).eq('id', existing.id))
-      } else {
-        ({ error } = await supabase.from('video_platform_schedules').insert({
-          video_id: video.id, platform, status: 'scheduled', ...payload,
-        }))
-      }
-    }
-    if (error) { toast.error(error.message); return }
-    toast.success('Jadwal disimpan!')
+    toast.success(platformsToSave.length > 1 ? 'Jadwal disimpan untuk semua platform pilihan!' : 'Jadwal disimpan!')
     queryClient.invalidateQueries({ queryKey: ['schedules-video', video.id] })
     queryClient.invalidateQueries({ queryKey: ['schedules'] })
     setAdding(null)
     setEditingId(null)
-    setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false })
+    setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false, cross_platforms: [] })
   }
 
   function startEdit(s: { id: string; platform: string; social_account_id?: string | null; tanggal_tayang: string; jam_post?: string | null; caption_override?: string | null; media_url?: string | null; is_story?: boolean | null }) {
@@ -590,6 +599,7 @@ function DistributionTab({
       caption_override: s.caption_override ?? '',
       media_url: s.media_url ?? '',
       is_story: !!s.is_story,
+      cross_platforms: [],
     })
     setEditingId(s.id)
     setAdding(s.platform as Platform)
@@ -646,7 +656,7 @@ function DistributionTab({
                 <Button size="sm" variant="secondary" className="h-6 text-[10px] gap-1" onClick={(e) => {
                   e.stopPropagation()
                   if (platform === adding) { setAdding(null); setEditingId(null) }
-                  else { setAdding(platform); setEditingId(null); setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false }) }
+                  else { setAdding(platform); setEditingId(null); setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false, cross_platforms: [] }) }
                 }}>
                   <Plus className="w-2.5 h-2.5" /> Jadwal
                 </Button>
@@ -860,9 +870,44 @@ function DistributionTab({
                   <Label className="text-xs">Caption Override</Label>
                   <Textarea className="mt-1 text-xs" rows={2} placeholder="Kosongkan untuk pakai caption default" value={form.caption_override} onChange={(e) => setForm((f) => ({ ...f, caption_override: e.target.value }))} />
                 </div>
-                <div className="flex gap-2">
+
+                {/* Sebarkan juga ke platform lain (Multi-Post) */}
+                {!editingId && (
+                  <div className="space-y-1.5 border-t border-border/40 pt-2.5">
+                    <Label className="text-[10px] text-text-secondary font-bold uppercase tracking-wider block mb-1">Sebarkan juga ke platform lain (Multi-Post) ⚡</Label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {PLATFORMS.filter(p => p !== platform).map((p) => {
+                        const isCrossSelected = form.cross_platforms?.includes(p)
+                        return (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => {
+                              setForm((f) => {
+                                const current = f.cross_platforms || []
+                                const next = current.includes(p) ? current.filter(x => x !== p) : [...current, p]
+                                return { ...f, cross_platforms: next }
+                              })
+                            }}
+                            className={cn(
+                              "px-2.5 py-1 text-[10px] rounded-full border transition-all font-semibold flex items-center gap-1",
+                              isCrossSelected
+                                ? "bg-accent border-accent text-white shadow-xs"
+                                : "bg-white border-border text-text-secondary hover:bg-subtle"
+                            )}
+                          >
+                            <span>{isCrossSelected ? '✓' : '+'}</span>
+                            <span>{PLATFORM_LABELS[p]}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-1">
                   <Button size="sm" className="flex-1 h-8 text-xs bg-accent hover:bg-accent/90" onClick={() => addSchedule(platform)}>{editingId ? 'Update Jadwal' : 'Simpan Jadwal'}</Button>
-                  <Button size="sm" variant="secondary" className="h-8 text-xs" onClick={() => { setAdding(null); setEditingId(null); setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false }) }}>Batal</Button>
+                  <Button size="sm" variant="secondary" className="h-8 text-xs" onClick={() => { setAdding(null); setEditingId(null); setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false, cross_platforms: [] }) }}>Batal</Button>
                 </div>
               </div>
             )}
