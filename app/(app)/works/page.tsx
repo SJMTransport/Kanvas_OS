@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { Search, Plus, FolderOpen, Pencil, Trash2, ChevronRight } from 'lucide-react'
+import { Search, Plus, FolderOpen, Pencil, Trash2, ChevronRight, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
@@ -27,16 +27,17 @@ export default function WorksPage() {
   const [description, setDescription] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Work | null>(null)
 
-  const { data: works = [], isLoading } = useQuery<Work[]>({
+  const { data: works = [], isLoading, isError, refetch } = useQuery<Work[]>({
     queryKey: ['works', workspaceId],
     queryFn: async () => {
       if (!workspaceId) return []
       const supabase = createClient()
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('works')
         .select('*')
         .eq('workspace_id', workspaceId)
         .order('updated_at', { ascending: false })
+      if (error) throw error
       return (data ?? []) as Work[]
     },
     enabled: !!workspaceId,
@@ -44,13 +45,20 @@ export default function WorksPage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!workspaceId || !title.trim()) return
+      if (!workspaceId || !title.trim()) throw new Error('Judul wajib diisi')
       const supabase = createClient()
       if (editWork) {
-        await supabase.from('works').update({ title: title.trim(), description: description.trim() || null }).eq('id', editWork.id)
+        const { error } = await supabase
+          .from('works')
+          .update({ title: title.trim(), description: description.trim() || null })
+          .eq('id', editWork.id)
+        if (error) throw error
       } else {
         const { data: { user } } = await supabase.auth.getUser()
-        await supabase.from('works').insert({ workspace_id: workspaceId, created_by: user?.id ?? null, title: title.trim(), description: description.trim() || null })
+        const { error } = await supabase
+          .from('works')
+          .insert({ workspace_id: workspaceId, created_by: user?.id ?? null, title: title.trim(), description: description.trim() || null })
+        if (error) throw error
       }
     },
     onSuccess: () => {
@@ -58,20 +66,21 @@ export default function WorksPage() {
       closeDialog()
       toast.success(editWork ? 'Karya diperbarui' : 'Karya baru ditambahkan')
     },
-    onError: () => toast.error('Gagal menyimpan'),
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Gagal menyimpan'),
   })
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const supabase = createClient()
-      await supabase.from('works').delete().eq('id', id)
+      const { error } = await supabase.from('works').delete().eq('id', id)
+      if (error) throw error
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['works', workspaceId] })
       setDeleteTarget(null)
       toast.success('Karya dihapus')
     },
-    onError: () => toast.error('Gagal menghapus'),
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Gagal menghapus'),
   })
 
   function openAdd() {
@@ -106,6 +115,17 @@ export default function WorksPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-36 rounded-xl" />)}
         </div>
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-16 text-center">
+        <AlertTriangle className="w-10 h-10 text-error mx-auto mb-3" />
+        <h2 className="font-heading text-lg font-bold text-text-primary mb-1">Gagal memuat Karya</h2>
+        <p className="text-sm text-text-secondary mb-4">Pastikan migrasi database sudah dijalankan, lalu coba lagi.</p>
+        <Button onClick={() => refetch()}>Coba Lagi</Button>
       </div>
     )
   }

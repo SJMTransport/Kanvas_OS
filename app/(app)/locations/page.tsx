@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { Search, Plus, MapPin, Pencil, Trash2 } from 'lucide-react'
+import { Search, Plus, MapPin, Pencil, Trash2, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Location } from '@/lib/types/domain'
 
@@ -27,16 +27,17 @@ export default function LocationsPage() {
   const [notes, setNotes] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Location | null>(null)
 
-  const { data: locations = [], isLoading } = useQuery<Location[]>({
+  const { data: locations = [], isLoading, isError, refetch } = useQuery<Location[]>({
     queryKey: ['locations', workspaceId],
     queryFn: async () => {
       if (!workspaceId) return []
       const supabase = createClient()
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('locations')
         .select('*')
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false })
+      if (error) throw error
       return (data ?? []) as Location[]
     },
     enabled: !!workspaceId,
@@ -44,7 +45,7 @@ export default function LocationsPage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!workspaceId || !name.trim()) return
+      if (!workspaceId || !name.trim()) throw new Error('Nama lokasi wajib diisi')
       const supabase = createClient()
       const payload = {
         name: name.trim(),
@@ -54,10 +55,12 @@ export default function LocationsPage() {
         notes: notes.trim() || null,
       }
       if (editLoc) {
-        await supabase.from('locations').update(payload).eq('id', editLoc.id)
+        const { error } = await supabase.from('locations').update(payload).eq('id', editLoc.id)
+        if (error) throw error
       } else {
         const { data: { user } } = await supabase.auth.getUser()
-        await supabase.from('locations').insert({ ...payload, workspace_id: workspaceId, created_by: user?.id ?? null })
+        const { error } = await supabase.from('locations').insert({ ...payload, workspace_id: workspaceId, created_by: user?.id ?? null })
+        if (error) throw error
       }
     },
     onSuccess: () => {
@@ -65,20 +68,21 @@ export default function LocationsPage() {
       closeDialog()
       toast.success(editLoc ? 'Lokasi diperbarui' : 'Lokasi ditambahkan')
     },
-    onError: () => toast.error('Gagal menyimpan'),
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Gagal menyimpan'),
   })
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const supabase = createClient()
-      await supabase.from('locations').delete().eq('id', id)
+      const { error } = await supabase.from('locations').delete().eq('id', id)
+      if (error) throw error
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['locations', workspaceId] })
       setDeleteTarget(null)
       toast.success('Lokasi dihapus')
     },
-    onError: () => toast.error('Gagal menghapus'),
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Gagal menghapus'),
   })
 
   function openAdd() {
@@ -109,6 +113,17 @@ export default function LocationsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
         </div>
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-16 text-center">
+        <AlertTriangle className="w-10 h-10 text-error mx-auto mb-3" />
+        <h2 className="font-heading text-lg font-bold text-text-primary mb-1">Gagal memuat Lokasi</h2>
+        <p className="text-sm text-text-secondary mb-4">Pastikan migrasi database sudah dijalankan, lalu coba lagi.</p>
+        <Button onClick={() => refetch()}>Coba Lagi</Button>
       </div>
     )
   }

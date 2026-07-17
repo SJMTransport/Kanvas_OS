@@ -20,6 +20,7 @@ import { getStatusBadgeClass, STATUS_CONFIG } from '@/lib/utils/status'
 import { getPlatformDot, getPlatformBadge } from '@/lib/utils/platform'
 import { formatNumber } from '@/lib/utils/formatters'
 import { ScriptBlocks, type ScriptBlock } from '@/components/content/ScriptBlocks'
+import { VideoWorkBadges } from '@/components/content/VideoWorkBadges'
 import type { VideoStatus, Platform } from '@/lib/types'
 import type { VideoWithSchedules } from '@/lib/hooks/useVideos'
 
@@ -1325,6 +1326,7 @@ export default function ContentDetailPage() {
                 {video.format}
               </span>
             )}
+            <VideoWorkBadges videoId={video.id} />
           </div>
         </div>
 
