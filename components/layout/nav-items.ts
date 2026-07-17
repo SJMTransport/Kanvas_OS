@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, CalendarDays, Video,
-  Handshake, Image, Settings, Lightbulb, type LucideIcon
+  Handshake, Image, Settings, Lightbulb, FolderOpen, MapPin, type LucideIcon
 } from 'lucide-react'
 
 export interface NavItem {
@@ -12,6 +12,7 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Karya', href: '/works', icon: FolderOpen },
   { label: 'Kalender', href: '/calendar', icon: CalendarDays },
   {
     label: 'Content',
@@ -38,6 +39,7 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Quotation Baru', href: '/brand/quotations/new' },
     ],
   },
+  { label: 'Lokasi', href: '/locations', icon: MapPin },
   { label: 'Aset', href: '/aset', icon: Image },
   { label: 'Settings', href: '/settings', icon: Settings },
 ]
