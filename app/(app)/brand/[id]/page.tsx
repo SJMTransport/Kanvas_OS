@@ -22,6 +22,7 @@ import {
 import { formatDate, formatRupiah } from '@/lib/utils/formatters'
 import { cn } from '@/lib/utils'
 import { AddVideoSheet } from '@/app/(app)/content/add-video-sheet'
+import { LinkVideoDialog } from '@/app/(app)/brand/link-video-dialog'
 
 const followupSchema = z.object({
   tanggal: z.string().min(1),
@@ -75,6 +76,7 @@ export default function BrandDetailPage() {
   const [addFollowup, setAddFollowup] = useState(false)
   const [savingFollowup, setSavingFollowup] = useState(false)
   const [addVideoOpen, setAddVideoOpen] = useState(false)
+  const [linkVideoOpen, setLinkVideoOpen] = useState(false)
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FollowupForm>({
     resolver: zodResolver(followupSchema) as any,
@@ -412,9 +414,19 @@ export default function BrandDetailPage() {
         <TabsContent value="videos" className="space-y-4 mt-0">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold text-text-primary">Daftar Konten Video</h2>
-            <Button size="sm" onClick={() => setAddVideoOpen(true)} className="h-8 text-xs gap-1.5">
-              <Plus className="w-3.5 h-3.5" /> Video Baru
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setLinkVideoOpen(true)}
+                className="h-8 text-xs gap-1.5"
+              >
+                <Layers className="w-3.5 h-3.5" /> Tautkan dari Library
+              </Button>
+              <Button size="sm" onClick={() => setAddVideoOpen(true)} className="h-8 text-xs gap-1.5">
+                <Plus className="w-3.5 h-3.5" /> Buat Baru
+              </Button>
+            </div>
           </div>
 
           {(videos ?? []).length === 0 ? (
@@ -643,7 +655,7 @@ export default function BrandDetailPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Sheet to add new video (pre-filled with brand_id) */}
+      {/* Sheet to create a brand new video pre-filled with brand_id */}
       <AddVideoSheet 
         open={addVideoOpen} 
         onOpenChange={(open) => {
@@ -654,6 +666,15 @@ export default function BrandDetailPage() {
           brand_id: id as string,
           is_endorsement: true
         }} 
+      />
+
+      {/* Dialog to link an existing video from the library */}
+      <LinkVideoDialog
+        open={linkVideoOpen}
+        onOpenChange={setLinkVideoOpen}
+        brandId={id as string}
+        brandName={brand?.nama_brand}
+        onLinked={() => queryClient.invalidateQueries({ queryKey: ['brand-videos', id] })}
       />
 
     </div>
