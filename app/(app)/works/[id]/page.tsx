@@ -84,21 +84,34 @@ export default function WorkDetailPage() {
         .order('added_at', { ascending: true })
       if (error) throw error
       if (!data) return []
+      const rows = data as WorkItem[]
 
-      const enriched: WorkItemWithMeta[] = await Promise.all(
-        (data as WorkItem[]).map(async (item) => {
-          const config = ITEM_TYPES[item.item_type]
-          if (!config) return { ...item, label: 'Item' }
-          const { data: meta } = await supabase
+      // Batch label lookups: one query per item_type (grouped .in) instead of one per item.
+      const byType = new Map<WorkItemType, string[]>()
+      for (const item of rows) {
+        if (!byType.has(item.item_type)) byType.set(item.item_type, [])
+        byType.get(item.item_type)!.push(item.item_id)
+      }
+
+      const labelMap = new Map<string, string>() // `${type}:${id}` -> label
+      await Promise.all(
+        Array.from(byType.entries()).map(async ([type, ids]) => {
+          const config = ITEM_TYPES[type]
+          if (!config) return
+          const { data: metas } = await supabase
             .from(config.table)
-            .select(config.labelField)
-            .eq('id', item.item_id)
-            .maybeSingle()
-          const label = (meta as Record<string, string> | null)?.[config.labelField] ?? 'Tanpa judul'
-          return { ...item, label }
+            .select(`id, ${config.labelField}`)
+            .in('id', ids)
+          for (const m of (metas ?? []) as Record<string, string>[]) {
+            labelMap.set(`${type}:${m.id}`, m[config.labelField] ?? 'Tanpa judul')
+          }
         })
       )
-      return enriched
+
+      return rows.map((item) => ({
+        ...item,
+        label: labelMap.get(`${item.item_type}:${item.item_id}`) ?? 'Tanpa judul',
+      }))
     },
     enabled: !!id,
   })

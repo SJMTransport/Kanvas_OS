@@ -30,7 +30,7 @@ export default function DashboardPage() {
         supabase.from('brands').select('id, nama_brand, status, next_followup_date, industri').eq('workspace_id', workspaceId).not('status', 'in', '("selesai","cold")').lte('next_followup_date', today).order('next_followup_date', { ascending: true }).limit(5),
         supabase.from('invoices').select('id, invoice_number, total, due_date, brands(nama_brand)').eq('workspace_id', workspaceId).eq('status', 'overdue').order('due_date', { ascending: true }).limit(5),
         supabase.from('videos').select('id, judul, status, updated_at, created_by, users(full_name)').eq('workspace_id', workspaceId).order('updated_at', { ascending: false }).limit(5),
-        supabase.from('videos').select('pilar_konten').eq('workspace_id', workspaceId).not('pilar_konten', 'is', null).limit(200),
+        supabase.rpc('pilar_konten_counts', { ws_id: workspaceId }),
       ])
 
       const settledValue = <T,>(r: PromiseSettledResult<T>): T | undefined =>
@@ -44,10 +44,11 @@ export default function DashboardPage() {
       const followups = (settledValue(results[5]) as any)?.data ?? []
       const overdueInvoices = (settledValue(results[6]) as any)?.data ?? []
       const recentVideos = (settledValue(results[7]) as any)?.data ?? []
+      // RPC returns one row per pillar: { pilar_konten, count }. Flatten back into the
+      // string[] the client expects — bounded by distinct pillars, not total videos.
       const pilarRaw = (settledValue(results[8]) as any)?.data ?? []
-
-      const pilarVideos = pilarRaw
-        .map((v: any) => v.pilar_konten)
+      const pilarVideos = (pilarRaw as { pilar_konten: string; count: number }[])
+        .flatMap((r) => Array.from({ length: Number(r.count) || 0 }, () => r.pilar_konten))
         .filter(Boolean) as string[]
 
       return {

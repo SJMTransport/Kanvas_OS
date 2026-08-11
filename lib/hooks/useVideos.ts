@@ -83,6 +83,9 @@ export function useVideos(opts: UseVideosOptions = {}) {
       const { data } = await q
       return (data ?? []) as unknown as VideoWithSchedules[]
     },
+    // Rely on the cache instead of the old staleTime:0/refetchOnMount:'always'.
+    // Mutations invalidate ['videos'] so data stays correct without refetching
+    // the full join-heavy list on every mount.
     enabled: !!workspaceId && enabled !== false,
     staleTime: 30_000,
   })

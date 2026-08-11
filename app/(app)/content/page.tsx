@@ -178,9 +178,11 @@ export default function ContentPage() {
     sortDir,
     page,
     pageSize: PAGE_SIZE,
+    enabled: viewMode === 'table',
   })
 
-  // For kanban we need all videos (no pagination) — only run when kanban is active
+  // For kanban we need all videos (no pagination). Only fetch when kanban is active
+  // so the default table view doesn't pay for a second full videos fetch.
   const allVideosQuery = useVideos({
     status: null,
     search: search || undefined,
