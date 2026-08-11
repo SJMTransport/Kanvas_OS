@@ -10,15 +10,35 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, Printer, Save, Video as VideoIcon, Search, Check } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
+import { ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, Printer, Save, Video as VideoIcon, Search, Check, FileJson } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { Platform } from '@/lib/types'
 import {
   EMPTY_CAMPAIGN, newReportVideo,
-  type ReportData, type ReportVideo, type ReportCampaignInfo,
+  type ReportData, type ReportVideo, type ReportCampaignInfo, type ReportPlatformData,
 } from '@/lib/types/report'
 import { buildReportHTML, printReport } from '../report-html'
+
+// Merge one imported platform blob into an existing (or new) ReportPlatformData.
+const PLATFORM_ALIASES: Record<string, Platform> = {
+  tiktok: 'tiktok', tt: 'tiktok', instagram: 'instagram', ig: 'instagram',
+  youtube: 'youtube', yt: 'youtube', facebook: 'facebook', fb: 'facebook',
+}
+function mergePlatform(target: ReportPlatformData, src: any): ReportPlatformData {
+  if (!src || typeof src !== 'object') return target
+  const out = { ...target }
+  const map: Record<string, keyof ReportPlatformData> = {
+    date: 'date', url: 'url', views: 'views', likes: 'likes', comments: 'comments',
+    saved: 'saved', saves: 'saved', shares: 'shares', shared: 'shares', reactions: 'reactions',
+  }
+  for (const [k, v] of Object.entries(src)) {
+    const field = map[k.toLowerCase()]
+    if (field && v !== null && v !== undefined && v !== '') out[field] = v as any
+  }
+  return out
+}
 
 const PLATFORMS: { key: Platform; label: string }[] = [
   { key: 'tiktok', label: 'TikTok' }, { key: 'instagram', label: 'IG' },
@@ -38,6 +58,7 @@ export default function ReportEditorPage() {
   const [videos, setVideos] = useState<ReportVideo[]>([])
   const [openIdx, setOpenIdx] = useState<number | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
 
@@ -107,6 +128,45 @@ export default function ReportEditorPage() {
     })
   }
 
+  // Import JSON: merge by title into existing videos, or add new ones.
+  // targetIdx: null = auto match by title, -1 = always new, >=0 = force into that video.
+  function importJSON(items: any[], targetIdx: number | null) {
+    setVideos((vs) => {
+      const next = [...vs]
+      let merged = 0, created = 0
+      for (const raw of items) {
+        if (!raw || typeof raw !== 'object') continue
+        const title = String(raw.title ?? raw.judul ?? '').trim()
+        // Resolve which video to merge into.
+        let idx = -2
+        if (targetIdx !== null && targetIdx >= 0) idx = targetIdx
+        else if (targetIdx === -1) idx = -2 // always new
+        else idx = next.findIndex((v) => v.title.trim().toLowerCase() === title.toLowerCase() && title !== '')
+
+        const applyPlatforms = (v: ReportVideo): ReportVideo => {
+          const copy: ReportVideo = { ...v, tiktok: { ...v.tiktok }, instagram: { ...v.instagram }, youtube: { ...v.youtube }, facebook: { ...v.facebook }, enabled: { ...v.enabled } }
+          for (const [key, val] of Object.entries(raw)) {
+            const pl = PLATFORM_ALIASES[key.toLowerCase()]
+            if (pl) copy[pl] = mergePlatform(copy[pl], val)
+          }
+          return copy
+        }
+
+        if (idx >= 0 && next[idx]) {
+          next[idx] = applyPlatforms(next[idx])
+          merged++
+        } else {
+          const fresh = newReportVideo(null, title || `Video ${next.length + 1}`, null)
+          next.push(applyPlatforms(fresh))
+          created++
+        }
+      }
+      toast.success(`Import selesai: ${merged} digabung, ${created} baru`)
+      return next
+    })
+    setImportOpen(false)
+  }
+
   const previewHTML = useMemo(() => buildReportHTML(reportData), [reportData])
 
   if (isLoading || !loaded) {
@@ -127,6 +187,7 @@ export default function ReportEditorPage() {
           <h1 className="font-heading font-bold text-text-primary truncate">{campaign.campaign || 'Laporan Baru'}</h1>
           <p className="text-[11px] text-text-muted">{saving ? 'Menyimpan…' : 'Tersimpan otomatis'}</p>
         </div>
+        <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="gap-1.5"><FileJson className="w-3.5 h-3.5" /> Import JSON</Button>
         <Button variant="outline" size="sm" onClick={save} className="gap-1.5"><Save className="w-3.5 h-3.5" /> Simpan</Button>
         <Button size="sm" onClick={() => printReport(reportData)} className="gap-1.5"><Printer className="w-3.5 h-3.5" /> Print / PDF</Button>
       </div>
@@ -229,7 +290,74 @@ export default function ReportEditorPage() {
         existingIds={videos.map((v) => v.video_id).filter(Boolean) as string[]}
         onAdd={(added) => { setVideos((vs) => [...vs, ...added]); setPickerOpen(false) }}
       />
+
+      <ImportJsonDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        videos={videos}
+        onImport={importJSON}
+      />
     </div>
+  )
+}
+
+// ── Import JSON dialog: paste AI-generated JSON, merge into videos ──
+function ImportJsonDialog({ open, onClose, videos, onImport }: {
+  open: boolean; onClose: () => void; videos: ReportVideo[]
+  onImport: (items: any[], targetIdx: number | null) => void
+}) {
+  const [text, setText] = useState('')
+  const [target, setTarget] = useState<string>('auto')
+  const [error, setError] = useState('')
+
+  useEffect(() => { if (!open) { setText(''); setTarget('auto'); setError('') } }, [open])
+
+  function doImport() {
+    setError('')
+    let parsed: any
+    try {
+      parsed = JSON.parse(text)
+    } catch (e) {
+      setError('JSON tidak valid. Periksa lagi format-nya.')
+      return
+    }
+    const items = Array.isArray(parsed) ? parsed : [parsed]
+    if (items.length === 0) { setError('Tidak ada data untuk diimpor.'); return }
+    const targetIdx = target === 'auto' ? null : target === 'new' ? -1 : Number(target)
+    onImport(items, targetIdx)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader><DialogTitle>Import Data JSON</DialogTitle></DialogHeader>
+        <p className="text-xs text-text-secondary">
+          Tempel JSON hasil rangkuman AI — bisa 1 video atau array beberapa video.
+          Jika <strong>judul cocok</strong> dengan video di laporan, metriknya <strong>digabungkan</strong>. Judul baru → video baru ditambahkan.
+        </p>
+        <Textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={9}
+          placeholder={'{\n  "title": "Judul Video",\n  "tiktok": { "views": 12000, "likes": 800, "comments": 40, "shares": 12, "saved": 30 }\n}'}
+          className="font-mono text-xs"
+        />
+        <div>
+          <Label className="text-[11px]">Target Video</Label>
+          <select value={target} onChange={(e) => setTarget(e.target.value)}
+            className="w-full mt-1 h-9 px-2 border border-border rounded-md text-sm bg-white">
+            <option value="auto">🔍 Otomatis (cocokkan judul)</option>
+            <option value="new">➕ Selalu buat video baru</option>
+            {videos.map((v, i) => <option key={i} value={String(i)}>Paksa ke: V{i + 1} — {v.title || 'Video ' + (i + 1)}</option>)}
+          </select>
+        </div>
+        {error && <p className="text-xs text-error">{error}</p>}
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" size="sm" onClick={onClose}>Batal</Button>
+          <Button size="sm" onClick={doImport} disabled={!text.trim()}>Import</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
