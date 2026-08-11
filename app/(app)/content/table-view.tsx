@@ -12,7 +12,8 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, useQuery } from '@tanstack/react-query'
+import { useWorkspace } from '@/lib/hooks/useWorkspace'
 import { getPlatformBadge } from '@/lib/utils/platform'
 import { getStatusBadgeClass, STATUS_CONFIG } from '@/lib/utils/status'
 import { cn } from '@/lib/utils'
@@ -89,27 +90,58 @@ function PilarCell({ video, save }: { video: VideoWithSchedules; save: SaveFn })
   )
 }
 
-function TemaCell({ video, save }: { video: VideoWithSchedules; save: SaveFn }) {
+function TemaCell({ video, save, temaOptions }: { video: VideoWithSchedules; save: SaveFn; temaOptions: string[] }) {
   const current = (video.temas && video.temas.length > 0) ? video.temas.join(', ') : (video.tema ?? '')
   const [editing, setEditing] = useState(false)
   const [val, setVal] = useState(current)
   useEffect(() => { if (!editing) setVal(current) }, [current, editing])
-  function commit() {
-    const arr = val.split(',').map((s) => s.trim()).filter(Boolean)
+
+  const segments = val.split(',').map((s) => s.trim()).filter(Boolean)
+  const lastFragment = val.includes(',') ? (val.slice(val.lastIndexOf(',') + 1).trim()) : val.trim()
+  const selectedLower = new Set(segments.map((s) => s.toLowerCase()))
+  const suggestions = temaOptions
+    .filter((t) => !selectedLower.has(t.toLowerCase()) && t.toLowerCase().includes(lastFragment.toLowerCase()))
+    .slice(0, 8)
+
+  function commit(next?: string) {
+    const source = next ?? val
+    const arr = source.split(',').map((s) => s.trim()).filter(Boolean)
     save(video.id, { temas: arr })
     setEditing(false)
   }
+  function pick(t: string) {
+    // Replace the in-progress last fragment with the picked tema.
+    const kept = val.includes(',') ? val.slice(0, val.lastIndexOf(',')).trim() : ''
+    const merged = [kept, t].filter(Boolean).join(', ')
+    setVal(merged)
+  }
+
   if (editing) {
     return (
-      <input
-        autoFocus
-        value={val}
-        onChange={(e) => setVal(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false) }}
-        placeholder="tema1, tema2"
-        className="w-full text-xs h-7 border border-accent rounded px-1.5 bg-white"
-      />
+      <div className="relative">
+        <input
+          autoFocus
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onBlur={() => setTimeout(() => commit(), 120)}
+          onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false) }}
+          placeholder="Ketik atau pilih tema"
+          className="w-full text-xs h-7 border border-accent rounded px-1.5 bg-white"
+        />
+        {suggestions.length > 0 && (
+          <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
+            {suggestions.map((t) => (
+              <button
+                key={t}
+                onMouseDown={(e) => { e.preventDefault(); pick(t) }}
+                className="block w-full text-left px-2 py-1.5 text-xs text-text-primary hover:bg-surface"
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     )
   }
   return (
@@ -153,7 +185,7 @@ function AsetCell({ video, save }: { video: VideoWithSchedules; save: SaveFn }) 
   )
 }
 
-function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, onFieldSave, activePlatformFilter }: {
+function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, onFieldSave, temaOptions, activePlatformFilter }: {
   video: VideoWithSchedules
   index: number
   page: number
@@ -161,6 +193,7 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, onFie
   onRowClick: (v: VideoWithSchedules) => void
   onDelete: (v: VideoWithSchedules) => void
   onFieldSave: SaveFn
+  temaOptions: string[]
   activePlatformFilter?: Platform[] | null
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: video.id })
@@ -201,7 +234,7 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, onFie
         <p className="font-medium text-text-primary text-sm truncate">{video.judul}</p>
       </td>
       <td className="px-3 py-2.5 text-xs text-text-secondary max-w-[150px]" onClick={(e) => e.stopPropagation()}>
-        <TemaCell video={video} save={onFieldSave} />
+        <TemaCell video={video} save={onFieldSave} temaOptions={temaOptions} />
       </td>
       <td className="px-3 py-2.5 text-xs text-text-secondary max-w-[120px]" onClick={(e) => e.stopPropagation()}>
         <PilarCell video={video} save={onFieldSave} />
@@ -283,6 +316,20 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
   const [localVideos, setLocalVideos] = useState<VideoWithSchedules[] | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const queryClient = useQueryClient()
+  const { workspaceId } = useWorkspace()
+
+  // Existing workspace temas for the inline Tema suggestions.
+  const { data: temaOptions = [] } = useQuery<string[]>({
+    queryKey: ['workspace-temas', workspaceId],
+    queryFn: async () => {
+      if (!workspaceId) return []
+      const supabase = createClient()
+      const { data } = await supabase.rpc('get_workspace_temas', { ws_id: workspaceId })
+      return (data ?? []) as string[]
+    },
+    enabled: !!workspaceId,
+    staleTime: 1000 * 60 * 5,
+  })
 
   async function handleDelete(video: VideoWithSchedules) {
     if (!confirm(`Hapus "${video.judul}"? Data jadwal dan performa terkait juga akan dihapus.`)) return
@@ -300,6 +347,8 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
     if (error) { toast.error('Gagal menyimpan: ' + error.message); return }
     toast.success('Tersimpan')
     queryClient.invalidateQueries({ queryKey: ['videos'] })
+    // Refresh tema suggestions in case a new tema was just introduced.
+    if ('temas' in patch) queryClient.invalidateQueries({ queryKey: ['workspace-temas', workspaceId] })
   }
 
   // When initialVideos changes (like new fetch or page refetch), reset local reordered state
@@ -366,6 +415,7 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
                         onRowClick={onRowClick}
                         onDelete={handleDelete}
                         onFieldSave={handleFieldSave}
+                        temaOptions={temaOptions}
                         activePlatformFilter={activePlatformFilter}
                       />
                     ))}
