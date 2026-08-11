@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useVideos } from '@/lib/hooks/useVideos'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
@@ -34,6 +34,7 @@ export default function ContentPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { workspaceId } = useWorkspace()
+  const queryClient = useQueryClient()
 
   const initialStatusParam = searchParams.get('status')
   const initialMonthParam = searchParams.get('month')
@@ -92,6 +93,19 @@ export default function ContentPage() {
       const saved = localStorage.getItem(`view-content-${workspaceId}`)
       if (saved === 'kanban' || saved === 'table') setViewMode(saved)
     }
+  }, [workspaceId])
+
+  // Auto-promote scheduled videos to live once they have a posting link and
+  // their tayang date has arrived. Runs once when the content list opens.
+  useEffect(() => {
+    if (!workspaceId) return
+    const supabase = createClient()
+    supabase.rpc('promote_scheduled_to_live', { ws_id: workspaceId }).then((res: { data: number | null }) => {
+      if (res.data && Number(res.data) > 0) {
+        queryClient.invalidateQueries({ queryKey: ['videos'] })
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId])
 
   function changeView(v: ViewMode) {
