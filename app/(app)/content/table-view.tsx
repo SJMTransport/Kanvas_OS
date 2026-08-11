@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import { ChevronUp, ChevronDown, Video, Trash2, GripVertical } from 'lucide-react'
+import { ChevronUp, ChevronDown, Video, Trash2, GripVertical, Pencil, Plus } from 'lucide-react'
 import {
   DndContext, DragEndEvent, PointerSensor, useSensor, useSensors, closestCenter,
 } from '@dnd-kit/core'
@@ -59,13 +59,108 @@ function Th({ children, col, sortBy, sortDir, onSort, className }: {
   )
 }
 
-function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, activePlatformFilter }: {
+const PILAR_OPTIONS = ['Edukasi', 'Hiburan', 'Promosi', 'Inspirasi', 'Behind the Scenes']
+
+type SaveFn = (id: string, patch: Record<string, unknown>) => void
+
+function PilarCell({ video, save }: { video: VideoWithSchedules; save: SaveFn }) {
+  const [editing, setEditing] = useState(false)
+  if (editing) {
+    return (
+      <select
+        autoFocus
+        defaultValue={video.pilar_konten ?? ''}
+        onChange={(e) => { save(video.id, { pilar_konten: e.target.value || null }); setEditing(false) }}
+        onBlur={() => setEditing(false)}
+        className="w-full text-xs h-7 border border-accent rounded px-1 bg-white"
+      >
+        <option value="">Tanpa Pilar</option>
+        {PILAR_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+      </select>
+    )
+  }
+  return (
+    <button onClick={() => setEditing(true)} className="w-full text-left group/edit flex items-center gap-1">
+      {video.pilar_konten
+        ? <span className="font-semibold text-accent">{video.pilar_konten}</span>
+        : <span className="text-text-muted/30 font-mono">-</span>}
+      <Pencil className="w-3 h-3 text-text-muted/0 group-hover/edit:text-text-muted/50 transition-colors" />
+    </button>
+  )
+}
+
+function TemaCell({ video, save }: { video: VideoWithSchedules; save: SaveFn }) {
+  const current = (video.temas && video.temas.length > 0) ? video.temas.join(', ') : (video.tema ?? '')
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState(current)
+  useEffect(() => { if (!editing) setVal(current) }, [current, editing])
+  function commit() {
+    const arr = val.split(',').map((s) => s.trim()).filter(Boolean)
+    save(video.id, { temas: arr })
+    setEditing(false)
+  }
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false) }}
+        placeholder="tema1, tema2"
+        className="w-full text-xs h-7 border border-accent rounded px-1.5 bg-white"
+      />
+    )
+  }
+  return (
+    <button onClick={() => setEditing(true)} className="w-full text-left truncate group/edit flex items-center gap-1">
+      <span className="truncate">{current || <span className="text-text-muted/30 font-mono">-</span>}</span>
+      <Pencil className="w-3 h-3 shrink-0 text-text-muted/0 group-hover/edit:text-text-muted/50 transition-colors" />
+    </button>
+  )
+}
+
+function AsetCell({ video, save }: { video: VideoWithSchedules; save: SaveFn }) {
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState(video.google_drive_link ?? '')
+  useEffect(() => { if (!editing) setVal(video.google_drive_link ?? '') }, [video.google_drive_link, editing])
+  function commit() { save(video.id, { google_drive_link: val.trim() || null }); setEditing(false) }
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false) }}
+        placeholder="https://drive.google.com/..."
+        className="w-full text-xs h-7 border border-accent rounded px-1.5 bg-white"
+      />
+    )
+  }
+  return (
+    <div className="flex items-center justify-center gap-1">
+      {video.google_drive_link && (
+        <a href={video.google_drive_link} target="_blank" rel="noopener noreferrer"
+          className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-600 transition-colors" title="Buka Google Drive">
+          <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M19.43 12.98l-6.7-11.53c-.3-.5-.8-.8-1.4-.8h.02c-.6 0-1.1.3-1.4.8L3.25 12.98c-.3.5-.3 1.1 0 1.6l3.35 5.76c.3.5.8.8 1.4.8h13.4c.6 0 1.1-.3 1.4-.8l3.35-5.76c.3-.5.3-1.1 0-1.6zm-10.4-8.98h2l5.7 9.8h-2zM8.82 17.5l-2.85-4.9 5.7-9.8 2.85 4.9zm11.36 0h-13.4l2.85-4.9h13.4z" /></svg>
+        </a>
+      )}
+      <button onClick={() => setEditing(true)} className="text-text-muted/50 hover:text-accent transition-colors" title={video.google_drive_link ? 'Ubah link' : 'Tambah link aset'}>
+        {video.google_drive_link ? <Pencil className="w-3 h-3" /> : <Plus className="w-3.5 h-3.5" />}
+      </button>
+    </div>
+  )
+}
+
+function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, onFieldSave, activePlatformFilter }: {
   video: VideoWithSchedules
   index: number
   page: number
   pageSize: number
   onRowClick: (v: VideoWithSchedules) => void
   onDelete: (v: VideoWithSchedules) => void
+  onFieldSave: SaveFn
   activePlatformFilter?: Platform[] | null
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: video.id })
@@ -105,32 +200,14 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, activ
       <td className="px-3 py-2.5 max-w-[200px]">
         <p className="font-medium text-text-primary text-sm truncate">{video.judul}</p>
       </td>
-      <td className="px-3 py-2.5 text-xs text-text-secondary max-w-[150px] truncate">
-        {video.temas && video.temas.length > 0 ? video.temas.join(', ') : video.tema ?? '-'}
+      <td className="px-3 py-2.5 text-xs text-text-secondary max-w-[150px]" onClick={(e) => e.stopPropagation()}>
+        <TemaCell video={video} save={onFieldSave} />
       </td>
-      <td className="px-3 py-2.5 text-xs text-text-secondary max-w-[120px] truncate">
-        {video.pilar_konten ? (
-          <span className="font-semibold text-accent">{video.pilar_konten}</span>
-        ) : (
-          <span className="text-text-muted/30 font-mono">-</span>
-        )}
+      <td className="px-3 py-2.5 text-xs text-text-secondary max-w-[120px]" onClick={(e) => e.stopPropagation()}>
+        <PilarCell video={video} save={onFieldSave} />
       </td>
       <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
-        {video.google_drive_link ? (
-          <a
-            href={video.google_drive_link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center w-6.5 h-6.5 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-600 hover:text-emerald-700 transition-colors shadow-sm"
-            title="Buka Google Drive"
-          >
-            <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-              <path d="M19.43 12.98l-6.7-11.53c-.3-.5-.8-.8-1.4-.8h.02c-.6 0-1.1.3-1.4.8L3.25 12.98c-.3.5-.3 1.1 0 1.6l3.35 5.76c.3.5.8.8 1.4.8h13.4c.6 0 1.1-.3 1.4-.8l3.35-5.76c.3-.5.3-1.1 0-1.6zm-10.4-8.98h2l5.7 9.8h-2zM8.82 17.5l-2.85-4.9 5.7-9.8 2.85 4.9zm11.36 0h-13.4l2.85-4.9h13.4z" />
-            </svg>
-          </a>
-        ) : (
-          <span className="text-text-muted/20 text-xs font-mono">-</span>
-        )}
+        <AsetCell video={video} save={onFieldSave} />
       </td>
       <td className="px-3 py-2.5">
         <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium border', getStatusBadgeClass(video.status as VideoStatus))}>
@@ -216,6 +293,15 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
     queryClient.invalidateQueries({ queryKey: ['videos'] })
   }
 
+  // Inline edit of a single video field (pilar/tema/aset) directly in the table.
+  async function handleFieldSave(id: string, patch: Record<string, unknown>) {
+    const supabase = createClient()
+    const { error } = await supabase.from('videos').update(patch).eq('id', id)
+    if (error) { toast.error('Gagal menyimpan: ' + error.message); return }
+    toast.success('Tersimpan')
+    queryClient.invalidateQueries({ queryKey: ['videos'] })
+  }
+
   // When initialVideos changes (like new fetch or page refetch), reset local reordered state
   useEffect(() => {
     setLocalVideos(null)
@@ -279,6 +365,7 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
                         pageSize={pageSize}
                         onRowClick={onRowClick}
                         onDelete={handleDelete}
+                        onFieldSave={handleFieldSave}
                         activePlatformFilter={activePlatformFilter}
                       />
                     ))}
