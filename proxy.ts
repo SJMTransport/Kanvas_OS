@@ -26,9 +26,9 @@ export async function proxy(request: NextRequest) {
       },
     })
 
-    // Only check auth — no DB calls to keep proxy fast
-    const { data } = await supabase.auth.getUser()
-    const user = data?.user ?? null
+    // Only check auth — read from cookie, no network call
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user ?? null
     const { pathname } = request.nextUrl
 
     const isAppRoute = APP_ROUTES.some((r) => pathname === r || pathname.startsWith(r + '/'))

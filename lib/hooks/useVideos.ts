@@ -30,11 +30,12 @@ interface UseVideosOptions {
   page?: number
   pageSize?: number
   pilarKonten?: string[] | null
+  enabled?: boolean
 }
 
 export function useVideos(opts: UseVideosOptions = {}) {
   const { workspaceId } = useWorkspace()
-  const { status, contentType, platform, search, tema, monthCurrent, sortBy = 'sort_order', sortDir = 'asc', page = 0, pageSize = 25, pilarKonten } = opts
+  const { status, contentType, platform, search, tema, monthCurrent, sortBy = 'sort_order', sortDir = 'asc', page = 0, pageSize = 25, pilarKonten, enabled = true } = opts
 
   return useQuery<VideoWithSchedules[]>({
     queryKey: ['videos', workspaceId, status, contentType, platform, search, tema, monthCurrent, sortBy, sortDir, page, pilarKonten],
@@ -82,9 +83,8 @@ export function useVideos(opts: UseVideosOptions = {}) {
       const { data } = await q
       return (data ?? []) as unknown as VideoWithSchedules[]
     },
-    enabled: !!workspaceId,
-    staleTime: 0,
-    refetchOnMount: 'always',
+    enabled: !!workspaceId && enabled !== false,
+    staleTime: 30_000,
   })
 }
 

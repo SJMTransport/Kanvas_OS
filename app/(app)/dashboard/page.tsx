@@ -22,8 +22,7 @@ export default function DashboardPage() {
       // All queries run in parallel — much faster than sequential.
       // Each is settled independently so one flaky request can't sink the whole dashboard.
       const results = await Promise.allSettled([
-        supabase.auth.getUser(),
-        supabase.from('video_platform_schedules').select('*, videos(id, judul, thumbnail_url, status, workspace_id)').eq('tanggal_tayang', today).order('jam_post', { ascending: true }),
+        supabase.from('video_platform_schedules').select('*, videos!inner(id, judul, thumbnail_url, status, workspace_id)').eq('videos.workspace_id', workspaceId).eq('tanggal_tayang', today).order('jam_post', { ascending: true }),
         supabase.from('videos').select('*', { count: 'exact', head: true }).eq('workspace_id', workspaceId),
         supabase.from('videos').select('*', { count: 'exact', head: true }).eq('workspace_id', workspaceId).eq('status', 'scheduled'),
         supabase.from('videos').select('*', { count: 'exact', head: true }).eq('workspace_id', workspaceId).eq('status', 'live').gte('updated_at', startOfMonth.toISOString()),
@@ -31,34 +30,29 @@ export default function DashboardPage() {
         supabase.from('brands').select('id, nama_brand, status, next_followup_date, industri').eq('workspace_id', workspaceId).not('status', 'in', '("selesai","cold")').lte('next_followup_date', today).order('next_followup_date', { ascending: true }).limit(5),
         supabase.from('invoices').select('id, invoice_number, total, due_date, brands(nama_brand)').eq('workspace_id', workspaceId).eq('status', 'overdue').order('due_date', { ascending: true }).limit(5),
         supabase.from('videos').select('id, judul, status, updated_at, created_by, users(full_name)').eq('workspace_id', workspaceId).order('updated_at', { ascending: false }).limit(5),
-        supabase.from('videos').select('pilar_konten').eq('workspace_id', workspaceId),
+        supabase.from('videos').select('pilar_konten').eq('workspace_id', workspaceId).not('pilar_konten', 'is', null).limit(200),
       ])
 
       const settledValue = <T,>(r: PromiseSettledResult<T>): T | undefined =>
         r.status === 'fulfilled' ? r.value : undefined
 
-      const user = (settledValue(results[0]) as any)?.data?.user ?? null
-      const todaySchedules = (settledValue(results[1]) as any)?.data ?? []
-      const totalVideos = (settledValue(results[2]) as any)?.count ?? 0
-      const scheduledCount = (settledValue(results[3]) as any)?.count ?? 0
-      const liveCount = (settledValue(results[4]) as any)?.count ?? 0
-      const draftCount = (settledValue(results[5]) as any)?.count ?? 0
-      const followups = (settledValue(results[6]) as any)?.data ?? []
-      const overdueInvoices = (settledValue(results[7]) as any)?.data ?? []
-      const recentVideos = (settledValue(results[8]) as any)?.data ?? []
-      const pilarRaw = (settledValue(results[9]) as any)?.data ?? []
+      const todaySchedules = (settledValue(results[0]) as any)?.data ?? []
+      const totalVideos = (settledValue(results[1]) as any)?.count ?? 0
+      const scheduledCount = (settledValue(results[2]) as any)?.count ?? 0
+      const liveCount = (settledValue(results[3]) as any)?.count ?? 0
+      const draftCount = (settledValue(results[4]) as any)?.count ?? 0
+      const followups = (settledValue(results[5]) as any)?.data ?? []
+      const overdueInvoices = (settledValue(results[6]) as any)?.data ?? []
+      const recentVideos = (settledValue(results[7]) as any)?.data ?? []
+      const pilarRaw = (settledValue(results[8]) as any)?.data ?? []
 
       const pilarVideos = pilarRaw
         .map((v: any) => v.pilar_konten)
         .filter(Boolean) as string[]
 
-      const filteredSchedules = (todaySchedules ?? []).filter(
-        (s: any) => s?.videos?.workspace_id === workspaceId
-      )
-
       return {
-        userName: (user?.user_metadata?.full_name as string) || user?.email || 'Kreator',
-        todaySchedules: filteredSchedules,
+        userName: 'Kreator',
+        todaySchedules,
         pipeline: { total: totalVideos ?? 0, scheduled: scheduledCount ?? 0, live: liveCount ?? 0, draft: draftCount ?? 0 },
         followups: followups ?? [],
         overdueInvoices: (overdueInvoices ?? []) as any[],

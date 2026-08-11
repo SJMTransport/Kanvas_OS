@@ -3,10 +3,11 @@
 import { useWorkspaceStore } from '@/lib/stores/workspaceStore'
 
 export function useWorkspace() {
-  const store = useWorkspaceStore()
+  const workspace = useWorkspaceStore((s) => s.currentWorkspace)
+  const role = useWorkspaceStore((s) => s.role)
   return {
-    workspace: store.currentWorkspace,
-    workspaceId: store.currentWorkspace?.id ?? null,
-    role: store.role,
+    workspace,
+    workspaceId: workspace?.id ?? null,
+    role,
   }
 }

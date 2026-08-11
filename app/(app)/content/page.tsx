@@ -28,7 +28,7 @@ import type { VideoWithSchedules } from '@/lib/hooks/useVideos'
 import type { VideoStatus, ContentType, Platform } from '@/lib/types'
 
 type ViewMode = 'table' | 'kanban'
-const PAGE_SIZE = 10000
+const PAGE_SIZE = 200
 
 export default function ContentPage() {
   const router = useRouter()
@@ -180,7 +180,7 @@ export default function ContentPage() {
     pageSize: PAGE_SIZE,
   })
 
-  // For kanban we need all videos (no pagination)
+  // For kanban we need all videos (no pagination) — only run when kanban is active
   const allVideosQuery = useVideos({
     status: null,
     search: search || undefined,
@@ -188,6 +188,7 @@ export default function ContentPage() {
     sortDir: 'desc',
     page: 0,
     pageSize: 500,
+    enabled: viewMode === 'kanban',
   })
 
   const total = videosQuery.data?.length ?? 0

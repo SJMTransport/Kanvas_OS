@@ -3,25 +3,15 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useQueryClient } from '@tanstack/react-query'
 import { useWorkspaceStore } from '@/lib/stores/workspaceStore'
 import { WorkspaceSwitcher } from './workspace-switcher'
 import { NAV_ITEMS } from './nav-items'
 import { ChevronLeft, ChevronRight, ChevronDown, Palette } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const PREFETCH_ROUTES: Record<string, string[]> = {
-  '/content':    ['videos'],
-  '/dashboard':  ['dashboard'],
-  '/calendar':   ['schedules'],
-  '/brand':      ['brands'],
-  '/performance':['performance'],
-}
-
 export const Sidebar = React.memo(function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const queryClient = useQueryClient()
   const { sidebarCollapsed, setSidebarCollapsed, currentWorkspace } = useWorkspaceStore()
   const [expanded, setExpanded] = useState<string[]>([])
 
@@ -36,21 +26,8 @@ export const Sidebar = React.memo(function Sidebar() {
   }
 
   function handleMouseEnter(href: string) {
-    // Prefetch Next.js page bundle
+    // Prefetch Next.js page bundle on hover for instant navigation
     router.prefetch(href)
-    // Prefetch data via React Query (marks as fresh so navigating feels instant)
-    const keys = PREFETCH_ROUTES[href]
-    if (keys && currentWorkspace?.id) {
-      keys.forEach((key) => {
-        if (!queryClient.getQueryData([key, currentWorkspace.id])) {
-          queryClient.prefetchQuery({
-            queryKey: [key, currentWorkspace.id],
-            staleTime: 1000 * 60 * 5,
-            queryFn: () => [], // actual fetch happens on page mount; this just primes the cache slot
-          })
-        }
-      })
-    }
   }
 
   return (

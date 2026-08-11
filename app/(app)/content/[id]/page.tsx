@@ -1182,8 +1182,7 @@ export default function ContentDetailPage() {
       if (error) throw error
       return data as unknown as VideoWithSchedules
     },
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: 10_000,
   })
 
   // Get Video Performance Records
