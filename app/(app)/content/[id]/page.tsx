@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   ArrowLeft, Plus, Trash2, Check, ExternalLink, Loader2, FileText, Video, Upload, X,
 } from 'lucide-react'
@@ -35,13 +36,7 @@ const ALL_STATUSES: VideoStatus[] = ['ide', 'scripting', 'produksi', 'editing', 
 function StatusStepper({ currentStatus, onStatusChange }: { currentStatus: VideoStatus; onStatusChange: (s: VideoStatus) => void }) {
   const currentIndex = ALL_STATUSES.indexOf(currentStatus)
   return (
-    <div className="w-full bg-white border border-border rounded-xl p-4 shadow-sm mb-6">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-semibold text-text-secondary">Tahapan Alur Konten</span>
-        <span className="text-xs text-accent font-semibold uppercase">
-          Status: {STATUS_CONFIG[currentStatus]?.label ?? currentStatus}
-        </span>
-      </div>
+    <div className="w-full bg-white border border-border rounded-xl p-3 shadow-sm">
       <div className="relative flex items-center justify-between px-2">
         {/* Progress Line */}
         <div className="absolute left-6 right-6 top-3 h-0.5 bg-border -z-10" />
@@ -169,61 +164,12 @@ function TemaSelect({ temas, onChange, workspaceId }: { temas: string[]; onChang
 
 // ─── Info Tab ────────────────────────────────────────────────────────────────
 
-function InfoTab({ video }: { video: VideoWithSchedules }) {
-  const queryClient = useQueryClient()
-  const { workspaceId } = useWorkspace()
-  const [saving, setSaving] = useState(false)
-  const [temas, setTemas] = useState<string[]>(video.temas ?? (video.tema ? [video.tema] : []))
-  const [form, setForm] = useState({
-    no_video: video.no_video ? video.no_video.replace(/^VID-/, '') : '',
-    judul: video.judul ?? '',
-    status: video.status ?? '',
-    format: video.format ?? '',
-    tanggal_shooting: video.tanggal_shooting ?? '',
-    deadline_posting: video.deadline_posting ?? '',
-    storage_bahan: video.storage_bahan ?? '',
-    storage_video: video.storage_video ?? '',
-    google_drive_link: video.google_drive_link ?? '',
-    caption_default: video.caption_default ?? '',
-    pilar_konten: video.pilar_konten ?? '',
-  })
-
+function InfoTab({ form, setForm, temas, setTemas, workspaceId, isFoto }: { form: any, setForm: any, temas: string[], setTemas: any, workspaceId: string | null, isFoto: boolean }) {
   function set(field: string, value: string) {
-    setForm((f) => ({ ...f, [field]: value }))
-  }
-
-  async function handleSave() {
-    setSaving(true)
-    const supabase = createClient()
-    const payload: Record<string, unknown> = {
-      no_video: form.no_video ? `VID-${form.no_video.padStart(3, '0')}` : null,
-      judul: form.judul || null,
-      status: form.status || null,
-      format: form.format || null,
-      temas,
-      tema: temas[0] ?? null,
-      tanggal_shooting: form.tanggal_shooting || null,
-      deadline_posting: form.deadline_posting || null,
-      storage_bahan: form.storage_bahan || null,
-      storage_video: form.storage_video || null,
-      google_drive_link: form.google_drive_link || null,
-      caption_default: form.caption_default || null,
-      pilar_konten: form.pilar_konten || null,
-    }
-    const { error } = await supabase.from('videos').update(payload).eq('id', video.id)
-    setSaving(false)
-    if (error) {
-      toast.error(error.message)
-    } else {
-      toast.success('Perubahan tersimpan!')
-      queryClient.invalidateQueries({ queryKey: ['videos'] })
-      queryClient.invalidateQueries({ queryKey: ['video-detail', video.id] })
-    }
+    setForm((f: any) => ({ ...f, [field]: value }))
   }
 
   const FORMAT_OPTIONS = ['Short Video', 'Long Video', 'Reels', 'Live']
-  const isFoto = (video as any).content_type === 'foto'
-  const isLiveOrScheduled = video.status === 'live' || video.status === 'scheduled'
 
   return (
     <div className="space-y-4">
@@ -298,54 +244,16 @@ function InfoTab({ video }: { video: VideoWithSchedules }) {
           </div>
         </div>
       )}
-
-      <Button onClick={handleSave} disabled={saving} className="w-full gap-2 h-9 text-xs mt-2 bg-accent hover:bg-accent/90">
-        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-        {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
-      </Button>
     </div>
   )
 }
 
 // ─── Production Assets Panel (Drive Links & Caption) ─────────────────────────
 
-function ProductionAssets({ video }: { video: VideoWithSchedules }) {
-  const queryClient = useQueryClient()
-  const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({
-    storage_bahan: video.storage_bahan ?? '',
-    storage_video: video.storage_video ?? '',
-    google_drive_link: video.google_drive_link ?? '',
-    caption_default: video.caption_default ?? '',
-  })
-
+function ProductionAssets({ form, setForm, isFoto }: { form: any, setForm: any, isFoto: boolean }) {
   function set(field: string, value: string) {
-    setForm((f) => ({ ...f, [field]: value }))
+    setForm((f: any) => ({ ...f, [field]: value }))
   }
-
-  async function handleSave() {
-    setSaving(true)
-    const supabase = createClient()
-    const { error } = await supabase
-      .from('videos')
-      .update({
-        storage_bahan: form.storage_bahan || null,
-        storage_video: form.storage_video || null,
-        google_drive_link: form.google_drive_link || null,
-        caption_default: form.caption_default || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', video.id)
-    setSaving(false)
-    if (error) {
-      toast.error(error.message)
-    } else {
-      toast.success('Aset produksi disimpan!')
-      queryClient.invalidateQueries({ queryKey: ['video-detail', video.id] })
-    }
-  }
-
-  const isFoto = (video as any).content_type === 'foto'
 
   return (
     <div className="space-y-4">
@@ -371,11 +279,6 @@ function ProductionAssets({ video }: { video: VideoWithSchedules }) {
         <Label className="text-xs text-text-muted">Caption Default</Label>
         <Textarea value={form.caption_default} onChange={(e) => set('caption_default', e.target.value)} rows={3} className="text-xs resize-none" placeholder="Tulis caption default di sini..." />
       </div>
-
-      <Button onClick={handleSave} disabled={saving} variant="secondary" className="w-full gap-2 h-9 text-xs">
-        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-        {saving ? 'Menyimpan...' : 'Simpan Aset'}
-      </Button>
     </div>
   )
 }
@@ -1181,6 +1084,79 @@ function PreviewCard({ platform, data, video }: { platform: Platform; data: any;
   )
 }
 
+// ─── Perencanaan Tab (Unified) ────────────────────────────────────────────────
+
+function PerencanaanTab({ video }: { video: VideoWithSchedules }) {
+  const queryClient = useQueryClient()
+  const { workspaceId } = useWorkspace()
+  const [saving, setSaving] = useState(false)
+  const [temas, setTemas] = useState<string[]>(video.temas ?? (video.tema ? [video.tema] : []))
+  const [form, setForm] = useState({
+    no_video: video.no_video ? video.no_video.replace(/^VID-/, '') : '',
+    judul: video.judul ?? '',
+    status: video.status ?? '',
+    format: video.format ?? '',
+    tanggal_shooting: video.tanggal_shooting ?? '',
+    deadline_posting: video.deadline_posting ?? '',
+    storage_bahan: video.storage_bahan ?? '',
+    storage_video: video.storage_video ?? '',
+    google_drive_link: video.google_drive_link ?? '',
+    caption_default: video.caption_default ?? '',
+    pilar_konten: video.pilar_konten ?? '',
+  })
+
+  async function handleSave() {
+    setSaving(true)
+    const supabase = createClient()
+    const payload: Record<string, unknown> = {
+      no_video: form.no_video ? `VID-${form.no_video.padStart(3, '0')}` : null,
+      judul: form.judul || null,
+      status: form.status || null,
+      format: form.format || null,
+      temas,
+      tema: temas[0] ?? null,
+      tanggal_shooting: form.tanggal_shooting || null,
+      deadline_posting: form.deadline_posting || null,
+      storage_bahan: form.storage_bahan || null,
+      storage_video: form.storage_video || null,
+      google_drive_link: form.google_drive_link || null,
+      caption_default: form.caption_default || null,
+      pilar_konten: form.pilar_konten || null,
+      updated_at: new Date().toISOString(),
+    }
+    const { error } = await supabase.from('videos').update(payload).eq('id', video.id)
+    setSaving(false)
+    if (error) {
+      toast.error(error.message)
+    } else {
+      toast.success('Perubahan perencanaan tersimpan!')
+      queryClient.invalidateQueries({ queryKey: ['videos'] })
+      queryClient.invalidateQueries({ queryKey: ['video-detail', video.id] })
+    }
+  }
+
+  const isFoto = (video as any).content_type === 'foto'
+
+  return (
+    <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+        <div>
+          <h3 className="font-heading font-semibold text-text-primary text-sm border-b border-border pb-2.5 mb-4">Informasi Konten</h3>
+          <InfoTab form={form} setForm={setForm} temas={temas} setTemas={setTemas} workspaceId={workspaceId} isFoto={isFoto} />
+        </div>
+        <div>
+          <h3 className="font-heading font-semibold text-text-primary text-sm border-b border-border pb-2.5 mb-4">Aset Produksi</h3>
+          <ProductionAssets form={form} setForm={setForm} isFoto={isFoto} />
+        </div>
+      </div>
+      <Button onClick={handleSave} disabled={saving} className="w-full gap-2 h-10 text-sm font-semibold bg-accent hover:bg-accent/90">
+        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+        {saving ? 'Menyimpan...' : 'Simpan Perencanaan & Aset'}
+      </Button>
+    </div>
+  )
+}
+
 // ─── Main Content Detail Page ──────────────────────────────────────────────────
 
 export default function ContentDetailPage() {
@@ -1305,19 +1281,26 @@ export default function ContentDetailPage() {
   return (
     <div className="max-w-6xl mx-auto px-6 py-6 font-sans">
       {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-        <div>
+      <div className="flex flex-col md:flex-row justify-between gap-6 mb-6">
+        <div className="flex-1 space-y-3">
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors mb-2"
+            className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Kembali ke Daftar Konten
           </button>
-          <h1 className="font-heading font-bold text-xl text-text-primary leading-tight">
-            {video.judul || <span className="text-text-muted italic">Ketik judul...</span>}
-          </h1>
-          <div className="mt-1 flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-3">
+            <h1 className="font-heading font-bold text-2xl text-text-primary leading-tight">
+              {video.judul || <span className="text-text-muted italic">Ketik judul...</span>}
+            </h1>
+            {video.no_video && (
+              <span className="text-xs text-text-muted font-mono bg-subtle px-2 py-1 rounded-md border border-border">
+                {video.no_video}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
             <span className={cn('inline-flex text-[10px] px-2 py-0.5 rounded-full border font-medium uppercase tracking-wider', getStatusBadgeClass(video.status as VideoStatus))}>
               {STATUS_CONFIG[video.status as VideoStatus]?.label ?? video.status}
             </span>
@@ -1328,88 +1311,109 @@ export default function ContentDetailPage() {
             )}
             <VideoWorkBadges videoId={video.id} />
           </div>
+          <div className="pt-2 max-w-2xl">
+            <StatusStepper currentStatus={video.status as VideoStatus} onStatusChange={handleStatusChange} />
+          </div>
         </div>
 
         {/* Dashboard KPI Mini Summary Card */}
         {totalViews > 0 && (
-          <div className="flex items-center gap-4 bg-emerald-50/70 border border-emerald-100 rounded-xl px-4 py-2.5 shadow-sm shrink-0">
+          <div className="flex items-center gap-4 bg-emerald-50/70 border border-emerald-100 rounded-xl px-5 py-3 shadow-sm shrink-0 self-start">
             <div className="text-center">
-              <p className="font-heading font-bold text-emerald-800 text-sm">{formatNumber(totalViews)}</p>
-              <p className="text-[9px] text-emerald-600 font-bold uppercase tracking-wider">Views</p>
+              <p className="font-heading font-bold text-emerald-800 text-base">{formatNumber(totalViews)}</p>
+              <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Views</p>
             </div>
-            <div className="w-px h-6 bg-emerald-200/60" />
+            <div className="w-px h-8 bg-emerald-200/60" />
             <div className="text-center">
-              <p className="font-heading font-bold text-emerald-800 text-sm">{formatNumber(totalLikes)}</p>
-              <p className="text-[9px] text-emerald-600 font-bold uppercase tracking-wider">Likes</p>
+              <p className="font-heading font-bold text-emerald-800 text-base">{formatNumber(totalLikes)}</p>
+              <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Likes</p>
             </div>
-            <div className="w-px h-6 bg-emerald-200/60" />
+            <div className="w-px h-8 bg-emerald-200/60" />
             <div className="text-center">
-              <p className="font-heading font-bold text-emerald-800 text-sm">{formatNumber(totalComments)}</p>
-              <p className="text-[9px] text-emerald-600 font-bold uppercase tracking-wider">Comments</p>
+              <p className="font-heading font-bold text-emerald-800 text-base">{formatNumber(totalComments)}</p>
+              <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Comments</p>
             </div>
           </div>
         )}
       </div>
 
-      {/* Stepper Status */}
-      <StatusStepper currentStatus={video.status as VideoStatus} onStatusChange={handleStatusChange} />
+      <Tabs defaultValue="perencanaan" className="w-full">
+        <TabsList className="w-full justify-start border-b border-border rounded-none bg-transparent p-0 space-x-6 h-auto mb-6 overflow-x-auto">
+          <TabsTrigger value="perencanaan" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent data-[state=active]:shadow-none rounded-none px-1 py-2.5 font-semibold text-text-muted data-[state=active]:text-accent">Perencanaan</TabsTrigger>
+          <TabsTrigger value="script" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent data-[state=active]:shadow-none rounded-none px-1 py-2.5 font-semibold text-text-muted data-[state=active]:text-accent">Script</TabsTrigger>
+          <TabsTrigger value="distribusi" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent data-[state=active]:shadow-none rounded-none px-1 py-2.5 font-semibold text-text-muted data-[state=active]:text-accent">Distribusi</TabsTrigger>
+          <TabsTrigger value="checklist" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent data-[state=active]:shadow-none rounded-none px-1 py-2.5 font-semibold text-text-muted data-[state=active]:text-accent">Checklist</TabsTrigger>
+          <TabsTrigger value="performa" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent data-[state=active]:shadow-none rounded-none px-1 py-2.5 font-semibold text-text-muted data-[state=active]:text-accent">Performa</TabsTrigger>
+        </TabsList>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
-        {/* Kolom Kiri: Detail Perencanaan & Editor Script */}
-        <div className="space-y-6">
+        <TabsContent value="perencanaan" className="outline-none">
+          <PerencanaanTab video={video} />
+        </TabsContent>
+
+        <TabsContent value="script" className="outline-none">
           <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
-            <h3 className="font-heading font-semibold text-text-primary text-sm border-b border-border pb-2.5 mb-4">Detail Perencanaan</h3>
-            <InfoTab key={video.id} video={video} />
-          </div>
-          <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
-            <h3 className="font-heading font-semibold text-text-primary text-sm border-b border-border pb-2.5 mb-2">Editor Script</h3>
             <ScriptTab video={video} />
           </div>
-        </div>
+        </TabsContent>
 
-        {/* Kolom Kanan: Distribusi, Preview, Aset, Checklist & Laporan */}
-        <div className="space-y-6">
-          <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
-            <h3 className="font-heading font-semibold text-text-primary text-sm border-b border-border pb-2.5 mb-4">Saluran Distribusi (Platform)</h3>
-            <DistributionTab 
-              video={video} 
-              activePlatform={activePlatform} 
-              setActivePlatform={setActivePlatform} 
-              perfRecords={perfRecords}
-              refetchPerformance={refetchPerformance}
-            />
-          </div>
-
-          <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
-            <h3 className="font-heading font-semibold text-text-primary text-sm border-b border-border pb-2.5 mb-4 font-sans flex items-center gap-1.5">
-              <span>Preview:</span>
-              <span className="text-accent capitalize">{activePlatform}</span>
-            </h3>
-            <PreviewCard platform={activePlatform} data={platformData[activePlatform] ?? {}} video={video} />
-          </div>
-
-          <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
-            <h3 className="font-heading font-semibold text-text-primary text-sm border-b border-border pb-2.5 mb-4">Aset Produksi</h3>
-            <ProductionAssets video={video} />
-          </div>
-
-          <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
-            <h3 className="font-heading font-semibold text-text-primary text-sm border-b border-border pb-2.5 mb-4">Checklist</h3>
+        <TabsContent value="distribusi" className="outline-none">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
+            <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
+              <h3 className="font-heading font-semibold text-text-primary text-sm border-b border-border pb-2.5 mb-4">Saluran Distribusi (Platform)</h3>
+              <DistributionTab 
+                video={video} 
+                activePlatform={activePlatform} 
+                setActivePlatform={setActivePlatform} 
+                perfRecords={perfRecords}
+                refetchPerformance={refetchPerformance}
+              />
+            </div>
             <div className="space-y-4">
+              <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
+                <h3 className="font-heading font-semibold text-text-primary text-sm border-b border-border pb-2.5 mb-4 flex items-center gap-1.5">
+                  <span>Preview:</span>
+                  <span className="text-accent capitalize">{activePlatform}</span>
+                </h3>
+                <PreviewCard platform={activePlatform} data={platformData[activePlatform] ?? {}} video={video} />
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="checklist" className="outline-none">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
               <ChecklistSection title="Shooting Checklist" table="shooting_checklists" videoId={video.id} />
+            </div>
+            <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
               <ChecklistSection title="Editing Checklist" table="editing_checklists" videoId={video.id} />
             </div>
           </div>
+        </TabsContent>
 
-          <div className="bg-white border border-border rounded-xl p-5 shadow-sm space-y-3">
-            <h3 className="font-heading font-semibold text-text-primary text-sm border-b border-border pb-2.5 mb-3">Laporan Video</h3>
-            <Button variant="secondary" className="w-full gap-2 h-9 text-xs font-semibold" onClick={handleExportAll} disabled={exporting}>
+        <TabsContent value="performa" className="outline-none space-y-6">
+          <div className="flex items-center justify-between bg-white border border-border rounded-xl p-5 shadow-sm">
+            <h3 className="font-heading font-semibold text-text-primary text-sm">Laporan Video & Performa Keseluruhan</h3>
+            <Button variant="secondary" className="gap-2 h-9 text-xs font-semibold" onClick={handleExportAll} disabled={exporting}>
               {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
               Unduh Laporan 4 Platform (PDF)
             </Button>
           </div>
-        </div>
-      </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {PLATFORMS.map(platform => (
+              <div key={platform} className="bg-white border border-border rounded-xl p-4 shadow-sm space-y-4">
+                <PreviewCard platform={platform} data={platformData[platform]} video={video} />
+                <PlatformPerformanceForm 
+                  platform={platform} 
+                  videoId={video.id} 
+                  existingRecord={platformData[platform]} 
+                  onSaveSuccess={refetchPerformance} 
+                />
+              </div>
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
