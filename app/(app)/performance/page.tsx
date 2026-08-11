@@ -8,7 +8,7 @@ import { formatNumber } from '@/lib/utils/formatters'
 import { getPlatformDot } from '@/lib/utils/platform'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
-import { BarChart2, Video } from 'lucide-react'
+import { BarChart2, Video, FileBarChart } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PerformanceSummary } from './performance-summary'
 import type { Platform } from '@/lib/types'
@@ -43,6 +43,9 @@ export default function PerformancePage() {
           <h1 className="font-heading text-2xl font-bold text-text-primary">Performa</h1>
           <p className="text-sm text-text-secondary mt-0.5">Input & pantau metrik video per platform</p>
         </div>
+        <Button size="sm" onClick={() => router.push('/performance/reports')} className="gap-1.5">
+          <FileBarChart className="w-3.5 h-3.5" /> Laporan Campaign
+        </Button>
       </div>
 
       {/* Ringkasan agregat semua konten */}
