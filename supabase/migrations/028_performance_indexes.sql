@@ -55,6 +55,10 @@ CREATE INDEX IF NOT EXISTS idx_workspace_members_workspace ON public.workspace_m
 -- creator_saved_content: joined from creator profiles and referenced by works.
 CREATE INDEX IF NOT EXISTS idx_creator_saved_content_creator ON public.creator_saved_content(creator_id);
 
+-- Ensure the pilar_konten column exists before the aggregate below references it
+-- (migration 023_add_pilar_konten may not have been applied on every database).
+ALTER TABLE public.videos ADD COLUMN IF NOT EXISTS pilar_konten TEXT;
+
 -- Dashboard pillar breakdown: aggregate in the DB instead of fetching every video's
 -- pilar_konten column and counting client-side. Returns one row per pillar with its count.
 CREATE OR REPLACE FUNCTION public.pilar_konten_counts(ws_id UUID)
