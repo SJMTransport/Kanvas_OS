@@ -13,7 +13,7 @@ import { getPlatformBadge, getPlatformDot } from '@/lib/utils/platform'
 import { formatNumber } from '@/lib/utils/formatters'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { ArrowLeft, Download, Loader2, Video, BarChart2 } from 'lucide-react'
+import { ArrowLeft, Download, Loader2, Video } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { Platform } from '@/lib/types'
 
@@ -162,25 +162,6 @@ export default function PerformanceInputPage({ params }: { params: { videoId: st
   const [activePlatform, setActivePlatform] = useState<Platform>('tiktok')
   const [exporting, setExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState(0)
-  const [isSyncing, setIsSyncing] = useState(false)
-
-  async function handleSyncSingle() {
-    setIsSyncing(true)
-    try {
-      const res = await fetch(`/api/performance/sync?video_id=${params.videoId}`, { method: 'POST' })
-      const data = await res.json()
-      if (data.success) {
-        toast.success(data.message)
-        queryClient.invalidateQueries({ queryKey: ['performance', params.videoId] })
-      } else {
-        toast.error(data.message || 'Gagal sinkronisasi data')
-      }
-    } catch (err: any) {
-      toast.error('Gagal sinkronisasi: ' + err.message)
-    } finally {
-      setIsSyncing(false)
-    }
-  }
 
   const { data: video, isLoading: videoLoading } = useQuery({
     queryKey: ['video-perf', params.videoId],
@@ -263,14 +244,6 @@ export default function PerformanceInputPage({ params }: { params: { videoId: st
         </div>
         <div className="flex items-center gap-2">
           {exporting && <div className="w-24"><Progress value={exportProgress} /></div>}
-          <Button 
-            disabled={isSyncing} 
-            onClick={handleSyncSingle} 
-            className="gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white border-transparent"
-          >
-            {isSyncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BarChart2 className="w-3.5 h-3.5" />}
-            Tarik Statistik Resmi ⚡
-          </Button>
           <Button variant="secondary" size="sm" onClick={handleExportAll} disabled={exporting} className="gap-1.5">
             {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
             Export 4 Platform
