@@ -17,7 +17,12 @@ export default function DashboardPage() {
       if (!workspaceId) return null
       const supabase = createClient()
       const today = new Date().toISOString().split('T')[0]
-      const startOfMonth = new Date(); startOfMonth.setDate(1)
+      // Current month bounds as YYYY-MM-DD for the "Live Bulan Ini" metric,
+      // which counts videos actually aired this month (by tayang date).
+      const now = new Date()
+      const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+      const monthEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      const monthEnd = `${monthEndDate.getFullYear()}-${String(monthEndDate.getMonth() + 1).padStart(2, '0')}-${String(monthEndDate.getDate()).padStart(2, '0')}`
 
       // All queries run in parallel — much faster than sequential.
       // Each is settled independently so one flaky request can't sink the whole dashboard.
@@ -25,7 +30,7 @@ export default function DashboardPage() {
         supabase.from('video_platform_schedules').select('*, videos!inner(id, judul, thumbnail_url, status, workspace_id)').eq('videos.workspace_id', workspaceId).eq('tanggal_tayang', today).order('jam_post', { ascending: true }),
         supabase.from('videos').select('*', { count: 'exact', head: true }).eq('workspace_id', workspaceId),
         supabase.from('videos').select('*', { count: 'exact', head: true }).eq('workspace_id', workspaceId).eq('status', 'scheduled'),
-        supabase.from('videos').select('*', { count: 'exact', head: true }).eq('workspace_id', workspaceId).eq('status', 'live').gte('updated_at', startOfMonth.toISOString()),
+        supabase.from('video_platform_schedules').select('video_id, videos!inner(workspace_id)').eq('videos.workspace_id', workspaceId).gte('tanggal_tayang', monthStart).lte('tanggal_tayang', monthEnd),
         supabase.from('videos').select('*', { count: 'exact', head: true }).eq('workspace_id', workspaceId).in('status', ['ide', 'scripting', 'produksi', 'editing']),
         supabase.from('brands').select('id, nama_brand, status, next_followup_date, industri').eq('workspace_id', workspaceId).not('status', 'in', '("selesai","cold")').lte('next_followup_date', today).order('next_followup_date', { ascending: true }).limit(5),
         supabase.from('invoices').select('id, invoice_number, total, due_date, brands(nama_brand)').eq('workspace_id', workspaceId).eq('status', 'overdue').order('due_date', { ascending: true }).limit(5),
@@ -39,7 +44,9 @@ export default function DashboardPage() {
       const todaySchedules = (settledValue(results[0]) as any)?.data ?? []
       const totalVideos = (settledValue(results[1]) as any)?.count ?? 0
       const scheduledCount = (settledValue(results[2]) as any)?.count ?? 0
-      const liveCount = (settledValue(results[3]) as any)?.count ?? 0
+      // Distinct videos aired this month (a video posted to multiple platforms counts once).
+      const liveRows = (settledValue(results[3]) as any)?.data ?? []
+      const liveCount = new Set((liveRows as { video_id: string }[]).map((r) => r.video_id)).size
       const draftCount = (settledValue(results[4]) as any)?.count ?? 0
       const followups = (settledValue(results[5]) as any)?.data ?? []
       const overdueInvoices = (settledValue(results[6]) as any)?.data ?? []
