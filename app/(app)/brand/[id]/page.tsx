@@ -552,6 +552,7 @@ export default function BrandDetailPage() {
                 <div className="py-12 text-center text-text-muted bg-white border border-border rounded-xl">
                   <Handshake className="w-8 h-8 mx-auto mb-2 text-border" />
                   <p className="text-sm">Belum ada deal</p>
+                  <p className="text-xs text-text-muted/70 mt-1">Pembuatan deal dari app segera hadir. Untuk sekarang, mulai dari Quotation.</p>
                 </div>
               ) : (
                 <div className="grid gap-2.5">
@@ -574,6 +575,7 @@ export default function BrandDetailPage() {
                 <div className="py-12 text-center text-text-muted bg-white border border-border rounded-xl">
                   <Receipt className="w-8 h-8 mx-auto mb-2 text-border" />
                   <p className="text-sm">Belum ada invoice</p>
+                  <p className="text-xs text-text-muted/70 mt-1">Pembuatan invoice dari app segera hadir.</p>
                 </div>
               ) : (
                 <div className="grid gap-2.5">
