@@ -18,6 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Plus, Loader2, AlertCircle, Eye } from 'lucide-react'
+import { PageHeader } from '@/components/layout/page-header'
 import { formatDate } from '@/lib/utils/formatters'
 
 const PIPELINE_STATUSES = ['prospect', 'approach', 'negosiasi', 'deal', 'aktif', 'selesai'] as const
@@ -119,14 +120,13 @@ export default function BrandPage() {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="font-heading text-xl font-bold text-text-primary">Brand</h1>
-          <p className="text-xs text-text-secondary mt-0.5">Pipeline manajemen brand & klien</p>
-        </div>
-        <Button size="sm" onClick={() => setSheetOpen(true)}>
-          <Plus className="w-4 h-4 mr-1" /> Brand Baru
-        </Button>
+      <div className="px-4 sm:px-6 pt-4 pb-3 border-b border-border shrink-0">
+        <PageHeader
+          title="Brand"
+          subtitle="Pipeline manajemen brand & klien"
+          className="mb-0"
+          action={<Button size="sm" onClick={() => setSheetOpen(true)}><Plus className="w-4 h-4 mr-1" /> Brand Baru</Button>}
+        />
       </div>
 
       <div className="flex-1 overflow-x-auto p-4">

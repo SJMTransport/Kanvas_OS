@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Search, Plus, MapPin, Pencil, Trash2, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageContainer, PageHeader } from '@/components/layout/page-header'
+import { EmptyState } from '@/components/layout/empty-state'
 import type { Location } from '@/lib/types/domain'
 
 export default function LocationsPage() {
@@ -143,10 +144,12 @@ export default function LocationsPage() {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 bg-surface rounded-xl border border-border">
-          <MapPin className="w-12 h-12 text-border mb-3" />
-          <p className="text-sm text-text-muted">{search ? 'Tidak ada lokasi yang cocok' : 'Belum ada lokasi. Tambahkan tempat favorit kamu!'}</p>
-        </div>
+        <EmptyState
+          icon={MapPin}
+          title={search ? 'Tidak ada lokasi yang cocok' : 'Belum ada lokasi'}
+          description={search ? undefined : 'Tambahkan tempat yang bermakna untuk karyamu.'}
+          action={!search ? <Button onClick={openAdd} size="sm"><Plus className="w-4 h-4 mr-1.5" /> Lokasi Baru</Button> : undefined}
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((l) => (

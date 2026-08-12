@@ -15,6 +15,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Skeleton } from '@/components/ui/skeleton'
 import { Search, Plus, Users, X, Star } from 'lucide-react'
 import { toast } from 'sonner'
+import { PageHeader } from '@/components/layout/page-header'
 import type { CreatorProfile } from '@/lib/types/incubator'
 
 const PLATFORMS = ['tiktok', 'instagram', 'youtube', 'facebook', 'pinterest', 'twitter', 'threads']
@@ -92,7 +93,17 @@ export default function CreatorPage() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Toolbar */}
+      {/* Title header — consistent across the app */}
+      <div className="bg-white border-b border-border px-4 sm:px-6 pt-4 pb-3">
+        <PageHeader
+          title="Creator"
+          subtitle="Kreator yang kamu pelajari & referensi"
+          className="mb-0"
+          action={<Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setAddOpen(true)}><Plus className="w-3.5 h-3.5" /> Tambah Kreator</Button>}
+        />
+      </div>
+
+      {/* Toolbar — search & filters */}
       <div className="bg-white border-b border-border px-4 py-2.5 flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[160px] max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
@@ -126,12 +137,6 @@ export default function CreatorPage() {
             <SelectItem value="done">Selesai</SelectItem>
           </SelectContent>
         </Select>
-
-        <div className="flex-1" />
-
-        <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setAddOpen(true)}>
-          <Plus className="w-3.5 h-3.5" /> Tambah Kreator
-        </Button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4">

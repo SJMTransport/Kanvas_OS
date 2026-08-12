@@ -16,6 +16,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
 import Link from 'next/link'
 import { PageContainer, PageHeader } from '@/components/layout/page-header'
+import { EmptyState } from '@/components/layout/empty-state'
 import type { Work } from '@/lib/types/domain'
 
 export default function WorksPage() {
@@ -147,10 +148,12 @@ export default function WorksPage() {
 
       {/* Grid */}
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 bg-surface rounded-xl border border-border">
-          <FolderOpen className="w-12 h-12 text-border mb-3" />
-          <p className="text-sm text-text-muted">{search ? 'Tidak ada karya yang cocok' : 'Belum ada karya. Mulai dengan membuat satu!'}</p>
-        </div>
+        <EmptyState
+          icon={FolderOpen}
+          title={search ? 'Tidak ada karya yang cocok' : 'Belum ada karya'}
+          description={search ? undefined : 'Mulai dengan membuat karya pertamamu.'}
+          action={!search ? <Button onClick={openAdd} size="sm"><Plus className="w-4 h-4 mr-1.5" /> Karya Baru</Button> : undefined}
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((w) => (

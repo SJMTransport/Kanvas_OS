@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Search, Plus, Lightbulb, Layers, X, Trash2, LayoutGrid, List } from 'lucide-react'
+import { PageHeader } from '@/components/layout/page-header'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
@@ -165,6 +166,11 @@ export default function IdeaPage() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
+      {/* Title header — consistent across the app */}
+      <div className="bg-white border-b border-border px-4 sm:px-6 pt-4 pb-3">
+        <PageHeader title="Ide" subtitle="Tangkap & kembangkan ide konten" className="mb-0" />
+      </div>
+
       {/* Toolbar */}
       <div className="bg-white border-b border-border px-4 py-2.5 flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[160px] max-w-xs">

@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Search, X, Play, Bookmark, Plus, Loader2, Trash2, Hash, Tv2, List, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
+import { PageHeader } from '@/components/layout/page-header'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
@@ -290,6 +291,11 @@ export default function SavedContentPage() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
+      {/* Title header — consistent across the app */}
+      <div className="bg-white border-b border-border px-4 sm:px-6 pt-4 pb-3">
+        <PageHeader title="Referensi" subtitle="Konten disimpan untuk inspirasi & bahan bedah" className="mb-0" />
+      </div>
+
       {/* Toolbar */}
       <div className="bg-white border-b border-border px-4 py-2.5 flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[180px] max-w-xs">

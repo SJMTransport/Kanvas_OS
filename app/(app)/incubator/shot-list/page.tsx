@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Search, X, Plus, Loader2, Trash2, Pencil, Clapperboard, Play, ChevronLeft, ChevronRight, Maximize2 } from 'lucide-react'
+import { PageHeader } from '@/components/layout/page-header'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { KATEGORI_SHOT, TIPE_SHOT, type ShotListReference, type KategoriShot, type TipeShot } from '@/lib/types/incubator'
@@ -236,7 +237,17 @@ export default function ShotListPage() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* Toolbar */}
+      {/* Title header — consistent across the app */}
+      <div className="bg-white border-b border-border px-4 sm:px-6 pt-4 pb-3">
+        <PageHeader
+          title="Shot List"
+          subtitle="Pustaka referensi shot untuk produksi"
+          className="mb-0"
+          action={<Button size="sm" className="h-8 gap-1.5 text-xs" onClick={openAdd}><Plus className="w-3.5 h-3.5" /> Tambah Referensi</Button>}
+        />
+      </div>
+
+      {/* Toolbar — search & filters */}
       <div className="bg-white border-b border-border px-4 py-2.5 flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[180px] max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
@@ -279,9 +290,6 @@ export default function ShotListPage() {
 
         <div className="flex-1" />
         <span className="text-xs text-text-muted">{filtered.length} referensi</span>
-        <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={openAdd}>
-          <Plus className="w-3.5 h-3.5" /> Tambah Referensi
-        </Button>
       </div>
 
       {/* Grid */}
