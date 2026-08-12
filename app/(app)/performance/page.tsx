@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input'
 import { BarChart2, Video, FileBarChart, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PerformanceSummary } from './performance-summary'
-import { PageContainer, PageHeader } from '@/components/layout/page-header'
+import { PageHeader } from '@/components/layout/page-header'
 import type { Platform, VideoStatus } from '@/lib/types'
 
 const PLATFORMS: Platform[] = ['tiktok', 'instagram', 'youtube', 'facebook']
@@ -63,36 +63,46 @@ export default function PerformancePage() {
   )
 
   return (
-    <PageContainer>
-      <PageHeader
-        title="Performa"
-        subtitle="Input & pantau metrik video per platform"
-        action={<Button size="sm" onClick={() => router.push('/performance/reports')} className="gap-1.5"><FileBarChart className="w-3.5 h-3.5" /> Laporan Campaign</Button>}
-      />
-
-      {/* Ringkasan agregat semua konten */}
-      <PerformanceSummary />
-
-      {/* Search */}
-      <div className="relative max-w-sm mb-3">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-        <Input placeholder="Cari judul atau no. video..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+    <div className="flex flex-col h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] min-h-0">
+      {/* Title header */}
+      <div className="bg-white border-b border-border px-4 sm:px-6 pt-4 pb-3 shrink-0">
+        <PageHeader
+          title="Performa"
+          subtitle="Input & pantau metrik video per platform"
+          className="mb-0"
+          action={<Button size="sm" onClick={() => router.push('/performance/reports')} className="gap-1.5"><FileBarChart className="w-3.5 h-3.5" /> Laporan Campaign</Button>}
+        />
       </div>
 
-      {isLoading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
+      {/* Toolbar */}
+      <div className="bg-white border-b border-border px-4 py-2.5 flex items-center gap-2 shrink-0">
+        <div className="relative flex-1 min-w-[180px] max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
+          <Input placeholder="Cari judul atau no. video..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-8 text-sm" />
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="py-16 text-center bg-surface rounded-xl border border-border">
-          <BarChart2 className="w-10 h-10 text-border mx-auto mb-3" />
-          <p className="text-text-muted">{search ? 'Tidak ada video cocok' : 'Belum ada video.'}</p>
+      </div>
+
+      {/* Body: aggregate summary + full-width table */}
+      <div className="flex-1 overflow-auto min-h-0">
+        <div className="px-4 sm:px-6 pt-4">
+          <PerformanceSummary />
         </div>
-      ) : (
-        <div className="bg-white border border-border rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
+
+        {isLoading ? (
+          <div className="px-4 sm:px-6 space-y-2">
+            {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="px-4 sm:px-6">
+            <div className="py-16 text-center bg-surface rounded-xl border border-border">
+              <BarChart2 className="w-10 h-10 text-border mx-auto mb-3" />
+              <p className="text-text-muted">{search ? 'Tidak ada video cocok' : 'Belum ada video.'}</p>
+            </div>
+          </div>
+        ) : (
+          <>
             <table className="w-full border-collapse min-w-[760px]">
-              <thead className="bg-surface border-b border-border">
+              <thead className="bg-surface border-b border-border sticky top-0 z-10">
                 <tr>
                   <th className="px-3 py-2.5 text-left text-xs font-semibold text-text-muted uppercase tracking-wide w-24">No. Video</th>
                   <th className="px-3 py-2.5 text-left text-xs font-semibold text-text-muted uppercase tracking-wide">Judul</th>
@@ -151,12 +161,12 @@ export default function PerformancePage() {
                 ))}
               </tbody>
             </table>
-          </div>
-          <div className="px-4 py-2 border-t border-border">
-            <p className="text-xs text-text-muted">Menampilkan {filtered.length} video</p>
-          </div>
-        </div>
-      )}
-    </PageContainer>
+            <div className="px-4 sm:px-6 py-2 border-t border-border">
+              <p className="text-xs text-text-muted">Menampilkan {filtered.length} video</p>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   )
 }
