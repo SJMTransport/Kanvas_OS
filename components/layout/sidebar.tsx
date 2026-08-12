@@ -9,20 +9,33 @@ import { NAV_ITEMS } from './nav-items'
 import { ChevronLeft, ChevronRight, ChevronDown, Palette } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+function SoonBadge() {
+  return (
+    <span className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-subtle text-text-muted border border-border">
+      Segera
+    </span>
+  )
+}
+
 export const Sidebar = React.memo(function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { sidebarCollapsed, setSidebarCollapsed, currentWorkspace } = useWorkspaceStore()
-  const [expanded, setExpanded] = useState<string[]>([])
+
+  function isActive(href: string) {
+    return pathname === href || pathname.startsWith(href + '/')
+  }
+
+  // Auto-expand the group that contains the current route so the user sees
+  // where they are, without forcing every group open.
+  const [expanded, setExpanded] = useState<string[]>(() =>
+    NAV_ITEMS.filter((i) => i.children?.some((c) => pathname === c.href || pathname.startsWith(c.href + '/'))).map((i) => i.label)
+  )
 
   function toggleExpand(label: string) {
     setExpanded((prev) =>
       prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]
     )
-  }
-
-  function isActive(href: string) {
-    return pathname === href || pathname.startsWith(href + '/')
   }
 
   function handleMouseEnter(href: string) {
@@ -82,13 +95,14 @@ export const Sidebar = React.memo(function Sidebar() {
                         href={child.href}
                         onMouseEnter={() => handleMouseEnter(child.href)}
                         className={cn(
-                          'block px-2 py-1.5 rounded-md text-sm transition-colors',
+                          'flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors',
                           isActive(child.href)
                             ? 'text-accent font-medium bg-accent-light'
                             : 'text-text-secondary hover:text-text-primary hover:bg-subtle'
                         )}
                       >
-                        {child.label}
+                        <span className="flex-1">{child.label}</span>
+                        {child.soon && <SoonBadge />}
                       </Link>
                     ))}
                   </div>
@@ -111,7 +125,8 @@ export const Sidebar = React.memo(function Sidebar() {
                 title={sidebarCollapsed ? item.label : undefined}
               >
                 <Icon className="w-4 h-4 shrink-0" />
-                {!sidebarCollapsed && <span>{item.label}</span>}
+                {!sidebarCollapsed && <span className="flex-1">{item.label}</span>}
+                {!sidebarCollapsed && item.soon && <SoonBadge />}
               </Link>
             )
           }

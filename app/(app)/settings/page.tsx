@@ -295,8 +295,8 @@ export default function SettingsPage() {
         {/* Sosmed */}
         <TabsContent value="sosmed">
           <div className="space-y-4">
-            <div className="bg-subtle p-3 rounded-lg border border-border text-xs text-text-muted">
-              ℹ️ Hubungkan akun Anda menggunakan tombol di bawah agar sistem dapat mempublikasikan naskah, file video, dan gambar secara otomatis sesuai jadwal.
+            <div className="bg-amber-50 p-3 rounded-lg border border-amber-200 text-xs text-amber-800">
+              ⚠️ <span className="font-semibold">Mode pratinjau.</span> Auto-publish ke platform belum aktif — koneksi akun di sini masih simulasi. Integrasi API resmi (TikTok, Meta, YouTube) sedang disiapkan. Untuk sekarang, catat handle akun sebagai referensi saja.
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -1,47 +1,51 @@
 import {
-  LayoutDashboard, CalendarDays, Video, BarChart2,
-  Handshake, Image, Settings, Lightbulb, FolderOpen, MapPin, type LucideIcon
+  LayoutDashboard, Video, Handshake, Image, Settings, Lightbulb, CalendarDays,
+  type LucideIcon,
 } from 'lucide-react'
+
+export interface NavChild {
+  label: string
+  href: string
+  soon?: boolean
+}
 
 export interface NavItem {
   label: string
   href?: string
   icon: LucideIcon
-  children?: { label: string; href: string }[]
+  soon?: boolean
+  children?: NavChild[]
 }
 
+// Compact, grouped navigation. Six top-level entries:
+// Dashboard · Konten · Incubator · Brand · Aset · Settings.
+// Calendar & Performa live under Konten (they're part of the content flow);
+// Karya & Lokasi live under Incubator (knowledge/support entities).
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Karya', href: '/works', icon: FolderOpen },
-  { label: 'Kalender', href: '/calendar', icon: CalendarDays },
   {
-    label: 'Content',
+    label: 'Konten',
     icon: Video,
     children: [
       { label: 'Video Banking', href: '/content' },
+      { label: 'Kalender', href: '/calendar' },
+      { label: 'Performa', href: '/performance' },
     ],
   },
-  { label: 'Performa', href: '/performance', icon: BarChart2 },
   {
     label: 'Incubator',
     icon: Lightbulb,
     children: [
-      { label: 'Idea', href: '/incubator/idea' },
+      { label: 'Ide', href: '/incubator/idea' },
+      { label: 'Referensi', href: '/incubator/saved' },
       { label: 'Creator', href: '/incubator/creator' },
-      { label: 'Konten Disimpan', href: '/incubator/saved' },
       { label: 'Shot List', href: '/incubator/shot-list' },
+      { label: 'Karya', href: '/works' },
+      { label: 'Lokasi', href: '/locations' },
     ],
   },
-  {
-    label: 'Brand',
-    icon: Handshake,
-    children: [
-      { label: 'Pipeline', href: '/brand' },
-      { label: 'Quotation Baru', href: '/brand/quotations/new' },
-    ],
-  },
-  { label: 'Lokasi', href: '/locations', icon: MapPin },
-  { label: 'Aset', href: '/aset', icon: Image },
+  { label: 'Brand', href: '/brand', icon: Handshake },
+  { label: 'Aset', href: '/aset', icon: Image, soon: true },
   { label: 'Settings', href: '/settings', icon: Settings },
 ]
 
