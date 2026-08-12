@@ -278,185 +278,6 @@ export default function ContentPage() {
           )}
         </div>
 
-        {/* Status filter */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 text-sm min-w-36 justify-between font-normal border-border bg-white hover:bg-subtle text-text-primary">
-              <span className="truncate">{statusFilterLabel}</span>
-              <ChevronDown className="ml-1 w-3.5 h-3.5 shrink-0 opacity-50" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-48">
-            <DropdownMenuLabel>Pilih Status</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuCheckboxItem
-              checked={statusFilter === 'all'}
-              onCheckedChange={(checked) => checked && setStatusFilter('all')}
-            >
-              Semua Status
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuSeparator />
-            {STATUS_ORDER.map((s) => {
-              const checked = statusFilter !== 'all' && statusFilter.includes(s)
-              return (
-                <DropdownMenuCheckboxItem
-                  key={s}
-                  checked={checked}
-                  onCheckedChange={(checked) => handleStatusChange(s, checked)}
-                >
-                  {STATUS_CONFIG[s]?.label ?? s}
-                </DropdownMenuCheckboxItem>
-              )
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Tema filter */}
-        {workspaceTemas.length > 0 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 text-sm min-w-36 justify-between font-normal border-border bg-white hover:bg-subtle text-text-primary">
-                <span className="truncate">{temaFilterLabel}</span>
-                <ChevronDown className="ml-1 w-3.5 h-3.5 shrink-0 opacity-50" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-48 max-h-72 overflow-y-auto">
-              <DropdownMenuLabel>Pilih Tema</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuCheckboxItem
-                checked={temaFilter === 'all'}
-                onCheckedChange={(checked) => checked && setTemaFilter('all')}
-              >
-                Semua Tema
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuSeparator />
-              {workspaceTemas.map((t) => {
-                const checked = temaFilter !== 'all' && temaFilter.includes(t)
-                return (
-                  <DropdownMenuCheckboxItem
-                    key={t}
-                    checked={checked}
-                    onCheckedChange={(checked) => handleTemaChange(t, checked)}
-                  >
-                    {t}
-                  </DropdownMenuCheckboxItem>
-                )
-              })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-
-        {/* Pilar filter */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 text-sm min-w-36 justify-between font-normal border-border bg-white hover:bg-subtle text-text-primary">
-              <span className="truncate">{pilarFilterLabel}</span>
-              <ChevronDown className="ml-1 w-3.5 h-3.5 shrink-0 opacity-50" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-48 bg-white border border-border">
-            <DropdownMenuLabel>Pilih Pilar Konten</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuCheckboxItem
-              checked={pilarFilter === 'all'}
-              onCheckedChange={(checked) => checked && setPilarFilter('all')}
-            >
-              Semua Pilar
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuSeparator />
-            {['Edukasi', 'Hiburan', 'Promosi', 'Inspirasi', 'Behind the Scenes'].map((p) => {
-              const checked = pilarFilter !== 'all' && pilarFilter.includes(p)
-              return (
-                <DropdownMenuCheckboxItem
-                  key={p}
-                  checked={checked}
-                  onCheckedChange={(checked) => handlePilarChange(p, checked)}
-                >
-                  {p}
-                </DropdownMenuCheckboxItem>
-              )
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Content type filter */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 text-sm min-w-32 justify-between font-normal border-border bg-white hover:bg-subtle text-text-primary">
-              <span className="truncate">{contentTypeFilterLabel}</span>
-              <ChevronDown className="ml-1 w-3.5 h-3.5 shrink-0 opacity-50" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-40">
-            <DropdownMenuLabel>Pilih Tipe</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuCheckboxItem
-              checked={contentTypeFilter === 'all'}
-              onCheckedChange={(checked) => checked && setContentTypeFilter('all')}
-            >
-              Semua Tipe
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuCheckboxItem
-              checked={contentTypeFilter !== 'all' && contentTypeFilter.includes('video')}
-              onCheckedChange={(checked) => handleContentTypeChange('video', checked)}
-            >
-              🎬 Video
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={contentTypeFilter !== 'all' && contentTypeFilter.includes('foto')}
-              onCheckedChange={(checked) => handleContentTypeChange('foto', checked)}
-            >
-              🖼️ Foto
-            </DropdownMenuCheckboxItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Platform filter */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 text-sm min-w-36 justify-between font-normal border-border bg-white hover:bg-subtle text-text-primary">
-              <span className="truncate">{platformFilterLabel}</span>
-              <ChevronDown className="ml-1 w-3.5 h-3.5 shrink-0 opacity-50" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-44">
-            <DropdownMenuLabel>Pilih Platform</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuCheckboxItem
-              checked={platformFilter === 'all'}
-              onCheckedChange={(checked) => checked && setPlatformFilter('all')}
-            >
-              Semua Platform
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuCheckboxItem
-              checked={platformFilter !== 'all' && platformFilter.includes('tiktok')}
-              onCheckedChange={(checked) => handlePlatformChange('tiktok', checked)}
-            >
-              🎵 TikTok
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={platformFilter !== 'all' && platformFilter.includes('instagram')}
-              onCheckedChange={(checked) => handlePlatformChange('instagram', checked)}
-            >
-              📸 Instagram
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={platformFilter !== 'all' && platformFilter.includes('youtube')}
-              onCheckedChange={(checked) => handlePlatformChange('youtube', checked)}
-            >
-              📺 YouTube
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={platformFilter !== 'all' && platformFilter.includes('facebook')}
-              onCheckedChange={(checked) => handlePlatformChange('facebook', checked)}
-            >
-              👥 Facebook
-            </DropdownMenuCheckboxItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
         <div className="flex-1" />
 
         {/* View toggle */}
@@ -549,6 +370,37 @@ export default function ContentPage() {
             total={total}
             pageSize={PAGE_SIZE}
             activePlatformFilter={platformFilter === 'all' ? null : platformFilter}
+            columnFilters={{
+              status: {
+                value: statusFilter,
+                toggle: (v, c) => handleStatusChange(v as VideoStatus, c),
+                reset: () => setStatusFilter('all'),
+                options: STATUS_ORDER.map((s) => ({ value: s, label: STATUS_CONFIG[s]?.label ?? s })),
+              },
+              tema: {
+                value: temaFilter,
+                toggle: (v, c) => handleTemaChange(v, c),
+                reset: () => setTemaFilter('all'),
+                options: workspaceTemas.map((t) => ({ value: t, label: t })),
+              },
+              pilar: {
+                value: pilarFilter,
+                toggle: (v, c) => handlePilarChange(v, c),
+                reset: () => setPilarFilter('all'),
+                options: ['Edukasi', 'Hiburan', 'Promosi', 'Inspirasi', 'Behind the Scenes'].map((p) => ({ value: p, label: p })),
+              },
+              platform: {
+                value: platformFilter,
+                toggle: (v, c) => handlePlatformChange(v as Platform, c),
+                reset: () => setPlatformFilter('all'),
+                options: [
+                  { value: 'tiktok', label: '🎵 TikTok' },
+                  { value: 'instagram', label: '📸 Instagram' },
+                  { value: 'youtube', label: '📺 YouTube' },
+                  { value: 'facebook', label: '👥 Facebook' },
+                ],
+              },
+            }}
           />
         ) : (
           <KanbanView

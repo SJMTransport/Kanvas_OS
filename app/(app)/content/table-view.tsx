@@ -3,7 +3,11 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import { ChevronUp, ChevronDown, Video, Trash2, GripVertical, Pencil, Plus } from 'lucide-react'
+import { ChevronUp, ChevronDown, Video, Trash2, GripVertical, Pencil, Plus, Filter } from 'lucide-react'
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
 import {
   DndContext, DragEndEvent, PointerSensor, useSensor, useSensors, closestCenter,
 } from '@dnd-kit/core'
@@ -15,7 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
 import { getPlatformBadge } from '@/lib/utils/platform'
-import { getStatusBadgeClass, STATUS_CONFIG } from '@/lib/utils/status'
+import { getStatusBadgeClass, STATUS_CONFIG, STATUS_ORDER } from '@/lib/utils/status'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -23,6 +27,56 @@ import type { VideoWithSchedules } from '@/lib/hooks/useVideos'
 import type { VideoStatus, Platform } from '@/lib/types'
 
 const PLATFORMS: Platform[] = ['tiktok', 'instagram', 'youtube', 'facebook']
+
+// A single column filter: current value ('all' or a list), a per-option toggle,
+// and a reset back to 'all'.
+export interface FilterSpec {
+  value: string[] | 'all'
+  toggle: (v: string, checked: boolean) => void
+  reset: () => void
+  options: { value: string; label: string }[]
+}
+export interface ColumnFilters {
+  status: FilterSpec
+  tema: FilterSpec
+  pilar: FilterSpec
+  platform: FilterSpec
+}
+
+// Funnel button in a column header that opens the filter for that column.
+function HeaderFilter({ label, spec }: { label: string; spec?: FilterSpec }) {
+  if (!spec) return null
+  const active = spec.value !== 'all'
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          onClick={(e) => e.stopPropagation()}
+          className={cn('p-0.5 rounded transition-colors', active ? 'text-accent' : 'text-text-muted/40 hover:text-text-muted')}
+          title={`Filter ${label}`}
+        >
+          <Filter className="w-3 h-3" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent onClick={(e) => e.stopPropagation()} align="start" className="w-48 max-h-72 overflow-y-auto bg-white border border-border">
+        <DropdownMenuLabel>{label}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuCheckboxItem checked={spec.value === 'all'} onCheckedChange={(c) => c && spec.reset()}>
+          Semua
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuSeparator />
+        {spec.options.map((o) => {
+          const checked = spec.value !== 'all' && spec.value.includes(o.value)
+          return (
+            <DropdownMenuCheckboxItem key={o.value} checked={checked} onCheckedChange={(c) => spec.toggle(o.value, c)}>
+              {o.label}
+            </DropdownMenuCheckboxItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
 
 interface Props {
   videos: VideoWithSchedules[]
@@ -36,6 +90,7 @@ interface Props {
   total: number
   pageSize: number
   activePlatformFilter?: Platform[] | null
+  columnFilters?: ColumnFilters
 }
 
 function SortIcon({ col, sortBy, sortDir }: { col: string; sortBy: string; sortDir: string }) {
@@ -311,7 +366,7 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, onFie
   )
 }
 
-export function TableView({ videos: initialVideos, loading, sortBy, sortDir, page, onSort, onPageChange, onRowClick, total, pageSize, activePlatformFilter }: Props) {
+export function TableView({ videos: initialVideos, loading, sortBy, sortDir, page, onSort, onPageChange, onRowClick, total, pageSize, activePlatformFilter, columnFilters }: Props) {
   const totalPages = Math.ceil(total / pageSize)
   const [localVideos, setLocalVideos] = useState<VideoWithSchedules[] | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
@@ -385,11 +440,11 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
               <th className="w-6 px-2" />
               <Th col="no_video" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-28">No. Video</Th>
               <Th col="judul" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Judul</Th>
-              <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-40">Tema</Th>
-              <Th col="pilar_konten" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-32">Pilar</Th>
+              <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-40">Tema <HeaderFilter label="Tema" spec={columnFilters?.tema} /></Th>
+              <Th col="pilar_konten" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-32">Pilar <HeaderFilter label="Pilar" spec={columnFilters?.pilar} /></Th>
               <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-14 text-center">Aset</Th>
-              <Th col="status" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Status</Th>
-              <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Platform</Th>
+              <Th col="status" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Status <HeaderFilter label="Status" spec={columnFilters?.status} /></Th>
+              <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Platform <HeaderFilter label="Platform" spec={columnFilters?.platform} /></Th>
               <Th col="updated_at" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-36">Tanggal</Th>
               <th className="w-10" />
             </tr>
