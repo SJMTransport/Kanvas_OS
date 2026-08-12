@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowLeft, ExternalLink, Plus, Star, Sparkles, Lightbulb, Play } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import Link from 'next/link'
 import type { CreatorProfile, CreatorSavedContent, LinkMeta } from '@/lib/types/incubator'
 
 const ANALYSIS_FIELDS = [
@@ -229,9 +230,14 @@ export default function CreatorDetailPage() {
             <div className="bg-white border border-border rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <p className="font-semibold text-sm text-text-primary">Konten Disimpan</p>
-                <Button size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={() => setAddContentOpen(true)}>
-                  <Plus className="w-3 h-3" /> Simpan
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Link href={`/incubator/saved?creator=${encodeURIComponent(creator.username)}`} className="text-xs text-accent hover:underline">
+                    Lihat di Referensi
+                  </Link>
+                  <Button size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={() => setAddContentOpen(true)}>
+                    <Plus className="w-3 h-3" /> Simpan
+                  </Button>
+                </div>
               </div>
 
               {addContentOpen && (

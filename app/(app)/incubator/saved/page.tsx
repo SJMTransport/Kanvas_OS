@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
@@ -40,7 +40,9 @@ export default function SavedContentPage() {
   const router = useRouter()
   const { workspaceId } = useWorkspace()
   const queryClient = useQueryClient()
+  const searchParams = useSearchParams()
   const [search, setSearch] = useState('')
+  const [creatorFilter, setCreatorFilter] = useState<string | null>(searchParams.get('creator'))
   const [platformFilter, setPlatformFilter] = useState<string | null>(null)
   const [analysisFilter, setAnalysisFilter] = useState<'all' | 'analyzed' | 'not_analyzed'>('all')
 
@@ -107,8 +109,11 @@ export default function SavedContentPage() {
   })
 
   const allHashtags = [...new Set(items.flatMap((i) => i.hashtags ?? []))].sort()
+  const itemCreator = (item: SavedContentRow) => item.creator_profiles?.username ?? item.creator_username ?? null
+  const allCreators = [...new Set(items.map(itemCreator).filter(Boolean) as string[])].sort()
 
   const filtered = items.filter((item) => {
+    if (creatorFilter && itemCreator(item) !== creatorFilter) return false
     if (search) {
       const q = search.toLowerCase()
       const hook = item.analysis?.hook ?? ''
@@ -301,6 +306,20 @@ export default function SavedContentPage() {
             </button>
           )}
         </div>
+
+        {allCreators.length > 0 && (
+          <Select value={creatorFilter ?? 'all'} onValueChange={(v) => setCreatorFilter(v === 'all' ? null : v)}>
+            <SelectTrigger className="h-8 text-sm w-40">
+              <SelectValue placeholder="Creator" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Creator</SelectItem>
+              {allCreators.map((c) => (
+                <SelectItem key={c} value={c}>@{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         <Select value={platformFilter ?? 'all'} onValueChange={(v) => setPlatformFilter(v === 'all' ? null : v)}>
           <SelectTrigger className="h-8 text-sm w-36">
