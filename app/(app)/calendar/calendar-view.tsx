@@ -9,11 +9,10 @@ import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
 import { format, addMonths, subMonths, addWeeks, subWeeks, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Plus, List, LayoutGrid, CalendarDays } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, List, LayoutGrid, CalendarDays, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { getPlatformDot } from '@/lib/utils/platform'
 import { MonthView } from './month-view'
 import { WeekView } from './week-view'
 import { ListView } from './list-view'
@@ -81,6 +80,10 @@ export function CalendarView() {
     else setActiveDate((d) => dir === 1 ? addMonths(d, 1) : subMonths(d, 1))
   }
 
+  function goToday() {
+    setActiveDate(new Date())
+  }
+
   function handleDayClick(dateStr: string) {
     setQuickAddDate(dateStr)
     setQuickAddOpen(true)
@@ -129,18 +132,19 @@ export function CalendarView() {
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)]">
       {/* Header */}
-      <div className="bg-white border-b border-border px-4 py-3 space-y-2">
+      <div className="bg-white border-b border-border px-4 py-3">
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Nav */}
-          <button onClick={() => navigate(-1)} className="p-1.5 rounded-md hover:bg-subtle text-text-secondary">
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <h2 className="font-heading font-bold text-text-primary text-base w-40 text-center capitalize">
+          <h2 className="font-heading text-lg font-bold text-text-primary capitalize mr-1">
             {headerLabel}
           </h2>
-          <button onClick={() => navigate(1)} className="p-1.5 rounded-md hover:bg-subtle text-text-secondary">
+          {/* Nav */}
+          <button onClick={() => navigate(-1)} className="p-1.5 rounded-md hover:bg-subtle text-accent">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button onClick={() => navigate(1)} className="p-1.5 rounded-md hover:bg-subtle text-accent">
             <ChevronRight className="w-4 h-4" />
           </button>
+          <Button variant="outline" size="sm" onClick={goToday} className="h-8 text-xs">Hari Ini</Button>
 
           <div className="flex-1" />
 
@@ -179,26 +183,6 @@ export function CalendarView() {
             </PopoverContent>
           </Popover>
         </div>
-
-        {/* Platform filter */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {PLATFORMS.map((p) => (
-            <button
-              key={p}
-              onClick={() => togglePlatform(p)}
-              className={cn(
-                'flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-all',
-                activePlatforms.includes(p)
-                  ? 'border-transparent bg-opacity-100'
-                  : 'border-border bg-white text-text-muted opacity-50'
-              )}
-              style={activePlatforms.includes(p) ? { backgroundColor: getPlatformBgColor(p), color: getTextColor(p) } : undefined}
-            >
-              <span className={cn('w-2 h-2 rounded-full', getPlatformDot(p))} />
-              {PLATFORM_LABELS[p]}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Calendar body */}
@@ -226,6 +210,26 @@ export function CalendarView() {
           events={events}
           onEventClick={handleEventClick}
         />
+      )}
+
+      {/* Legend / platform filter — checkbox style */}
+      {viewMode !== 'list' && (
+        <div className="bg-white border-t border-border px-4 py-2.5 flex items-center gap-5 flex-wrap shrink-0">
+          {PLATFORMS.map((p) => {
+            const on = activePlatforms.includes(p)
+            return (
+              <button key={p} onClick={() => togglePlatform(p)} className="flex items-center gap-2 text-sm select-none">
+                <span
+                  className={cn('w-4 h-4 rounded flex items-center justify-center border transition-colors', on ? 'border-transparent' : 'border-border bg-white')}
+                  style={on ? { backgroundColor: getPlatformBgColor(p) } : undefined}
+                >
+                  {on && <Check className="w-3 h-3 text-white" />}
+                </span>
+                <span className={cn(on ? 'text-text-primary font-medium' : 'text-text-muted')}>{PLATFORM_LABELS[p]}</span>
+              </button>
+            )
+          })}
+        </div>
       )}
 
       {/* Desktop side panel */}
@@ -278,8 +282,4 @@ function getDateRange(viewMode: ViewMode, activeDate: Date) {
 
 function getPlatformBgColor(p: Platform): string {
   return { tiktok: '#000000', instagram: '#E1306C', youtube: '#FF0000', facebook: '#1877F2' }[p]
-}
-
-function getTextColor(_p: Platform): string {
-  return '#ffffff'
 }
