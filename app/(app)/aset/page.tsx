@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
 import { Image as ImageIcon, Clock } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PageContainer, PageHeader } from '@/components/layout/page-header'
 
 export default function AsetPage() {
   const { workspaceId } = useWorkspace()
@@ -24,11 +25,8 @@ export default function AsetPage() {
   })
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
-      <div className="mb-6">
-        <h1 className="font-heading text-2xl font-bold text-text-primary">Aset</h1>
-        <p className="text-sm text-text-secondary mt-0.5">Kelola foto, video, dan file aset konten</p>
-      </div>
+    <PageContainer>
+      <PageHeader title="Aset" subtitle="Kelola foto, video, dan file aset konten" />
 
       {/* Honest "coming soon" banner — upload/manage belum aktif */}
       <div className="flex items-start gap-3 bg-accent-light/50 border border-accent/20 rounded-xl p-4 mb-6">
@@ -62,6 +60,6 @@ export default function AsetPage() {
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   )
 }

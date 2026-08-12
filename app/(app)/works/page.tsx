@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
 import Link from 'next/link'
+import { PageContainer, PageHeader } from '@/components/layout/page-header'
 import type { Work } from '@/lib/types/domain'
 
 export default function WorksPage() {
@@ -110,38 +111,33 @@ export default function WorksPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+      <PageContainer className="space-y-4">
         <Skeleton className="h-10 w-48" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-36 rounded-xl" />)}
         </div>
-      </div>
+      </PageContainer>
     )
   }
 
   if (isError) {
     return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-16 text-center">
+      <PageContainer className="py-16 text-center">
         <AlertTriangle className="w-10 h-10 text-error mx-auto mb-3" />
         <h2 className="font-heading text-lg font-bold text-text-primary mb-1">Gagal memuat Karya</h2>
         <p className="text-sm text-text-secondary mb-4">Pastikan migrasi database sudah dijalankan, lalu coba lagi.</p>
         <Button onClick={() => refetch()}>Coba Lagi</Button>
-      </div>
+      </PageContainer>
     )
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-heading text-2xl font-bold text-text-primary">Karya</h1>
-          <p className="text-sm text-text-secondary mt-0.5">Kelola semua karya kreatif kamu</p>
-        </div>
-        <Button onClick={openAdd} size="sm">
-          <Plus className="w-4 h-4 mr-1.5" /> Karya Baru
-        </Button>
-      </div>
+    <PageContainer className="space-y-6">
+      <PageHeader
+        title="Karya"
+        subtitle="Kelola semua karya kreatif kamu"
+        action={<Button onClick={openAdd} size="sm"><Plus className="w-4 h-4 mr-1.5" /> Karya Baru</Button>}
+      />
 
       {/* Search */}
       <div className="relative max-w-sm">
@@ -228,6 +224,6 @@ export default function WorksPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageContainer>
   )
 }

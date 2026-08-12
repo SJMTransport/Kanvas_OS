@@ -67,7 +67,7 @@ export default function DashboardPage() {
 
   if (isError) {
     return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-16 text-center">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 text-center">
         <AlertTriangle className="w-10 h-10 text-error mx-auto mb-3" />
         <h2 className="font-heading text-lg font-bold text-text-primary mb-1">Gagal memuat dashboard</h2>
         <p className="text-sm text-text-secondary mb-4">Pastikan koneksi stabil, lalu coba lagi.</p>
@@ -80,7 +80,7 @@ export default function DashboardPage() {
 
   if (isLoading || !data) {
     return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         <Skeleton className="h-10 w-64" />
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}

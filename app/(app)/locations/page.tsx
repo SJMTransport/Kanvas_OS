@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label'
 import { Search, Plus, MapPin, Pencil, Trash2, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
+import { PageContainer, PageHeader } from '@/components/layout/page-header'
 import type { Location } from '@/lib/types/domain'
 
 export default function LocationsPage() {
@@ -108,37 +109,33 @@ export default function LocationsPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+      <PageContainer className="space-y-4">
         <Skeleton className="h-10 w-48" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
         </div>
-      </div>
+      </PageContainer>
     )
   }
 
   if (isError) {
     return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-16 text-center">
+      <PageContainer className="py-16 text-center">
         <AlertTriangle className="w-10 h-10 text-error mx-auto mb-3" />
         <h2 className="font-heading text-lg font-bold text-text-primary mb-1">Gagal memuat Lokasi</h2>
         <p className="text-sm text-text-secondary mb-4">Pastikan migrasi database sudah dijalankan, lalu coba lagi.</p>
         <Button onClick={() => refetch()}>Coba Lagi</Button>
-      </div>
+      </PageContainer>
     )
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-heading text-2xl font-bold text-text-primary">Lokasi</h1>
-          <p className="text-sm text-text-secondary mt-0.5">Tempat-tempat bermakna untuk karya kreatif kamu</p>
-        </div>
-        <Button onClick={openAdd} size="sm">
-          <Plus className="w-4 h-4 mr-1.5" /> Lokasi Baru
-        </Button>
-      </div>
+    <PageContainer className="space-y-6">
+      <PageHeader
+        title="Lokasi"
+        subtitle="Tempat-tempat bermakna untuk karya kreatif kamu"
+        action={<Button onClick={openAdd} size="sm"><Plus className="w-4 h-4 mr-1.5" /> Lokasi Baru</Button>}
+      />
 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
@@ -223,6 +220,6 @@ export default function LocationsPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageContainer>
   )
 }

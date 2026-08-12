@@ -136,7 +136,7 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
   }).sort((a, b) => b.count - a.count)
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-8">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-8">
 
       {/* Section 1 — Greeting */}
       <div>

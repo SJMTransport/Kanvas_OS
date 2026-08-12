@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
 import Link from 'next/link'
+import { PageContainer, PageHeader } from '@/components/layout/page-header'
 import { EMPTY_CAMPAIGN } from '@/lib/types/report'
 import type { PerformanceReport } from '@/lib/types/report'
 
@@ -80,20 +81,17 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <PageContainer className="space-y-6">
       <div>
         <Link href="/performance" className="text-sm text-text-muted hover:text-text-primary flex items-center gap-1 mb-3">
           <ArrowLeft className="w-4 h-4" /> Performa
         </Link>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-heading text-2xl font-bold text-text-primary">Laporan Campaign</h1>
-            <p className="text-sm text-text-secondary mt-0.5">Susun video jadi laporan performa siap kirim ke klien</p>
-          </div>
-          <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending} size="sm">
-            <Plus className="w-4 h-4 mr-1.5" /> Laporan Baru
-          </Button>
-        </div>
+        <PageHeader
+          title="Laporan Campaign"
+          subtitle="Susun video jadi laporan performa siap kirim ke klien"
+          className="mb-0"
+          action={<Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending} size="sm"><Plus className="w-4 h-4 mr-1.5" /> Laporan Baru</Button>}
+        />
       </div>
 
       {isLoading ? (
@@ -137,6 +135,6 @@ export default function ReportsPage() {
           })}
         </div>
       )}
-    </div>
+    </PageContainer>
   )
 }

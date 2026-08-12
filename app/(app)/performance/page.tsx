@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import { BarChart2, Video, FileBarChart, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PerformanceSummary } from './performance-summary'
+import { PageContainer, PageHeader } from '@/components/layout/page-header'
 import type { Platform, VideoStatus } from '@/lib/types'
 
 const PLATFORMS: Platform[] = ['tiktok', 'instagram', 'youtube', 'facebook']
@@ -62,16 +63,12 @@ export default function PerformancePage() {
   )
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="font-heading text-2xl font-bold text-text-primary">Performa</h1>
-          <p className="text-sm text-text-secondary mt-0.5">Input & pantau metrik video per platform</p>
-        </div>
-        <Button size="sm" onClick={() => router.push('/performance/reports')} className="gap-1.5">
-          <FileBarChart className="w-3.5 h-3.5" /> Laporan Campaign
-        </Button>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Performa"
+        subtitle="Input & pantau metrik video per platform"
+        action={<Button size="sm" onClick={() => router.push('/performance/reports')} className="gap-1.5"><FileBarChart className="w-3.5 h-3.5" /> Laporan Campaign</Button>}
+      />
 
       {/* Ringkasan agregat semua konten */}
       <PerformanceSummary />
@@ -160,6 +157,6 @@ export default function PerformancePage() {
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   )
 }
