@@ -22,6 +22,7 @@ import { getPlatformDot, getPlatformBadge } from '@/lib/utils/platform'
 import { formatNumber } from '@/lib/utils/formatters'
 import { ScriptBlocks, type ScriptBlock } from '@/components/content/ScriptBlocks'
 import { VideoWorkBadges } from '@/components/content/VideoWorkBadges'
+import { PlatformEmbed } from '@/components/content/PlatformEmbed'
 import type { VideoStatus, Platform } from '@/lib/types'
 import type { VideoWithSchedules } from '@/lib/hooks/useVideos'
 
@@ -888,10 +889,8 @@ function DistributionTab({
                   )}
                   
                   {s.url_post ? (
-                    <div className="space-y-2">
-                      <a href={s.url_post} target="_blank" rel="noopener noreferrer" className="text-[10px] text-accent flex items-center gap-1 hover:underline">
-                        <ExternalLink className="w-3 h-3" /> Lihat postingan
-                      </a>
+                    <div className="space-y-3 mt-2">
+                      <PlatformEmbed url={s.url_post} platform={platform} />
                       
                       {/* Integrated Performance Form */}
                       <PlatformPerformanceForm

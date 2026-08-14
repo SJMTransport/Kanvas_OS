@@ -18,6 +18,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { getStatusBadgeClass, STATUS_CONFIG } from '@/lib/utils/status'
 import { getPlatformBadge, getPlatformDot } from '@/lib/utils/platform'
+import { PlatformEmbed } from '@/components/content/PlatformEmbed'
 import { formatNumber } from '@/lib/utils/formatters'
 import type { VideoStatus, Platform } from '@/lib/types'
 import type { VideoWithSchedules } from '@/lib/hooks/useVideos'
@@ -393,7 +394,7 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
                   )}
 
                   {s.url_post
-                    ? <a href={s.url_post} target="_blank" rel="noopener noreferrer" className="text-[11px] text-accent flex items-center gap-1"><ExternalLink className="w-3 h-3" />Lihat postingan</a>
+                    ? <PlatformEmbed url={s.url_post} platform={platform} />
                     : s.status !== 'posted' && (
                       <div className="flex gap-1.5 mt-1">
                         <Input placeholder="URL post (setelah tayang)" className="h-7 text-xs flex-1" onKeyDown={(e) => { if (e.key === 'Enter') markPosted(s.id, (e.target as HTMLInputElement).value) }} />
