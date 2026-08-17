@@ -118,27 +118,27 @@ export function KanbanView({ videos, onCardClick }: Props) {
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="flex gap-3.5 overflow-x-auto h-full px-4 py-4 pb-8">
+      <div className="flex flex-1 min-h-0 w-full overflow-x-auto overflow-y-hidden gap-3 p-4 bg-[#F7FAF9]/60 rounded-[16px] border border-[#E8EEEC]">
         {columns.map((col) => (
           <div
             key={col.status}
             id={col.status}
-            className="flex flex-col shrink-0 w-60 bg-surface-secondary rounded-2xl border border-border/80 p-1.5 shadow-subtle"
+            className="flex flex-col shrink-0 w-64 h-full bg-white rounded-xl border border-[#E8EEEC] p-2"
           >
-            <div className="flex items-center justify-between px-3 py-2 border-b border-border/50 mb-1">
+            <div className="flex items-center justify-between px-2.5 py-2 border-b border-[#E8EEEC] mb-1.5">
               <span className={getStatusBadgeClass(col.status)}>
                 {col.label}
               </span>
-              <span className="text-xs text-text-muted font-bold px-2 py-0.5 rounded-full bg-white border border-border/60">{col.videos.length}</span>
+              <span className="text-xs text-text-muted font-bold px-2 py-0.5 rounded-full bg-[#F7FAF9] border border-[#E8EEEC]">{col.videos.length}</span>
             </div>
             <SortableContext items={col.videos.map((v) => v.id)} strategy={verticalListSortingStrategy} id={col.status}>
-              <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[100px]">
+              <div className="flex-1 overflow-y-auto p-1.5 space-y-2 min-h-0">
                 {col.videos.map((v) => (
                   <KanbanCard key={v.id} video={v} onClick={onCardClick} />
                 ))}
                 {col.videos.length === 0 && (
-                  <div className="h-16 border-2 border-dashed border-border rounded-lg flex items-center justify-center">
-                    <p className="text-xs text-text-muted">Drop di sini</p>
+                  <div className="py-8 text-center">
+                    <p className="text-xs text-text-muted font-medium">Tidak ada konten</p>
                   </div>
                 )}
               </div>

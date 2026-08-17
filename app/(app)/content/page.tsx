@@ -282,13 +282,17 @@ export default function ContentPage() {
       <PageHeader title="Konten" subtitle="Kelola dan pantau seluruh rencana & produksi konten" className="mb-0" />
       {/* Global Content Toolbar: Fixed & Anchored across ALL 4 view modes */}
       <PageToolbar
-        left={<SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari judul..." />}
-        center={<SegmentedTabs options={viewOptions} value={viewMode} onChange={changeView} />}
+        left={
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari judul..." />
+            <SegmentedTabs options={viewOptions} value={viewMode} onChange={changeView} />
+          </div>
+        }
         right={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 w-8 p-0" title="Opsi Opsi & Alat">
+                <Button variant="outline" size="sm" className="h-10 w-10 p-0 rounded-[12px] border-[#E8EEEC]" title="Opsi & Alat">
                   <MoreHorizontal className="w-4 h-4 text-text-secondary" />
                 </Button>
               </DropdownMenuTrigger>
@@ -306,8 +310,8 @@ export default function ContentPage() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button size="sm" className="h-8 gap-1.5 text-xs bg-teal-500 hover:bg-teal-600 text-white" onClick={() => setAddOpen(true)}>
-              <Plus className="w-3.5 h-3.5" />
+            <Button size="lg" className="h-10 gap-1.5 text-sm font-semibold rounded-[12px] bg-[#4C9998] hover:bg-[#287978] text-white" onClick={() => setAddOpen(true)}>
+              <Plus className="w-4 h-4" />
               <span>Tambah Konten</span>
             </Button>
           </div>
@@ -409,7 +413,7 @@ export default function ContentPage() {
         ) : viewMode === 'calendar' ? (
           <CalendarView />
         ) : (
-          <PerformanceView />
+          <PerformanceView searchQuery={search} embedded />
         )}
       </div>
 

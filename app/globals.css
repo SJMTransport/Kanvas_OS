@@ -37,6 +37,11 @@
   body {
     @apply bg-background text-text-primary font-sans;
   }
+  *:focus-visible {
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(76, 153, 152, 0.25) !important;
+    border-color: #4C9998 !important;
+  }
   body[data-scroll-locked] {
     margin-right: 0px !important;
   }

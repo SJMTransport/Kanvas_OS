@@ -28,10 +28,17 @@ interface PerfVideo {
   video_performance: { platform: string; views: number; likes: number; comments: number; recorded_at: string }[]
 }
 
-export function PerformanceView() {
+interface PerformanceViewProps {
+  searchQuery?: string
+  embedded?: boolean
+}
+
+export function PerformanceView({ searchQuery, embedded }: PerformanceViewProps = {}) {
   const router = useRouter()
   const { workspaceId } = useWorkspace()
-  const [search, setSearch] = useState('')
+  const [internalSearch, setInternalSearch] = useState('')
+
+  const activeSearch = searchQuery !== undefined ? searchQuery : internalSearch
 
   const { data: videos = [], isLoading } = useQuery<PerfVideo[]>({
     queryKey: ['videos-performance', workspaceId],
@@ -59,28 +66,31 @@ export function PerformanceView() {
   }
 
   const filtered = videos.filter((v) =>
-    [v.judul, v.no_video].filter(Boolean).join(' ').toLowerCase().includes(search.toLowerCase())
+    [v.judul, v.no_video].filter(Boolean).join(' ').toLowerCase().includes(activeSearch.toLowerCase())
   )
 
   return (
-    <div className="flex flex-col h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] min-h-0">
-      {/* Title header */}
-      <div className="bg-white border-b border-border px-4 sm:px-6 pt-4 pb-3 shrink-0">
-        <PageHeader
-          title="Performa"
-          subtitle="Input & pantau metrik video per platform"
-          className="mb-0"
-          action={<Button size="sm" onClick={() => router.push('/performance/reports')} className="gap-1.5"><FileBarChart className="w-3.5 h-3.5" /> Laporan Campaign</Button>}
-        />
-      </div>
+    <div className="flex flex-col flex-1 min-h-0">
+      {/* Show header/search only if NOT embedded */}
+      {!embedded && (
+        <>
+          <div className="bg-white border-b border-border px-4 sm:px-6 pt-4 pb-3 shrink-0">
+            <PageHeader
+              title="Performa"
+              subtitle="Input & pantau metrik video per platform"
+              className="mb-0"
+              action={<Button size="sm" onClick={() => router.push('/performance/reports')} className="gap-1.5"><FileBarChart className="w-3.5 h-3.5" /> Laporan Campaign</Button>}
+            />
+          </div>
 
-      {/* Toolbar */}
-      <div className="bg-white border-b border-border px-4 py-2.5 flex items-center gap-2 shrink-0">
-        <div className="relative flex-1 min-w-[180px] max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
-          <Input placeholder="Cari judul atau no. video..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-8 text-sm" />
-        </div>
-      </div>
+          <div className="bg-white border-b border-border px-4 py-2.5 flex items-center gap-2 shrink-0">
+            <div className="relative flex-1 min-w-[180px] max-w-xs">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
+              <Input placeholder="Cari judul atau no. video..." value={internalSearch} onChange={(e) => setInternalSearch(e.target.value)} className="pl-8 h-8 text-sm" />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Body: aggregate summary + full-width table */}
       <div className="flex-1 overflow-auto min-h-0">
@@ -96,7 +106,7 @@ export function PerformanceView() {
           <div className="px-4 sm:px-6">
             <div className="py-16 text-center bg-surface rounded-xl border border-border">
               <BarChart2 className="w-10 h-10 text-border mx-auto mb-3" />
-              <p className="text-text-muted">{search ? 'Tidak ada video cocok' : 'Belum ada video.'}</p>
+              <p className="text-text-muted">{activeSearch ? 'Tidak ada video cocok' : 'Belum ada video.'}</p>
             </div>
           </div>
         ) : (

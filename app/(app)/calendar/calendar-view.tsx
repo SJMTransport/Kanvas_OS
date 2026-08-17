@@ -130,33 +130,34 @@ export function CalendarView() {
     : format(activeDate, 'MMMM yyyy', { locale: localeId })
 
   return (
-    <div className="flex flex-col h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)]">
-      {/* Header */}
-      <div className="bg-white border-b border-border px-4 py-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h2 className="font-heading text-lg font-bold text-text-primary capitalize mr-1">
+    <div className="flex flex-col flex-1 min-h-0 bg-white rounded-[16px] border border-[#E8EEEC] overflow-hidden">
+      {/* Quiet Calendar Workspace Control Header */}
+      <div className="bg-[#F7FAF9] border-b border-[#E8EEEC] px-4 py-2 flex items-center justify-between gap-2 flex-wrap shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-text-primary capitalize mr-1">
             {headerLabel}
-          </h2>
-          {/* Nav */}
-          <button onClick={() => navigate(-1)} className="p-1.5 rounded-md hover:bg-subtle text-teal-700 transition-colors">
+          </span>
+          <button onClick={() => navigate(-1)} className="p-1 rounded-md hover:bg-[#EFF7F5] text-[#4C9998] transition-colors" title="Sebelumnya">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <button onClick={() => navigate(1)} className="p-1.5 rounded-md hover:bg-subtle text-teal-700 transition-colors">
+          <button onClick={() => navigate(1)} className="p-1 rounded-md hover:bg-[#EFF7F5] text-[#4C9998] transition-colors" title="Berikutnya">
             <ChevronRight className="w-4 h-4" />
           </button>
-          <Button variant="outline" size="sm" onClick={goToday} className="h-8 text-xs border-border bg-white text-text-primary hover:bg-subtle">Hari Ini</Button>
+          <Button variant="outline" size="sm" onClick={goToday} className="h-7 text-xs rounded-md border-[#E8EEEC] bg-white text-text-primary hover:bg-[#EFF7F5]">
+            Hari Ini
+          </Button>
+        </div>
 
-          <div className="flex-1" />
-
+        <div className="flex items-center gap-2">
           {/* View toggle */}
-          <div className="flex items-center border border-border rounded-md overflow-hidden bg-white">
+          <div className="flex items-center border border-[#E8EEEC] rounded-lg overflow-hidden bg-white p-0.5">
             {([['month', LayoutGrid], ['week', CalendarDays], ['list', List]] as [ViewMode, typeof List][]).map(([mode, Icon]) => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
                 className={cn(
-                  'px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5',
-                  viewMode === mode ? 'bg-teal-500 text-white' : 'text-text-secondary hover:bg-subtle'
+                  'px-2.5 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5',
+                  viewMode === mode ? 'bg-[#4C9998] text-white' : 'text-text-secondary hover:bg-[#EFF7F5]'
                 )}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -168,8 +169,8 @@ export function CalendarView() {
           {/* Quick add */}
           <Popover open={quickAddOpen} onOpenChange={setQuickAddOpen}>
             <PopoverTrigger asChild>
-              <Button size="sm" className="gap-1.5">
-                <Plus className="w-4 h-4" />
+              <Button size="sm" className="h-7 text-xs gap-1 rounded-md bg-[#4C9998] text-white hover:bg-[#287978]">
+                <Plus className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Jadwal</span>
               </Button>
             </PopoverTrigger>
