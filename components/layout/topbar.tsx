@@ -43,7 +43,7 @@ export function Topbar({ user }: TopbarProps) {
     >
       {/* Mobile logo */}
       <div className="flex items-center gap-2 lg:hidden">
-        <div className="w-7 h-7 rounded-lg bg-accent flex items-center justify-center">
+        <div className="w-7 h-7 rounded-sm bg-teal-500 flex items-center justify-center">
           <Palette className="w-3.5 h-3.5 text-white" />
         </div>
         <span className="font-heading font-bold text-text-primary text-sm">Kanvas OS</span>
@@ -60,10 +60,10 @@ export function Topbar({ user }: TopbarProps) {
       {/* Right: user */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-2 rounded-md p-1 hover:bg-subtle transition-colors">
+          <button className="flex items-center gap-2 rounded-sm p-1 hover:bg-subtle transition-colors">
             <Avatar className="w-7 h-7">
               <AvatarImage src={user?.avatar_url ?? ''} />
-              <AvatarFallback className="bg-accent-light text-accent text-xs font-bold">{initials}</AvatarFallback>
+              <AvatarFallback className="bg-teal-50 text-teal-600 text-xs font-bold">{initials}</AvatarFallback>
             </Avatar>
             <div className="hidden sm:block text-left">
               <p className="text-xs font-medium text-text-primary leading-none">{user?.full_name ?? user?.email}</p>
@@ -77,7 +77,7 @@ export function Topbar({ user }: TopbarProps) {
           </div>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => router.push('/settings')} className="gap-2">
-            <Settings className="w-4 h-4" /> Settings
+            <Settings className="w-4 h-4 text-teal-600" /> Settings
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleSignOut} className="gap-2 text-error focus:text-error">

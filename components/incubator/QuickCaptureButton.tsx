@@ -178,7 +178,7 @@ export function QuickCaptureButton() {
     <>
       <button
         onClick={handleOpen}
-        className="fixed bottom-20 right-4 lg:bottom-8 lg:right-8 z-40 w-12 h-12 rounded-full bg-amber-500 hover:bg-amber-600 text-white shadow-lg flex items-center justify-center transition-colors"
+        className="fixed bottom-20 right-4 lg:bottom-8 lg:right-8 z-40 w-12 h-12 rounded-full bg-teal-500 hover:bg-teal-600 text-white shadow-popover flex items-center justify-center transition-colors"
         title="Capture Ide"
       >
         <Lightbulb className="w-5 h-5" />
@@ -187,8 +187,8 @@ export function QuickCaptureButton() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-xl p-0 max-h-[90vh] overflow-y-auto">
           <DialogHeader className="px-4 pt-4 pb-0">
-            <DialogTitle className="flex items-center gap-2">
-              <Lightbulb className="w-4 h-4 text-amber-500" /> Ide Baru
+            <DialogTitle className="flex items-center gap-2 text-text-primary">
+              <Lightbulb className="w-4 h-4 text-teal-600" /> Ide Baru
             </DialogTitle>
           </DialogHeader>
 
@@ -201,7 +201,7 @@ export function QuickCaptureButton() {
             />
 
             {/* Tabs */}
-            <div className="flex items-center gap-1 border border-border rounded-lg p-0.5 w-fit">
+            <div className="flex items-center gap-1 border border-border rounded-sm p-0.5 w-fit">
               {[
                 { key: 'write' as Tab, label: 'Tulis', icon: PenLine },
                 { key: 'link' as Tab, label: 'Link', icon: Link2 },
@@ -211,8 +211,8 @@ export function QuickCaptureButton() {
                   key={key}
                   onClick={() => setTab(key)}
                   className={cn(
-                    'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
-                    tab === key ? 'bg-amber-100 text-amber-700' : 'text-text-secondary hover:bg-subtle'
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-xs text-xs font-medium transition-colors',
+                    tab === key ? 'bg-teal-50 text-teal-700' : 'text-text-secondary hover:bg-subtle'
                   )}
                 >
                   <Icon className="w-3.5 h-3.5" /> {label}
@@ -241,7 +241,7 @@ export function QuickCaptureButton() {
               <button
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading}
-                className="w-full flex items-center justify-center gap-2 px-4 py-6 border-2 border-dashed border-border rounded-xl text-sm text-text-muted hover:border-accent hover:text-accent transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-6 border-2 border-dashed border-border rounded-lg text-sm text-text-muted hover:border-teal-500 hover:text-teal-600 transition-colors"
               >
                 {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                 {uploading ? 'Mengupload...' : 'Pilih foto untuk diupload'}
@@ -254,7 +254,7 @@ export function QuickCaptureButton() {
               <Label className="text-xs text-text-muted mb-1.5 block">Tags</Label>
               <div className="flex flex-wrap gap-1 mb-2">
                 {tags.map((t) => (
-                  <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">
+                  <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 bg-teal-50 text-teal-700 border border-teal-200 text-xs rounded-full">
                     {t}
                     <button onClick={() => setTags((p) => p.filter((x) => x !== t))}><X className="w-2.5 h-2.5" /></button>
                   </span>
@@ -275,7 +275,7 @@ export function QuickCaptureButton() {
                 Simpan
               </Button>
               {tab === 'write' && (
-                <Button onClick={() => handleSimpan(true)} disabled={saving} className="bg-amber-500 hover:bg-amber-600">
+                <Button onClick={() => handleSimpan(true)} disabled={saving} className="bg-teal-500 hover:bg-teal-600">
                   Simpan & Buka
                 </Button>
               )}

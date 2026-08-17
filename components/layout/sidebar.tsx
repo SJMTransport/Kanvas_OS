@@ -79,25 +79,25 @@ export const Sidebar = React.memo(function Sidebar() {
                 <button
                   onClick={() => toggleExpand(item.label)}
                   className={cn(
-                    'flex items-center gap-2.5 w-full px-2 py-2 rounded-md text-sm transition-colors',
-                    active ? 'text-accent font-medium' : 'text-text-secondary hover:text-text-primary hover:bg-subtle'
+                    'flex items-center gap-2.5 w-full h-9 px-2.5 rounded-sm text-xs transition-colors',
+                    active ? 'text-teal-700 font-semibold bg-teal-50' : 'text-text-secondary hover:text-text-primary hover:bg-subtle'
                   )}
                 >
-                  <Icon className="w-4 h-4 shrink-0" />
+                  <Icon className="w-4 h-4 shrink-0 text-teal-600" />
                   <span className="flex-1 text-left">{item.label}</span>
                   <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', isExpanded && 'rotate-180')} />
                 </button>
                 {isExpanded && (
-                  <div className="ml-6 mt-0.5 space-y-0.5 border-l border-border pl-3">
+                  <div className="ml-5 mt-0.5 space-y-0.5 border-l border-border pl-2.5">
                     {item.children!.map((child) => (
                       <Link
                         key={child.href}
                         href={child.href}
                         onMouseEnter={() => handleMouseEnter(child.href)}
                         className={cn(
-                          'flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors',
+                          'flex items-center gap-2 h-8 px-2 rounded-sm text-xs transition-colors',
                           isActive(child.href)
-                            ? 'text-accent font-medium bg-accent-light'
+                            ? 'text-teal-700 font-semibold bg-teal-50'
                             : 'text-text-secondary hover:text-text-primary hover:bg-subtle'
                         )}
                       >
@@ -118,13 +118,13 @@ export const Sidebar = React.memo(function Sidebar() {
                 href={item.href}
                 onMouseEnter={() => handleMouseEnter(item.href!)}
                 className={cn(
-                  'flex items-center gap-2.5 px-2 py-2 rounded-md text-sm transition-colors',
+                  'flex items-center gap-2.5 h-9 px-2.5 rounded-sm text-xs transition-colors',
                   sidebarCollapsed && 'justify-center px-0',
-                  active ? 'text-accent font-medium bg-accent-light' : 'text-text-secondary hover:text-text-primary hover:bg-subtle'
+                  active ? 'text-teal-700 font-semibold bg-teal-50' : 'text-text-secondary hover:text-text-primary hover:bg-subtle'
                 )}
                 title={sidebarCollapsed ? item.label : undefined}
               >
-                <Icon className="w-4 h-4 shrink-0" />
+                <Icon className={cn('w-4 h-4 shrink-0', active ? 'text-teal-600' : 'text-text-secondary')} />
                 {!sidebarCollapsed && <span className="flex-1">{item.label}</span>}
                 {!sidebarCollapsed && item.soon && <SoonBadge />}
               </Link>
@@ -136,8 +136,8 @@ export const Sidebar = React.memo(function Sidebar() {
             <button
               key={item.label}
               className={cn(
-                'flex items-center justify-center w-full px-0 py-2 rounded-md text-sm transition-colors',
-                active ? 'text-accent font-medium bg-accent-light' : 'text-text-secondary hover:text-text-primary hover:bg-subtle'
+                'flex items-center justify-center w-full h-9 px-0 rounded-sm text-xs transition-colors',
+                active ? 'text-teal-700 font-semibold bg-teal-50' : 'text-text-secondary hover:text-text-primary hover:bg-subtle'
               )}
               title={item.label}
             >
