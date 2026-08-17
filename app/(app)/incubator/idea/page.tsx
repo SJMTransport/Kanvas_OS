@@ -159,9 +159,57 @@ export default function IdeaPage() {
     setCardModalOpen(true)
   }
 
-  function handleConvertToContent(card: IdeaCardType) {
-    setConvertCard(card)
-    setAddVideoOpen(true)
+  async function handleConvertToContent(card: IdeaCardType) {
+    if (!workspaceId) return
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      // Calculate next sort order
+      const { data: minRow } = await supabase
+        .from('videos')
+        .select('sort_order')
+        .eq('workspace_id', workspaceId)
+        .order('sort_order', { ascending: true })
+        .limit(1)
+        .single()
+      const nextSortOrder = ((minRow?.sort_order ?? 0) as number) - 1
+
+      // Insert video record preserving title, link, body; format left null
+      const { data: newVideo, error: vidErr } = await supabase
+        .from('videos')
+        .insert({
+          workspace_id: workspaceId,
+          created_by: user?.id ?? null,
+          judul: card.title || 'Ide Konten',
+          status: 'ide',
+          format: null,
+          sort_order: nextSortOrder,
+          google_drive_link: card.link_url || null,
+          caption_default: card.body || null,
+        } as any)
+        .select('id')
+        .single()
+
+      if (vidErr) throw vidErr
+
+      // Update idea_cards status to converted
+      await supabase
+        .from('idea_cards')
+        .update({ status: 'converted', converted_video_id: newVideo.id })
+        .eq('id', card.id)
+
+      toast.success('Ide berhasil dikembangkan ke Konten!')
+      queryClient.invalidateQueries({ queryKey: ['idea-cards', workspaceId] })
+      queryClient.invalidateQueries({ queryKey: ['videos'] })
+
+      setCardModalOpen(false)
+
+      // Instantly open Content Detail page for progressive disclosure
+      router.push(`/content/${newVideo.id}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal mengonversi ide')
+    }
   }
 
   return (

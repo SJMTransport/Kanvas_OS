@@ -22,6 +22,7 @@ import type { Work, WorkItem, WorkItemType } from '@/lib/types/domain'
 import { STATUS_CONFIG, STATUS_ORDER } from '@/lib/utils/status'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { VideoStatus } from '@/lib/types'
+import { AddVideoSheet } from '@/app/(app)/content/add-video-sheet'
 import { cn } from '@/lib/utils'
 
 const ITEM_TYPES: Record<WorkItemType, { label: string; icon: typeof VideoIcon; color: string; table: string; labelField: string; href?: (id: string) => string }> = {
@@ -60,6 +61,7 @@ export default function WorkDetailPage() {
   const queryClient = useQueryClient()
   const [addType, setAddType] = useState<WorkItemType | null>(null)
   const [pickerSearch, setPickerSearch] = useState('')
+  const [newVideoSheetOpen, setNewVideoSheetOpen] = useState(false)
 
   const { data: work, isLoading: workLoading, isError: workError, refetch } = useQuery<Work | null>({
     queryKey: ['work', id],
@@ -262,11 +264,16 @@ export default function WorkDetailPage() {
       </div>
 
       {/* Quick-add buttons */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" onClick={() => setNewVideoSheetOpen(true)} className="h-8 text-xs gap-1.5">
+          <Plus className="w-3.5 h-3.5" />
+          <span>Buat Konten Baru</span>
+        </Button>
+        <span className="text-text-muted text-xs mx-1">atau tautkan:</span>
         {(Object.keys(ITEM_TYPES) as WorkItemType[]).map((t) => {
           const Icon = ITEM_TYPES[t].icon
           return (
-            <Button key={t} variant="outline" size="sm" onClick={() => { setAddType(t); setPickerSearch('') }}>
+            <Button key={t} variant="outline" size="sm" className="h-8 text-xs" onClick={() => { setAddType(t); setPickerSearch('') }}>
               <Plus className="w-3.5 h-3.5 mr-1" />
               <Icon className="w-3.5 h-3.5 mr-1" />
               {ITEM_TYPES[t].label}
@@ -487,6 +494,8 @@ export default function WorkDetailPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AddVideoSheet open={newVideoSheetOpen} onOpenChange={setNewVideoSheetOpen} workId={id} />
     </div>
   )
 }

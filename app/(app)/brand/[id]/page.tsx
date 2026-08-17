@@ -664,6 +664,7 @@ export default function BrandDetailPage() {
           setAddVideoOpen(open)
           if (!open) queryClient.invalidateQueries({ queryKey: ['brand-videos', id] })
         }} 
+        brandId={id as string}
         defaultValues={{ 
           brand_id: id as string,
           is_endorsement: true

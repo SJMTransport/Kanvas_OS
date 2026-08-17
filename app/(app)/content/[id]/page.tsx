@@ -773,7 +773,13 @@ function DistributionTab({
 
                 <div>
                   <Label className="text-xs">Caption Override</Label>
-                  <Textarea className="mt-1 text-xs" rows={2} placeholder="Kosongkan untuk pakai caption default" value={form.caption_override} onChange={(e) => setForm((f) => ({ ...f, caption_override: e.target.value }))} />
+                  <Textarea
+                    className="mt-1 text-xs"
+                    rows={2}
+                    placeholder={video.caption_default ? `Inherit Caption Master: "${video.caption_default}"` : 'Kosongkan untuk pakai caption master'}
+                    value={form.caption_override}
+                    onChange={(e) => setForm((f) => ({ ...f, caption_override: e.target.value }))}
+                  />
                 </div>
 
                 {/* Sebarkan juga ke platform lain (Multi-Post) */}
