@@ -298,94 +298,59 @@ export default function SavedContentPage() {
       <PageHeader title="Referensi" subtitle="Konten disimpan untuk inspirasi & bahan bedah" className="mb-0" />
 
       {/* Toolbar */}
-      <div className="bg-white border-b border-border px-4 py-2.5 flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[180px] max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
-          <Input
-            placeholder="Cari hook, judul, creator..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 h-8 text-sm"
-          />
-          {search && (
-            <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
+      <PageToolbar
+        left={
+          <div className="flex items-center gap-2 flex-wrap">
+            <SearchInput
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cari hook, judul, creator..."
+            />
 
-        {allCreators.length > 0 && (
-          <Select value={creatorFilter ?? 'all'} onValueChange={(v) => setCreatorFilter(v === 'all' ? null : v)}>
-            <SelectTrigger className="h-8 text-sm w-40">
-              <SelectValue placeholder="Creator" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Creator</SelectItem>
-              {allCreators.map((c) => (
-                <SelectItem key={c} value={c}>@{c}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+            {allCreators.length > 0 && (
+              <Select value={creatorFilter ?? 'all'} onValueChange={(v) => setCreatorFilter(v === 'all' ? null : v)}>
+                <SelectTrigger className="h-10 text-sm w-40 rounded-[12px] border-[#E8EEEC] bg-white">
+                  <SelectValue placeholder="Creator" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Creator</SelectItem>
+                  {allCreators.map((c) => (
+                    <SelectItem key={c} value={c}>@{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
 
-        <Select value={platformFilter ?? 'all'} onValueChange={(v) => setPlatformFilter(v === 'all' ? null : v)}>
-          <SelectTrigger className="h-8 text-sm w-36">
-            <SelectValue placeholder="Platform" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua Platform</SelectItem>
-            {PLATFORMS.map((p) => (
-              <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            <Select value={platformFilter ?? 'all'} onValueChange={(v) => setPlatformFilter(v === 'all' ? null : v)}>
+              <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-[#E8EEEC] bg-white">
+                <SelectValue placeholder="Platform" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Platform</SelectItem>
+                {PLATFORMS.map((p) => (
+                  <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        <Select value={analysisFilter} onValueChange={(v) => setAnalysisFilter(v as typeof analysisFilter)}>
-          <SelectTrigger className="h-8 text-sm w-36">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua</SelectItem>
-            <SelectItem value="analyzed">Sudah Dibedah</SelectItem>
-            <SelectItem value="not_analyzed">Belum Dibedah</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={hashtagFilter ?? 'all'} onValueChange={(v) => setHashtagFilter(v === 'all' ? null : v)}>
-          <SelectTrigger className="h-8 text-sm w-36">
-            <SelectValue placeholder="Hashtag" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua Hashtag</SelectItem>
-            {allHashtags.map((h) => (
-              <SelectItem key={h} value={h}>#{h}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <div className="flex-1" />
-        <span className="text-xs text-text-muted">{filtered.length} konten</span>
-        <div className="flex items-center border border-border rounded-md overflow-hidden">
-          <button
-            onClick={() => setFeedMode(false)}
-            className={cn('p-1.5 transition-colors', !feedMode ? 'bg-accent text-white' : 'text-text-secondary hover:bg-subtle')}
-            title="Tampilan List"
-          >
-            <List className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => enterFeed(0)}
-            disabled={filtered.length === 0}
-            className={cn('p-1.5 transition-colors', feedMode ? 'bg-accent text-white' : 'text-text-secondary hover:bg-subtle disabled:opacity-40')}
-            title="Tampilan Feed"
-          >
-            <Tv2 className="w-4 h-4" />
-          </button>
-        </div>
-        <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setAddOpen(true)}>
-          <Plus className="w-3.5 h-3.5" /> Simpan Konten
-        </Button>
-      </div>
+            <Select value={analysisFilter} onValueChange={(v) => setAnalysisFilter(v as typeof analysisFilter)}>
+              <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-[#E8EEEC] bg-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Bedah</SelectItem>
+                <SelectItem value="analyzed">Sudah Dibedah</SelectItem>
+                <SelectItem value="not_analyzed">Belum Dibedah</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        }
+        right={
+          <Button size="lg" className="h-10 gap-1.5 text-sm font-semibold rounded-[12px] bg-[#4C9998] hover:bg-[#287978] text-white" onClick={() => setAddOpen(true)}>
+            <Plus className="w-4 h-4" /> Simpan Konten
+          </Button>
+        }
+      />
 
       {/* Add content form */}
       {addOpen && (
@@ -617,15 +582,8 @@ export default function SavedContentPage() {
               <Skeleton key={i} className="h-12 w-full rounded-[12px]" />
             ))}
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="py-20 text-center bg-white rounded-[16px] border border-border">
-            <Bookmark className="w-12 h-12 text-[#4C9998]/40 mx-auto mb-3" />
-            <p className="text-text-muted font-medium">
-              {items.length === 0 ? 'Belum ada konten disimpan' : 'Tidak ada konten sesuai filter'}
-            </p>
-          </div>
         ) : (
-          <div className="bg-white border border-border/80 rounded-[16px] overflow-hidden shadow-subtle">
+          <div className="bg-white border border-[#E8EEEC] rounded-[16px] overflow-hidden shadow-subtle">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr>
@@ -638,11 +596,21 @@ export default function SavedContentPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((item) => {
-                  const hook = item.analysis?.hook
-                  const filled = aspectCount(item)
-                  const creatorLabel = getCreatorLabel(item)
-                  return (
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-16 text-center">
+                      <Bookmark className="w-10 h-10 text-[#4C9998]/40 mx-auto mb-2" />
+                      <p className="text-text-muted text-sm font-medium">
+                        {items.length === 0 ? 'Belum ada konten disimpan' : 'Tidak ada konten sesuai filter'}
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((item) => {
+                    const hook = item.analysis?.hook
+                    const filled = aspectCount(item)
+                    const creatorLabel = getCreatorLabel(item)
+                    return (
                     <WorkspaceTableRow
                       key={item.id}
                       onClick={() => enterFeed(filtered.indexOf(item))}
@@ -699,7 +667,8 @@ export default function SavedContentPage() {
                       </WorkspaceTableCell>
                     </WorkspaceTableRow>
                   )
-                })}
+                })
+              )}
               </tbody>
             </table>
           </div>

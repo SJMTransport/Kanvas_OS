@@ -293,20 +293,8 @@ export default function ShotListPage() {
         {isLoading ? (
           <div className="p-4 space-y-2">
             {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="h-[64px] w-full rounded-[12px]" />
+              <Skeleton key={i} className="h-[52px] w-full rounded-[12px]" />
             ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="py-20 flex flex-col items-center justify-center text-center bg-white rounded-[16px] border border-[#E8EEEC]">
-            <Clapperboard className="w-12 h-12 text-[#4C9998]/40 mb-3" />
-            <p className="text-text-muted font-medium mb-3">
-              {items.length === 0 ? 'Belum ada referensi shot list' : 'Tidak ada referensi sesuai filter'}
-            </p>
-            {items.length === 0 && (
-              <Button size="lg" className="h-10 gap-1.5 text-sm font-semibold rounded-[12px] bg-[#4C9998] text-white" onClick={openAdd}>
-                <Plus className="w-4 h-4" /> Tambah Shot
-              </Button>
-            )}
           </div>
         ) : (
           <div className="bg-white border border-[#E8EEEC] rounded-[16px] overflow-hidden shadow-subtle">
@@ -322,25 +310,34 @@ export default function ShotListPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((item, index) => (
-                  <WorkspaceTableRow
-                    key={item.id}
-                    className="h-[64px] min-h-[64px]"
-                    onClick={() => openFeed(index)}
-                  >
-                    <WorkspaceTableCell className="w-[60px]">
-                      <div className="relative w-[48px] h-[48px] rounded-[8px] overflow-hidden bg-black shrink-0 border border-border/60">
-                        <img
-                          src={driveThumbnailUrl(item.drive_file_id)}
-                          alt={item.deskripsi}
-                          loading="lazy"
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/35 transition-colors">
-                          <Play className="w-3.5 h-3.5 text-white fill-current" />
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-16 text-center">
+                      <Clapperboard className="w-10 h-10 text-[#4C9998]/40 mx-auto mb-2" />
+                      <p className="text-text-muted text-sm font-medium">
+                        {items.length === 0 ? 'Belum ada referensi shot list' : 'Tidak ada referensi sesuai filter'}
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((item, index) => (
+                    <WorkspaceTableRow
+                      key={item.id}
+                      onClick={() => openFeed(index)}
+                    >
+                      <WorkspaceTableCell className="w-[50px]">
+                        <div className="relative w-9 h-9 rounded-md overflow-hidden bg-black shrink-0 border border-border/60">
+                          <img
+                            src={driveThumbnailUrl(item.drive_file_id)}
+                            alt={item.deskripsi}
+                            loading="lazy"
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/35 transition-colors">
+                            <Play className="w-3 h-3 text-white fill-current" />
+                          </div>
                         </div>
-                      </div>
-                    </WorkspaceTableCell>
+                      </WorkspaceTableCell>
 
                     <WorkspaceTableCell className="max-w-[320px]">
                       <p className="font-semibold text-text-primary text-sm line-clamp-2">{item.deskripsi}</p>
@@ -380,8 +377,9 @@ export default function ShotListPage() {
                         </button>
                       </div>
                     </WorkspaceTableCell>
-                  </WorkspaceTableRow>
-                ))}
+                    </WorkspaceTableRow>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

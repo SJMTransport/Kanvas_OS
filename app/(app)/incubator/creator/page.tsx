@@ -104,18 +104,18 @@ export default function CreatorPage() {
         className="mb-0"
       />
 
-      {/* Toolbar — search & filters */}
+      {/* Toolbar */}
       <PageToolbar
         left={
           <div className="flex items-center gap-2 flex-wrap">
             <SearchInput
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cari kreator..."
+              placeholder="Cari creator..."
             />
 
             <Select value={platformFilter} onValueChange={setPlatformFilter}>
-              <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-border bg-white"><SelectValue placeholder="Platform" /></SelectTrigger>
+              <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-[#E8EEEC] bg-white"><SelectValue placeholder="Platform" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Semua Platform</SelectItem>
                 {PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>)}
@@ -123,7 +123,7 @@ export default function CreatorPage() {
             </Select>
 
             <Select value={analysisFilter} onValueChange={setAnalysisFilter}>
-              <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-border bg-white"><SelectValue placeholder="Status Analisis" /></SelectTrigger>
+              <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-[#E8EEEC] bg-white"><SelectValue placeholder="Status Analisis" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Semua Status</SelectItem>
                 <SelectItem value="pending">Belum dianalisis</SelectItem>
@@ -135,7 +135,7 @@ export default function CreatorPage() {
         }
         right={
           <Button size="lg" className="h-10 gap-1.5 text-sm font-semibold rounded-[12px] bg-[#4C9998] hover:bg-[#287978] text-white" onClick={() => setAddOpen(true)}>
-            <Plus className="w-4 h-4" /> Tambah Kreator
+            <Plus className="w-4 h-4" /> Tambah Creator
           </Button>
         }
       />
@@ -146,15 +146,6 @@ export default function CreatorPage() {
             {Array.from({ length: 8 }).map((_, i) => (
               <Skeleton key={i} className="h-[52px] w-full rounded-[12px]" />
             ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="py-20 text-center bg-white rounded-[16px] border border-[#E8EEEC]">
-            <Users className="w-12 h-12 text-[#4C9998]/40 mx-auto mb-3" />
-            <p className="text-text-muted font-medium">Belum ada kreator tersimpan</p>
-            <p className="text-xs text-text-muted mt-1">Simpan kreator inspiratif untuk dipelajari.</p>
-            <Button size="lg" className="mt-4 rounded-[12px] bg-[#4C9998] text-white" onClick={() => setAddOpen(true)}>
-              <Plus className="w-4 h-4 mr-1.5" /> Tambah Kreator
-            </Button>
           </div>
         ) : (
           <div className="bg-white border border-[#E8EEEC] rounded-[16px] overflow-hidden shadow-subtle">
@@ -171,63 +162,73 @@ export default function CreatorPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((c) => (
-                  <WorkspaceTableRow
-                    key={c.id}
-                    onClick={() => router.push(`/incubator/creator/${c.id}`)}
-                  >
-                    <WorkspaceTableCell className="max-w-[260px]">
-                      <div className="flex items-center gap-2.5">
-                        <Avatar className="w-8 h-8 shrink-0">
-                          <AvatarImage src={c.avatar_url ?? ''} />
-                          <AvatarFallback className="bg-teal-50 text-[#287978] text-xs font-semibold">
-                            {c.username.slice(0, 2).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-text-primary text-sm truncate">@{c.username}</p>
-                          {c.display_name && (
-                            <p className="text-[11px] text-text-muted truncate">{c.display_name}</p>
-                          )}
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-16 text-center">
+                      <Users className="w-10 h-10 text-[#4C9998]/40 mx-auto mb-2" />
+                      <p className="text-text-muted text-sm font-medium">Belum ada kreator tersimpan</p>
+                      <p className="text-xs text-text-muted mt-1">Simpan kreator inspiratif untuk dipelajari.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((c) => (
+                    <WorkspaceTableRow
+                      key={c.id}
+                      onClick={() => router.push(`/incubator/creator/${c.id}`)}
+                    >
+                      <WorkspaceTableCell className="max-w-[260px]">
+                        <div className="flex items-center gap-2.5">
+                          <Avatar className="w-8 h-8 shrink-0">
+                            <AvatarImage src={c.avatar_url ?? ''} />
+                            <AvatarFallback className="bg-teal-50 text-[#287978] text-xs font-semibold">
+                              {c.username.slice(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-text-primary text-sm truncate">@{c.username}</p>
+                            {c.display_name && (
+                              <p className="text-[11px] text-text-muted truncate">{c.display_name}</p>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </WorkspaceTableCell>
+                      </WorkspaceTableCell>
 
-                    <WorkspaceTableCell>
-                      <Badge variant="outline" className="h-6 rounded-full px-2.5 text-xs font-medium capitalize bg-teal-50 text-teal-700 border-teal-200">
-                        {c.platform}
-                      </Badge>
-                    </WorkspaceTableCell>
+                      <WorkspaceTableCell>
+                        <Badge variant="outline" className="h-6 rounded-full px-2.5 text-xs font-medium capitalize bg-teal-50 text-teal-700 border-teal-200">
+                          {c.platform}
+                        </Badge>
+                      </WorkspaceTableCell>
 
-                    <WorkspaceTableCell className="text-xs text-text-secondary">
-                      {c.followers_count || '—'}
-                    </WorkspaceTableCell>
+                      <WorkspaceTableCell className="text-xs text-text-secondary">
+                        {c.followers_count || '—'}
+                      </WorkspaceTableCell>
 
-                    <WorkspaceTableCell>
-                      <div className="flex gap-0.5">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <Star key={i} className={cn('w-3.5 h-3.5', i < c.rating ? 'fill-amber-400 text-amber-400' : 'text-border')} />
-                        ))}
-                      </div>
-                    </WorkspaceTableCell>
+                      <WorkspaceTableCell>
+                        <div className="flex gap-0.5">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star key={i} className={cn('w-3.5 h-3.5', i < c.rating ? 'fill-amber-400 text-amber-400' : 'text-border')} />
+                          ))}
+                        </div>
+                      </WorkspaceTableCell>
 
-                    <WorkspaceTableCell>
-                      <Badge variant="outline" className="h-6 rounded-full px-2.5 text-xs font-medium">
-                        {c.analysis_status === 'done' ? 'Selesai' : c.analysis_status === 'in_progress' ? 'Sedang dipelajari' : 'Belum dianalisis'}
-                      </Badge>
-                    </WorkspaceTableCell>
+                      <WorkspaceTableCell>
+                        <Badge variant="outline" className="h-6 rounded-full px-2.5 text-xs font-medium">
+                          {c.analysis_status === 'done' ? 'Selesai' : c.analysis_status === 'in_progress' ? 'Sedang dipelajari' : 'Belum dianalisis'}
+                        </Badge>
+                      </WorkspaceTableCell>
 
-                    <WorkspaceTableCell className="text-xs text-text-secondary">
-                      {c.saved_content_count} konten
-                    </WorkspaceTableCell>
+                      <WorkspaceTableCell className="text-xs text-text-secondary">
+                        {c.saved_content_count} konten
+                      </WorkspaceTableCell>
 
-                    <WorkspaceTableCell align="right" onClick={(e) => e.stopPropagation()}>
-                      <Button variant="ghost" size="sm" className="h-8 text-xs rounded-[8px]" onClick={() => router.push(`/incubator/creator/${c.id}`)}>
-                        Detail
-                      </Button>
-                    </WorkspaceTableCell>
-                  </WorkspaceTableRow>
-                ))}
+                      <WorkspaceTableCell align="right" onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="sm" className="h-8 text-xs rounded-[8px]" onClick={() => router.push(`/incubator/creator/${c.id}`)}>
+                          Detail
+                        </Button>
+                      </WorkspaceTableCell>
+                    </WorkspaceTableRow>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

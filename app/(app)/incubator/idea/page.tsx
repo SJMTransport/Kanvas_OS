@@ -279,12 +279,6 @@ export default function IdeaPage() {
               <Skeleton key={i} className="h-[52px] w-full rounded-[12px]" />
             ))}
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="py-20 text-center bg-white rounded-[16px] border border-[#E8EEEC]">
-            <Lightbulb className="w-12 h-12 text-[#4C9998]/40 mx-auto mb-3" />
-            <p className="text-text-muted font-medium">Belum ada ide</p>
-            <p className="text-xs text-text-muted mt-1">Klik Tambah Ide untuk membuat ide baru.</p>
-          </div>
         ) : (
           <div className="bg-white border border-[#E8EEEC] rounded-[16px] overflow-hidden shadow-subtle">
             <table className="w-full text-left border-collapse">
@@ -298,17 +292,26 @@ export default function IdeaPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((card) => (
-                  <WorkspaceTableRow
-                    key={card.id}
-                    onClick={() => handleCardClick(card)}
-                  >
-                    <WorkspaceTableCell className="max-w-[320px]">
-                      <div className="flex items-center gap-2.5">
-                        <Lightbulb className="w-4 h-4 text-[#4C9998] shrink-0" />
-                        <span className="font-semibold text-text-primary text-sm truncate">{card.title || 'Tanpa judul'}</span>
-                      </div>
-                    </WorkspaceTableCell>
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-16 text-center">
+                      <Lightbulb className="w-10 h-10 text-[#4C9998]/40 mx-auto mb-2" />
+                      <p className="text-text-muted text-sm font-medium">Belum ada ide</p>
+                      <p className="text-xs text-text-muted mt-1">Klik Tambah Ide untuk membuat ide baru.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((card) => (
+                    <WorkspaceTableRow
+                      key={card.id}
+                      onClick={() => handleCardClick(card)}
+                    >
+                      <WorkspaceTableCell className="max-w-[320px]">
+                        <div className="flex items-center gap-2.5">
+                          <Lightbulb className="w-4 h-4 text-[#4C9998] shrink-0" />
+                          <span className="font-semibold text-text-primary text-sm truncate">{card.title || 'Tanpa judul'}</span>
+                        </div>
+                      </WorkspaceTableCell>
 
                     <WorkspaceTableCell>
                       <div className="flex items-center gap-1 flex-wrap">
@@ -348,8 +351,9 @@ export default function IdeaPage() {
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </WorkspaceTableCell>
-                  </WorkspaceTableRow>
-                ))}
+                    </WorkspaceTableRow>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
