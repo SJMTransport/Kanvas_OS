@@ -16,7 +16,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
 import Link from 'next/link'
 import { PageContainer, PageHeader } from '@/components/layout/page-header'
-import { SearchInput } from '@/components/layout/page-toolbar'
+import { PageToolbar, SearchInput } from '@/components/layout/page-toolbar'
 import { EmptyState } from '@/components/layout/empty-state'
 import type { Work } from '@/lib/types/domain'
 
@@ -134,15 +134,17 @@ export default function WorksPage() {
   }
 
   return (
-    <PageContainer className="space-y-6">
+    <PageContainer className="space-y-4">
       <PageHeader
         title="Karya"
         subtitle="Kelola semua karya kreatif kamu"
-        action={<Button onClick={openAdd} size="sm"><Plus className="w-4 h-4 mr-1.5" /> Karya Baru</Button>}
+        className="mb-0"
       />
 
-      {/* Search */}
-      <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari karya..." />
+      <PageToolbar
+        left={<SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari karya..." />}
+        right={<Button onClick={openAdd} size="sm"><Plus className="w-4 h-4 mr-1.5" /> Karya Baru</Button>}
+      />
 
       {/* Grid */}
       {filtered.length === 0 ? (

@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { Upload, Plus, ListOrdered, Loader2, MoreHorizontal } from 'lucide-react'
+import { PageContainer, PageHeader } from '@/components/layout/page-header'
 import { PageToolbar, SearchInput } from '@/components/layout/page-toolbar'
 import { SegmentedTabs, type TabOption } from '@/components/ui/segmented-tabs'
 import { cn } from '@/lib/utils'
@@ -277,7 +278,8 @@ export default function ContentPage() {
   ]
 
   return (
-    <div className="flex flex-col h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] min-h-0">
+    <PageContainer className="flex flex-col h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] min-h-0 space-y-4">
+      <PageHeader title="Konten" subtitle="Kelola dan pantau seluruh rencana & produksi konten" className="mb-0" />
       {/* Global Content Toolbar: Fixed & Anchored across ALL 4 view modes */}
       <PageToolbar
         left={<SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari judul..." />}
@@ -413,6 +415,6 @@ export default function ContentPage() {
 
       <AddVideoSheet open={addOpen} onOpenChange={setAddOpen} />
       <ImportExcelDialog open={importOpen} onOpenChange={setImportOpen} />
-    </div>
+    </PageContainer>
   )
 }

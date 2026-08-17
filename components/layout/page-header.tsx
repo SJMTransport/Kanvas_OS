@@ -11,7 +11,7 @@ export function PageContainer({
   className?: string
 }) {
   return (
-    <div className={cn('w-full px-4 sm:px-6 py-6 space-y-6', className)}>
+    <div className={cn('w-full px-6 py-6 space-y-6', className)}>
       {children}
     </div>
   )
@@ -29,12 +29,12 @@ export function PageHeader({
   className?: string
 }) {
   return (
-    <div className={cn('flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 min-h-[52px] shrink-0', className)}>
+    <div className={cn('flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 min-h-[52px] shrink-0 mb-4', className)}>
       <div className="min-w-0">
-        <h1 className="font-heading text-2xl font-bold text-text-primary truncate">{title}</h1>
-        {subtitle && <p className="text-sm text-text-secondary mt-0.5">{subtitle}</p>}
+        <h1 className="font-heading text-[24px] font-semibold text-text-primary truncate">{title}</h1>
+        {subtitle && <p className="text-[13px] text-text-secondary mt-0.5">{subtitle}</p>}
       </div>
-      {action && <div className="flex items-center gap-2 shrink-0">{action}</div>}
+      {action && <div className="flex items-center gap-2.5 shrink-0">{action}</div>}
     </div>
   )
 }

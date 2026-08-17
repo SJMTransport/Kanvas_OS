@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { LayoutGrid, List, Layers, Trash2, Plus, Lightbulb } from 'lucide-react'
-import { PageHeader } from '@/components/layout/page-header'
+import { PageContainer, PageHeader } from '@/components/layout/page-header'
 import { PageToolbar, SearchInput } from '@/components/layout/page-toolbar'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -214,11 +214,8 @@ export default function IdeaPage() {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Title header — consistent across the app */}
-      <div className="bg-white border-b border-border px-4 sm:px-6 pt-4 pb-3">
-        <PageHeader title="Ide" subtitle="Tangkap & kembangkan ide konten" className="mb-0" />
-      </div>
+    <PageContainer className="flex flex-col h-full space-y-4">
+      <PageHeader title="Ide" subtitle="Tangkap & kembangkan ide konten" className="mb-0" />
 
       {/* Toolbar */}
       <PageToolbar
@@ -431,6 +428,6 @@ export default function IdeaPage() {
         onOpenChange={(v) => { setAddVideoOpen(v); if (!v) setConvertCard(null) }}
         defaultValues={convertCard ? { judul: convertCard.title ?? '', caption_default: convertCard.body ?? '' } : undefined}
       />
-    </div>
+    </PageContainer>
   )
 }

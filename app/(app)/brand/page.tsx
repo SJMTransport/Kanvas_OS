@@ -18,7 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Plus, Loader2, AlertCircle, Eye } from 'lucide-react'
-import { PageHeader } from '@/components/layout/page-header'
+import { PageContainer, PageHeader } from '@/components/layout/page-header'
 import { PageToolbar, SearchInput } from '@/components/layout/page-toolbar'
 import { formatDate } from '@/lib/utils/formatters'
 
@@ -127,14 +127,12 @@ export default function BrandPage() {
   })
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="px-4 sm:px-6 pt-4 pb-3 border-b border-border shrink-0">
-        <PageHeader
-          title="Brand"
-          subtitle="Pipeline manajemen brand & klien"
-          className="mb-0"
-        />
-      </div>
+    <PageContainer className="h-full flex flex-col space-y-4">
+      <PageHeader
+        title="Brand"
+        subtitle="Pipeline manajemen brand & klien"
+        className="mb-0"
+      />
 
       <PageToolbar
         left={<SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari brand..." />}
@@ -289,6 +287,6 @@ export default function BrandPage() {
           </form>
         </SheetContent>
       </Sheet>
-    </div>
+    </PageContainer>
   )
 }

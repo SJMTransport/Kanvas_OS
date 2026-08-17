@@ -15,6 +15,7 @@ import { formatDistanceToNow, format, differenceInDays, isToday, isPast } from '
 import { id as localeId } from 'date-fns/locale'
 import type { Platform } from '@/lib/types'
 import type { RecentVideo } from './page'
+import { PageContainer, PageHeader } from '@/components/layout/page-header'
 import { cn } from '@/lib/utils'
 
 const STATUS_MAP: Record<string, string> = {
@@ -136,17 +137,12 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
   }).sort((a, b) => b.count - a.count)
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-8">
-
+    <PageContainer className="space-y-6">
       {/* Section 1 — Greeting */}
-      <div>
-        <h1 className="font-heading text-2xl font-bold text-text-primary">
-          {getGreeting()}, {firstName} {getGreetingEmoji()}
-        </h1>
-        <p className="text-text-secondary text-sm mt-0.5">
-          {format(new Date(), 'EEEE, d MMMM yyyy', { locale: localeId })}
-        </p>
-      </div>
+      <PageHeader
+        title={`${getGreeting()}, ${firstName} ${getGreetingEmoji()}`}
+        subtitle={format(new Date(), 'EEEE, d MMMM yyyy', { locale: localeId })}
+      />
 
       {/* Section 2 — Today's Schedule */}
       <div>
@@ -404,6 +400,6 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
           </div>
         </div>
       </div>
-    </div>
+    </PageContainer>
   )
 }

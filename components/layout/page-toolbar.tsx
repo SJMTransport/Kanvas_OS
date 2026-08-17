@@ -19,13 +19,13 @@ export function SearchInput({
   className?: string
 }) {
   return (
-    <div className={cn('relative w-72 shrink-0', className)}>
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+    <div className={cn('relative w-[288px] shrink-0', className)}>
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-text-muted" />
       <Input
         placeholder={placeholder}
         value={value}
         onChange={onChange}
-        className="pl-9 pr-8 h-10 text-xs rounded-md border-border bg-white placeholder:text-text-muted focus:ring-teal-500"
+        className="pl-9 pr-8 h-10 text-sm rounded-[12px] border-border bg-white placeholder:text-text-muted focus:ring-2 focus:ring-[#4C9998] focus:border-transparent"
       />
       {value && (
         <button
@@ -33,7 +33,7 @@ export function SearchInput({
           className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors p-0.5"
           title="Hapus pencarian"
         >
-          <X className="w-3.5 h-3.5" />
+          <X className="w-4 h-4" />
         </button>
       )}
     </div>
@@ -55,16 +55,16 @@ export function PageToolbar({
 }) {
   if (children) {
     return (
-      <div className={cn('bg-white border-b border-border px-4 sm:px-6 py-3 flex items-center justify-between gap-4 shrink-0 min-h-[56px]', className)}>
+      <div className={cn('grid grid-cols-[1fr_auto_1fr] items-center min-h-[56px] py-1.5 shrink-0 gap-4', className)}>
         {children}
       </div>
     )
   }
 
   return (
-    <div className={cn('bg-white border-b border-border px-4 sm:px-6 py-3 flex items-center justify-between gap-4 shrink-0 min-h-[56px]', className)}>
+    <div className={cn('grid grid-cols-[1fr_auto_1fr] items-center min-h-[56px] py-1.5 shrink-0 gap-4', className)}>
       {/* Left Zone */}
-      <div className="flex items-center gap-3 shrink-0">
+      <div className="flex items-center gap-3 justify-start min-w-0">
         {left}
       </div>
 
@@ -74,7 +74,7 @@ export function PageToolbar({
       </div>
 
       {/* Right Zone */}
-      <div className="flex items-center justify-end gap-2.5 shrink-0">
+      <div className="flex items-center justify-end gap-2.5 min-w-0">
         {right}
       </div>
     </div>

@@ -22,7 +22,7 @@ export function SegmentedTabs<T extends string = string>({
   className?: string
 }) {
   return (
-    <div className={cn('inline-flex h-10 items-center justify-center rounded-md bg-subtle p-1 border border-border shrink-0', className)}>
+    <div className={cn('inline-flex h-10 items-center justify-center rounded-[12px] bg-[#EFF7F5] p-1 border border-border/80 shrink-0', className)}>
       {options.map((opt) => {
         const Icon = opt.icon
         const isActive = value === opt.value
@@ -31,13 +31,13 @@ export function SegmentedTabs<T extends string = string>({
             key={opt.value}
             onClick={() => onChange(opt.value)}
             className={cn(
-              'inline-flex items-center justify-center gap-1.5 h-8 px-3.5 rounded-sm text-xs font-medium transition-all shrink-0',
+              'inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-[8px] text-[13px] font-medium transition-all shrink-0',
               isActive
-                ? 'bg-white text-teal-700 font-semibold shadow-subtle'
+                ? 'bg-white text-[#287978] font-semibold shadow-subtle'
                 : 'text-text-secondary hover:text-text-primary hover:bg-white/60'
             )}
           >
-            {Icon && <Icon className={cn('w-3.5 h-3.5 shrink-0', isActive ? 'text-teal-600' : 'text-text-secondary')} />}
+            {Icon && <Icon className={cn('w-4 h-4 shrink-0', isActive ? 'text-[#4C9998]' : 'text-text-secondary')} />}
             <span>{opt.label}</span>
           </button>
         )
