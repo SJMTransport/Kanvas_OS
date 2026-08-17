@@ -239,7 +239,7 @@ export default function ShotListPage() {
   }
 
   return (
-    <PageContainer className="h-full flex flex-col space-y-4">
+    <PageContainer className="flex flex-col h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] min-h-0 space-y-4">
       <PageHeader
         title="Shot List"
         subtitle="Pustaka referensi shot untuk produksi"

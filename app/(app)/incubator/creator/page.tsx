@@ -97,7 +97,7 @@ export default function CreatorPage() {
   }
 
   return (
-    <PageContainer className="flex flex-col h-full space-y-4">
+    <PageContainer className="flex flex-col h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] min-h-0 space-y-4">
       <PageHeader
         title="Creator"
         subtitle="Kreator yang kamu pelajari & referensi"
