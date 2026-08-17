@@ -232,7 +232,7 @@ export default function IdeaPage() {
             <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari ide..." />
 
             <Select value={boardFilter} onValueChange={setBoardFilter}>
-              <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-border bg-white"><SelectValue placeholder="Board" /></SelectTrigger>
+              <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-[#E8EEEC] bg-white"><SelectValue placeholder="Board" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Semua Board</SelectItem>
                 {boards.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
@@ -240,7 +240,7 @@ export default function IdeaPage() {
             </Select>
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-border bg-white"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-[#E8EEEC] bg-white"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Semua Status</SelectItem>
                 {['raw', 'developing', 'ready', 'converted', 'archived'].map((s) => (
@@ -251,7 +251,7 @@ export default function IdeaPage() {
 
             {allTags.length > 0 && (
               <Select value={tagFilter} onValueChange={setTagFilter}>
-                <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-border bg-white"><SelectValue placeholder="Tag" /></SelectTrigger>
+                <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-[#E8EEEC] bg-white"><SelectValue placeholder="Tag" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Semua Tag</SelectItem>
                   {allTags.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
@@ -260,7 +260,6 @@ export default function IdeaPage() {
             )}
           </div>
         }
-        center={<SegmentedTabs options={viewOptions} value={viewMode} onChange={changeView} />}
         right={
           <div className="flex items-center gap-2">
             <Button variant="secondary" size="default" className="h-9 gap-1.5 text-xs rounded-[12px]" onClick={() => setNewBoardOpen(true)}>
@@ -274,53 +273,25 @@ export default function IdeaPage() {
       />
 
       <div className="flex-1 overflow-y-auto">
-        {/* Boards strip */}
-        {boards.length > 0 && boardFilter === 'all' && (
-          <div className="flex gap-2 mb-4 flex-wrap">
-            {boards.map((b) => {
-              const count = cards.filter((c) => (c.board_ids ?? []).includes(b.id)).length
-              return (
-                <div
-                  key={b.id}
-                  className="group flex items-center gap-1.5 px-3 py-1.5 bg-white border border-border rounded-[12px] text-sm hover:border-[#4C9998] transition-colors"
-                >
-                  <button onClick={() => setBoardFilter(b.id)} className="flex items-center gap-1.5 hover:text-[#4C9998]">
-                    <Pin className="w-3.5 h-3.5 text-[#4C9998]" />
-                    <span className="font-medium">{b.name}</span>
-                    <span className="text-xs text-text-muted">({count})</span>
-                  </button>
-                  <button
-                    onClick={() => setDeleteBoardTarget(b)}
-                    className="text-text-muted hover:text-error opacity-0 group-hover:opacity-100 transition-opacity ml-1"
-                    title="Hapus board"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-        )}
-
         {isLoading ? (
-          <div className="columns-2 md:columns-3 lg:columns-4 gap-3">
+          <div className="p-4 space-y-2">
             {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="w-full h-36 rounded-[16px] mb-3 break-inside-avoid" />
+              <Skeleton key={i} className="h-[52px] w-full rounded-[12px]" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-20 text-center bg-white rounded-[16px] border border-border">
+          <div className="py-20 text-center bg-white rounded-[16px] border border-[#E8EEEC]">
             <Lightbulb className="w-12 h-12 text-[#4C9998]/40 mx-auto mb-3" />
             <p className="text-text-muted font-medium">Belum ada ide</p>
             <p className="text-xs text-text-muted mt-1">Klik Tambah Ide untuk membuat ide baru.</p>
           </div>
-        ) : viewMode === 'list' ? (
-          <div className="bg-white border border-border/80 rounded-[16px] overflow-hidden shadow-subtle">
+        ) : (
+          <div className="bg-white border border-[#E8EEEC] rounded-[16px] overflow-hidden shadow-subtle">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr>
-                  <WorkspaceTableHeaderCell>Judul Ide</WorkspaceTableHeaderCell>
-                  <WorkspaceTableHeaderCell>Tag</WorkspaceTableHeaderCell>
+                  <WorkspaceTableHeaderCell>Ide</WorkspaceTableHeaderCell>
+                  <WorkspaceTableHeaderCell>Board / Tag</WorkspaceTableHeaderCell>
                   <WorkspaceTableHeaderCell>Status</WorkspaceTableHeaderCell>
                   <WorkspaceTableHeaderCell>Diupdate</WorkspaceTableHeaderCell>
                   <WorkspaceTableHeaderCell align="right">Aksi</WorkspaceTableHeaderCell>
@@ -332,7 +303,7 @@ export default function IdeaPage() {
                     key={card.id}
                     onClick={() => handleCardClick(card)}
                   >
-                    <WorkspaceTableCell className="max-w-[280px]">
+                    <WorkspaceTableCell className="max-w-[320px]">
                       <div className="flex items-center gap-2.5">
                         <Lightbulb className="w-4 h-4 text-[#4C9998] shrink-0" />
                         <span className="font-semibold text-text-primary text-sm truncate">{card.title || 'Tanpa judul'}</span>
@@ -382,12 +353,6 @@ export default function IdeaPage() {
               </tbody>
             </table>
           </div>
-        ) : (
-          <Masonry breakpointCols={BREAKPOINTS} className="flex gap-3 -ml-3 w-auto" columnClassName="pl-3">
-            {filtered.map((card) => (
-              <IdeaCard key={card.id} card={card} onClick={handleCardClick} />
-            ))}
-          </Masonry>
         )}
       </div>
 

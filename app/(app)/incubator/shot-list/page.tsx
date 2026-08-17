@@ -14,6 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Search, X, Plus, Loader2, Trash2, Pencil, Clapperboard, Play, ChevronLeft, ChevronRight, Maximize2 } from 'lucide-react'
 import { PageContainer, PageHeader } from '@/components/layout/page-header'
 import { PageToolbar, SearchInput } from '@/components/layout/page-toolbar'
+import { Badge } from '@/components/ui/badge'
+import { WorkspaceTableRow, WorkspaceTableCell, WorkspaceTableHeaderCell } from '@/components/ui/table-row'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { KATEGORI_SHOT, TIPE_SHOT, type ShotListReference, type KategoriShot, type TipeShot } from '@/lib/types/incubator'
@@ -281,115 +283,107 @@ export default function ShotListPage() {
         }
         right={
           <Button size="lg" className="h-10 gap-1.5 text-sm font-semibold rounded-[12px] bg-[#4C9998] hover:bg-[#287978] text-white" onClick={openAdd}>
-            <Plus className="w-4 h-4" /> Tambah Referensi
+            <Plus className="w-4 h-4" /> Tambah Shot
           </Button>
         }
       />
 
-      {/* Grid */}
+      {/* Data Table */}
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-            {Array.from({ length: 12 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-[9/16] w-full rounded-[16px]" />
+          <div className="p-4 space-y-2">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} className="h-[64px] w-full rounded-[12px]" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-20 flex flex-col items-center justify-center text-center bg-white rounded-[16px] border border-border">
+          <div className="py-20 flex flex-col items-center justify-center text-center bg-white rounded-[16px] border border-[#E8EEEC]">
             <Clapperboard className="w-12 h-12 text-[#4C9998]/40 mb-3" />
             <p className="text-text-muted font-medium mb-3">
               {items.length === 0 ? 'Belum ada referensi shot list' : 'Tidak ada referensi sesuai filter'}
             </p>
             {items.length === 0 && (
               <Button size="lg" className="h-10 gap-1.5 text-sm font-semibold rounded-[12px] bg-[#4C9998] text-white" onClick={openAdd}>
-                <Plus className="w-4 h-4" /> Tambah Referensi
+                <Plus className="w-4 h-4" /> Tambah Shot
               </Button>
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-            {filtered.map((item, index) => {
-              const isPlaying = playingId === item.id
-              return (
-                <div key={item.id} className="group flex flex-col rounded-[16px] border border-border/80 bg-white overflow-hidden hover:border-[#4C9998] hover:shadow-subtle transition-all">
-                  <div className="relative w-full aspect-[9/16] bg-black overflow-hidden">
-                    {isPlaying ? (
-                      <iframe
-                        src={driveEmbedUrl(item.drive_file_id)}
-                        className="absolute inset-0 w-full h-full"
-                        style={previewTransformStyle(item.preview_zoom ?? 1, item.preview_offset_y ?? 0)}
-                        allow="autoplay; fullscreen"
-                        allowFullScreen
-                      />
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setPlayingId(item.id)}
-                        className="absolute inset-0 w-full h-full"
-                        aria-label={item.deskripsi}
-                      >
+          <div className="bg-white border border-[#E8EEEC] rounded-[16px] overflow-hidden shadow-subtle">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr>
+                  <WorkspaceTableHeaderCell>Thumbnail</WorkspaceTableHeaderCell>
+                  <WorkspaceTableHeaderCell>Shot</WorkspaceTableHeaderCell>
+                  <WorkspaceTableHeaderCell>Category</WorkspaceTableHeaderCell>
+                  <WorkspaceTableHeaderCell>Shot Type</WorkspaceTableHeaderCell>
+                  <WorkspaceTableHeaderCell>Source</WorkspaceTableHeaderCell>
+                  <WorkspaceTableHeaderCell align="right">Actions</WorkspaceTableHeaderCell>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((item, index) => (
+                  <WorkspaceTableRow
+                    key={item.id}
+                    className="h-[64px] min-h-[64px]"
+                    onClick={() => openFeed(index)}
+                  >
+                    <WorkspaceTableCell className="w-[60px]">
+                      <div className="relative w-[48px] h-[48px] rounded-[8px] overflow-hidden bg-black shrink-0 border border-border/60">
                         <img
                           src={driveThumbnailUrl(item.drive_file_id)}
                           alt={item.deskripsi}
                           loading="lazy"
-                          className="absolute inset-0 w-full h-full object-contain"
-                          style={previewTransformStyle(item.preview_zoom ?? 1, item.preview_offset_y ?? 0)}
+                          className="w-full h-full object-cover"
                         />
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/25 transition-colors">
-                          <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center">
-                            <Play className="w-4 h-4 text-text-primary fill-current ml-0.5" />
-                          </div>
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/35 transition-colors">
+                          <Play className="w-3.5 h-3.5 text-white fill-current" />
                         </div>
-                      </button>
-                    )}
-
-                    <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => openFeed(index)}
-                        className="p-1 rounded bg-white/90 hover:bg-white text-text-secondary hover:text-text-primary shadow-sm"
-                        title="Preview penuh"
-                      >
-                        <Maximize2 className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={() => openEdit(item)}
-                        className="p-1 rounded bg-white/90 hover:bg-white text-text-secondary hover:text-text-primary shadow-sm"
-                        title="Edit"
-                      >
-                        <Pencil className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={(e) => handleDelete(e, item)}
-                        className="p-1 rounded bg-white/90 hover:bg-white text-text-secondary hover:text-error shadow-sm"
-                        title="Hapus"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="p-2 space-y-1.5">
-                    <p className="text-xs font-medium text-text-primary line-clamp-2 leading-snug">{item.deskripsi}</p>
-                    <div className="flex flex-wrap gap-1">
-                      <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full border font-medium', KATEGORI_COLORS[item.kategori_shot])}>
-                        {item.kategori_shot}
-                      </span>
-                      <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full border font-medium', TIPE_COLORS[item.tipe_shot])}>
-                        {item.tipe_shot}
-                      </span>
-                    </div>
-                    {item.sumber && <p className="text-[10px] text-text-muted truncate">{item.sumber}</p>}
-                    {(item.tags ?? []).length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {(item.tags ?? []).map((t) => (
-                          <span key={t} className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-text-muted">#{t}</span>
-                        ))}
                       </div>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
+                    </WorkspaceTableCell>
+
+                    <WorkspaceTableCell className="max-w-[320px]">
+                      <p className="font-semibold text-text-primary text-sm line-clamp-2">{item.deskripsi}</p>
+                    </WorkspaceTableCell>
+
+                    <WorkspaceTableCell>
+                      <Badge variant="outline" className={cn('h-6 rounded-full px-2.5 text-xs font-medium', KATEGORI_COLORS[item.kategori_shot])}>
+                        {item.kategori_shot}
+                      </Badge>
+                    </WorkspaceTableCell>
+
+                    <WorkspaceTableCell>
+                      <Badge variant="outline" className={cn('h-6 rounded-full px-2.5 text-xs font-medium', TIPE_COLORS[item.tipe_shot])}>
+                        {item.tipe_shot}
+                      </Badge>
+                    </WorkspaceTableCell>
+
+                    <WorkspaceTableCell className="text-xs text-text-secondary max-w-[140px] truncate">
+                      {item.sumber || '—'}
+                    </WorkspaceTableCell>
+
+                    <WorkspaceTableCell align="right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => openEdit(item)}
+                          className="p-1 rounded-[8px] hover:bg-subtle text-text-secondary hover:text-text-primary transition-colors"
+                          title="Edit"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={(e) => handleDelete(e, item)}
+                          className="p-1 rounded-[8px] hover:bg-subtle text-text-muted hover:text-error transition-colors"
+                          title="Hapus"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </WorkspaceTableCell>
+                  </WorkspaceTableRow>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

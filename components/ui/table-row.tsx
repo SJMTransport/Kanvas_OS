@@ -21,8 +21,8 @@ export function WorkspaceTableRow({
     <tr
       onClick={onClick}
       className={cn(
-        'h-[52px] min-h-[52px] border-b border-border/60 hover:bg-subtle/80 transition-colors cursor-pointer',
-        isDragging && 'opacity-50 bg-subtle',
+        'h-[52px] min-h-[52px] border-b border-[#E8EEEC] hover:bg-[#EFF7F5] transition-colors cursor-pointer',
+        isDragging && 'opacity-50 bg-[#EFF7F5]',
         className
       )}
       {...props}
@@ -48,7 +48,7 @@ export function WorkspaceTableCell({
     <td
       onClick={onClick}
       className={cn(
-        'px-[14px] py-3.5 text-xs text-text-primary align-middle',
+        'px-[14px] py-3 text-xs text-text-primary align-middle',
         align === 'center' && 'text-center',
         align === 'right' && 'text-right',
         className
@@ -76,7 +76,7 @@ export function WorkspaceTableHeaderCell({
     <th
       onClick={onClick}
       className={cn(
-        'px-[14px] py-3 text-xs font-semibold text-text-secondary bg-[#F7FAF9] border-b border-border text-left align-middle shrink-0',
+        'h-10 px-[14px] py-2 text-xs font-semibold text-text-secondary bg-[#F7FAF9] border-b border-[#E8EEEC] text-left align-middle shrink-0',
         align === 'center' && 'text-center',
         align === 'right' && 'text-right',
         className
