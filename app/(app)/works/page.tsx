@@ -16,6 +16,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
 import Link from 'next/link'
 import { PageContainer, PageHeader } from '@/components/layout/page-header'
+import { SearchInput } from '@/components/layout/page-toolbar'
 import { EmptyState } from '@/components/layout/empty-state'
 import type { Work } from '@/lib/types/domain'
 
@@ -141,10 +142,7 @@ export default function WorksPage() {
       />
 
       {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-        <Input placeholder="Cari karya..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
-      </div>
+      <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari karya..." />
 
       {/* Grid */}
       {filtered.length === 0 ? (

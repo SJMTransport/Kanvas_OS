@@ -15,7 +15,9 @@ import { ImportExcelDialog } from './import-excel-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
-import { LayoutList, Columns, CalendarDays, BarChart2, Search, Upload, Plus, X, ListOrdered, Loader2, MoreHorizontal } from 'lucide-react'
+import { Upload, Plus, ListOrdered, Loader2, MoreHorizontal } from 'lucide-react'
+import { PageToolbar, SearchInput } from '@/components/layout/page-toolbar'
+import { SegmentedTabs, type TabOption } from '@/components/ui/segmented-tabs'
 import { cn } from '@/lib/utils'
 import { STATUS_ORDER, STATUS_CONFIG } from '@/lib/utils/status'
 import { toast } from 'sonner'
@@ -267,90 +269,48 @@ export default function ContentPage() {
 
   const hasActiveFilter = statusFilter !== 'all' || platformFilter !== 'all' || temaFilter !== 'all' || contentTypeFilter !== 'all' || pilarFilter !== 'all' || monthCurrent
 
+  const viewOptions: TabOption<ViewMode>[] = [
+    { value: 'table', label: 'Tabel' },
+    { value: 'kanban', label: 'Kanban' },
+    { value: 'calendar', label: 'Kalender' },
+    { value: 'performance', label: 'Performa' },
+  ]
+
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] min-h-0">
       {/* Global Content Toolbar: Fixed & Anchored across ALL 4 view modes */}
-      <div className="bg-white border-b border-border px-4 py-2.5 flex items-center justify-between gap-4 shrink-0">
-        {/* Left Zone: Fixed Search Input */}
-        <div className="relative w-64 shrink-0">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
-          <Input
-            placeholder="Cari judul..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 h-8 text-xs bg-white"
-          />
-          {search && (
-            <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-
-        {/* Center Zone: Fixed View Switcher */}
-        <div className="flex items-center border border-border rounded-sm overflow-hidden bg-white shrink-0">
-          <button
-            onClick={() => changeView('table')}
-            className={cn('flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors', viewMode === 'table' ? 'bg-teal-500 text-white' : 'text-text-secondary hover:bg-subtle')}
-            title="Tampilan Tabel"
-          >
-            <LayoutList className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Tabel</span>
-          </button>
-          <button
-            onClick={() => changeView('kanban')}
-            className={cn('flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors', viewMode === 'kanban' ? 'bg-teal-500 text-white' : 'text-text-secondary hover:bg-subtle')}
-            title="Tampilan Kanban"
-          >
-            <Columns className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Kanban</span>
-          </button>
-          <button
-            onClick={() => changeView('calendar')}
-            className={cn('flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors', viewMode === 'calendar' ? 'bg-teal-500 text-white' : 'text-text-secondary hover:bg-subtle')}
-            title="Tampilan Kalender"
-          >
-            <CalendarDays className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Kalender</span>
-          </button>
-          <button
-            onClick={() => changeView('performance')}
-            className={cn('flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors', viewMode === 'performance' ? 'bg-teal-500 text-white' : 'text-text-secondary hover:bg-subtle')}
-            title="Tampilan Performa"
-          >
-            <BarChart2 className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Performa</span>
-          </button>
-        </div>
-
-        {/* Right Zone: Fixed Action Slot */}
-        <div className="flex items-center justify-end gap-2 shrink-0">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 w-8 p-0" title="Opsi Opsi & Alat">
-                <MoreHorizontal className="w-4 h-4 text-text-secondary" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              {viewMode === 'table' && (
-                <DropdownMenuItem onClick={handleNumbering} disabled={numberingSaving || !workspaceId} className="gap-2 text-xs">
-                  {numberingSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ListOrdered className="w-3.5 h-3.5" />}
-                  <span>Auto-Numbering</span>
+      <PageToolbar
+        left={<SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari judul..." />}
+        center={<SegmentedTabs options={viewOptions} value={viewMode} onChange={changeView} />}
+        right={
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 w-8 p-0" title="Opsi Opsi & Alat">
+                  <MoreHorizontal className="w-4 h-4 text-text-secondary" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                {viewMode === 'table' && (
+                  <DropdownMenuItem onClick={handleNumbering} disabled={numberingSaving || !workspaceId} className="gap-2 text-xs">
+                    {numberingSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ListOrdered className="w-3.5 h-3.5" />}
+                    <span>Auto-Numbering</span>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => setImportOpen(true)} className="gap-2 text-xs">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Import Excel</span>
                 </DropdownMenuItem>
-              )}
-              <DropdownMenuItem onClick={() => setImportOpen(true)} className="gap-2 text-xs">
-                <Upload className="w-3.5 h-3.5" />
-                <span>Import Excel</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-          <Button size="sm" className="h-8 gap-1.5 text-xs bg-teal-500 hover:bg-teal-600 text-white" onClick={() => setAddOpen(true)}>
-            <Plus className="w-3.5 h-3.5" />
-            <span>Tambah Konten</span>
-          </Button>
-        </div>
-      </div>
+            <Button size="sm" className="h-8 gap-1.5 text-xs bg-teal-500 hover:bg-teal-600 text-white" onClick={() => setAddOpen(true)}>
+              <Plus className="w-3.5 h-3.5" />
+              <span>Tambah Konten</span>
+            </Button>
+          </div>
+        }
+      />
 
       {/* Active filter chip */}
       {hasActiveFilter && viewMode === 'table' && (

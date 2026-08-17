@@ -265,7 +265,7 @@ export function QuickCaptureButton() {
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }}
                 placeholder="Ketik tag + Enter"
-                className="h-8 text-xs"
+                className="h-9 text-xs rounded-md border-border focus:ring-teal-500"
               />
             </div>
 

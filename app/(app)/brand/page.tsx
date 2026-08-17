@@ -19,6 +19,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Plus, Loader2, AlertCircle, Eye } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
+import { PageToolbar, SearchInput } from '@/components/layout/page-toolbar'
 import { formatDate } from '@/lib/utils/formatters'
 
 const PIPELINE_STATUSES = ['prospect', 'approach', 'negosiasi', 'deal', 'aktif', 'selesai'] as const
@@ -116,7 +117,14 @@ export default function BrandPage() {
     setDragging(null)
   }
 
+  const [search, setSearch] = useState('')
   const today = new Date().toISOString().split('T')[0]
+
+  const filteredBrands = (brands ?? []).filter((b) => {
+    if (!search.trim()) return true
+    const q = search.toLowerCase()
+    return b.nama_brand.toLowerCase().includes(q) || (b.industri && b.industri.toLowerCase().includes(q)) || (b.pic_name && b.pic_name.toLowerCase().includes(q))
+  })
 
   return (
     <div className="h-full flex flex-col">
@@ -125,9 +133,13 @@ export default function BrandPage() {
           title="Brand"
           subtitle="Pipeline manajemen brand & klien"
           className="mb-0"
-          action={<Button size="sm" onClick={() => setSheetOpen(true)}><Plus className="w-4 h-4 mr-1" /> Brand Baru</Button>}
         />
       </div>
+
+      <PageToolbar
+        left={<SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari brand..." />}
+        right={<Button size="sm" onClick={() => setSheetOpen(true)}><Plus className="w-4 h-4 mr-1" /> Brand Baru</Button>}
+      />
 
       <div className="flex-1 overflow-x-auto p-4">
         {isLoading ? (
@@ -142,7 +154,7 @@ export default function BrandPage() {
         ) : (
           <div className="flex gap-4 min-w-max">
             {PIPELINE_STATUSES.map((status) => {
-              const columnBrands = (brands ?? []).filter((b) => b.status === status)
+              const columnBrands = filteredBrands.filter((b) => b.status === status)
               return (
                 <div
                   key={status}

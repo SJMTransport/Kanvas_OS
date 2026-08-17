@@ -14,8 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Search, Plus, Lightbulb, Layers, X, Trash2, LayoutGrid, List } from 'lucide-react'
+import { LayoutGrid, List, Layers, Trash2, Plus, Lightbulb } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
+import { PageToolbar, SearchInput } from '@/components/layout/page-toolbar'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
@@ -220,66 +221,57 @@ export default function IdeaPage() {
       </div>
 
       {/* Toolbar */}
-      <div className="bg-white border-b border-border px-4 py-2.5 flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[160px] max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
-          <Input
-            placeholder="Cari idea..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 h-8 text-sm"
-          />
-          {search && (
-            <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
+      <PageToolbar
+        left={
+          <div className="flex items-center gap-2 flex-wrap">
+            <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari ide..." />
 
-        <Select value={boardFilter} onValueChange={setBoardFilter}>
-          <SelectTrigger className="h-8 text-sm w-32"><SelectValue placeholder="Board" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua Board</SelectItem>
-            {boards.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+            <Select value={boardFilter} onValueChange={setBoardFilter}>
+              <SelectTrigger className="h-9 text-xs w-32 rounded-md border-border"><SelectValue placeholder="Board" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Board</SelectItem>
+                {boards.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
 
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="h-8 text-sm w-32"><SelectValue placeholder="Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua Status</SelectItem>
-            {['raw', 'developing', 'ready', 'converted', 'archived'].map((s) => (
-              <SelectItem key={s} value={s}>{s}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-9 text-xs w-32 rounded-md border-border"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Status</SelectItem>
+                {['raw', 'developing', 'ready', 'converted', 'archived'].map((s) => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        {allTags.length > 0 && (
-          <Select value={tagFilter} onValueChange={setTagFilter}>
-            <SelectTrigger className="h-8 text-sm w-32"><SelectValue placeholder="Tag" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Tag</SelectItem>
-              {allTags.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        )}
+            {allTags.length > 0 && (
+              <Select value={tagFilter} onValueChange={setTagFilter}>
+                <SelectTrigger className="h-9 text-xs w-32 rounded-md border-border"><SelectValue placeholder="Tag" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Tag</SelectItem>
+                  {allTags.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+        }
+        right={
+          <div className="flex items-center gap-2">
+            <div className="flex items-center border border-border rounded-md overflow-hidden p-0.5 bg-subtle">
+              <button onClick={() => changeView('grid')} className={cn('p-1.5 rounded-sm transition-all', viewMode === 'grid' ? 'bg-white text-teal-700 font-semibold shadow-subtle' : 'text-text-secondary hover:text-text-primary')}>
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button onClick={() => changeView('list')} className={cn('p-1.5 rounded-sm transition-all', viewMode === 'list' ? 'bg-white text-teal-700 font-semibold shadow-subtle' : 'text-text-secondary hover:text-text-primary')}>
+                <List className="w-4 h-4" />
+              </button>
+            </div>
 
-        <div className="flex-1" />
-
-        {/* View toggle */}
-        <div className="flex items-center border border-border rounded-md overflow-hidden">
-          <button onClick={() => changeView('grid')} className={cn('p-1.5 transition-colors', viewMode === 'grid' ? 'bg-accent text-white' : 'text-text-secondary hover:bg-subtle')}>
-            <LayoutGrid className="w-4 h-4" />
-          </button>
-          <button onClick={() => changeView('list')} className={cn('p-1.5 transition-colors', viewMode === 'list' ? 'bg-accent text-white' : 'text-text-secondary hover:bg-subtle')}>
-            <List className="w-4 h-4" />
-          </button>
-        </div>
-
-        <Button variant="secondary" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setNewBoardOpen(true)}>
-          <Layers className="w-3.5 h-3.5" /> Board
-        </Button>
-      </div>
+            <Button variant="secondary" size="sm" className="h-9 gap-1.5 text-xs" onClick={() => setNewBoardOpen(true)}>
+              <Layers className="w-3.5 h-3.5" /> Board
+            </Button>
+          </div>
+        }
+      />
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {/* Boards strip */}

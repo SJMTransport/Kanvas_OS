@@ -11,7 +11,7 @@ export function PageContainer({
   className?: string
 }) {
   return (
-    <div className={cn('max-w-6xl mx-auto px-4 sm:px-6 py-6', className)}>
+    <div className={cn('w-full px-4 sm:px-6 py-6 space-y-6', className)}>
       {children}
     </div>
   )
