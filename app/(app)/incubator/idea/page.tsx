@@ -228,11 +228,11 @@ export default function IdeaPage() {
       {/* Toolbar */}
       <PageToolbar
         left={
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-nowrap min-w-0 overflow-x-auto no-scrollbar whitespace-nowrap">
             <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari ide..." />
 
             <Select value={boardFilter} onValueChange={setBoardFilter}>
-              <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-[#E8EEEC] bg-white"><SelectValue placeholder="Board" /></SelectTrigger>
+              <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-[#E8EEEC] bg-white whitespace-nowrap"><SelectValue placeholder="Board" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Semua Board</SelectItem>
                 {boards.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
@@ -240,7 +240,7 @@ export default function IdeaPage() {
             </Select>
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-[#E8EEEC] bg-white"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-[#E8EEEC] bg-white whitespace-nowrap"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Semua Status</SelectItem>
                 {['raw', 'developing', 'ready', 'converted', 'archived'].map((s) => (
@@ -251,7 +251,7 @@ export default function IdeaPage() {
 
             {allTags.length > 0 && (
               <Select value={tagFilter} onValueChange={setTagFilter}>
-                <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-[#E8EEEC] bg-white"><SelectValue placeholder="Tag" /></SelectTrigger>
+                <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-[#E8EEEC] bg-white whitespace-nowrap"><SelectValue placeholder="Tag" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Semua Tag</SelectItem>
                   {allTags.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
@@ -261,9 +261,9 @@ export default function IdeaPage() {
           </div>
         }
         right={
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" size="default" className="h-9 gap-1.5 text-xs rounded-[12px]" onClick={() => setNewBoardOpen(true)}>
-              <Layers className="w-3.5 h-3.5" /> Board Baru
+          <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+            <Button variant="outline" className="h-10 gap-1.5 text-xs rounded-[12px] bg-white border border-[#E8EEEC] text-[#52504A] hover:bg-[#F7FAF9]" onClick={() => setNewBoardOpen(true)}>
+              <Layers className="w-3.5 h-3.5 text-[#52504A]" /> Board Baru
             </Button>
             <Button size="lg" className="h-10 gap-1.5 text-sm font-semibold rounded-[12px] bg-[#4C9998] hover:bg-[#287978] text-white" onClick={() => { setSelectedCard(null); setCardModalOpen(true) }}>
               <Plus className="w-4 h-4" /> Tambah Ide

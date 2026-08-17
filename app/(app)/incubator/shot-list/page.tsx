@@ -249,7 +249,7 @@ export default function ShotListPage() {
       {/* Toolbar — search & filters */}
       <PageToolbar
         left={
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-nowrap min-w-0 overflow-x-auto no-scrollbar whitespace-nowrap">
             <SearchInput
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -257,7 +257,7 @@ export default function ShotListPage() {
             />
 
             <Select value={kategoriFilter ?? 'all'} onValueChange={(v) => setKategoriFilter(v === 'all' ? null : v)}>
-              <SelectTrigger className="h-10 text-sm w-40 rounded-[12px] border-border bg-white">
+              <SelectTrigger className="h-10 text-sm w-40 rounded-[12px] border-[#E8EEEC] bg-white whitespace-nowrap">
                 <SelectValue placeholder="Kategori Shot" />
               </SelectTrigger>
               <SelectContent>
@@ -269,7 +269,7 @@ export default function ShotListPage() {
             </Select>
 
             <Select value={tipeFilter ?? 'all'} onValueChange={(v) => setTipeFilter(v === 'all' ? null : v)}>
-              <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-border bg-white">
+              <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-[#E8EEEC] bg-white whitespace-nowrap">
                 <SelectValue placeholder="Tipe Shot" />
               </SelectTrigger>
               <SelectContent>

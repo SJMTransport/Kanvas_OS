@@ -300,7 +300,7 @@ export default function SavedContentPage() {
       {/* Toolbar */}
       <PageToolbar
         left={
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-nowrap min-w-0 overflow-x-auto no-scrollbar whitespace-nowrap">
             <SearchInput
               value={search}
               onChange={(e) => setSearch(e.target.value)}

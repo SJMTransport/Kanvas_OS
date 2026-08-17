@@ -61,10 +61,25 @@ export function PageToolbar({
     )
   }
 
+  if (!center) {
+    return (
+      <div className={cn('flex items-center justify-between min-h-[56px] h-[56px] py-1.5 shrink-0 gap-3 flex-nowrap', className)}>
+        {/* Left Zone */}
+        <div className="flex items-center gap-2 flex-nowrap min-w-0 flex-1 overflow-x-auto no-scrollbar whitespace-nowrap">
+          {left}
+        </div>
+        {/* Right Zone */}
+        <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+          {right}
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className={cn('grid grid-cols-[1fr_auto_1fr] items-center min-h-[56px] py-1.5 shrink-0 gap-4', className)}>
+    <div className={cn('grid grid-cols-[1fr_auto_1fr] items-center min-h-[56px] h-[56px] py-1.5 shrink-0 gap-4 flex-nowrap', className)}>
       {/* Left Zone */}
-      <div className="flex items-center gap-3 justify-start min-w-0">
+      <div className="flex items-center gap-2 justify-start min-w-0 overflow-x-auto no-scrollbar whitespace-nowrap">
         {left}
       </div>
 
@@ -74,7 +89,7 @@ export function PageToolbar({
       </div>
 
       {/* Right Zone */}
-      <div className="flex items-center justify-end gap-2.5 min-w-0">
+      <div className="flex items-center justify-end gap-2.5 min-w-0 shrink-0 whitespace-nowrap">
         {right}
       </div>
     </div>
