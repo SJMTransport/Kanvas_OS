@@ -260,10 +260,10 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, onFie
     <tr
       ref={setNodeRef}
       style={style}
-      className={cn('hover:bg-surface cursor-pointer transition-colors', isDragging && 'opacity-50 bg-surface')}
+      className={cn('hover:bg-subtle/80 cursor-pointer transition-colors border-b border-border/60', isDragging && 'opacity-50 bg-subtle')}
       onClick={() => onRowClick(video)}
     >
-      <td className="px-2 py-2.5 w-6" onClick={(e) => e.stopPropagation()}>
+      <td className="px-2 py-3.5 w-6" onClick={(e) => e.stopPropagation()}>
         <button
           {...attributes}
           {...listeners}
@@ -272,9 +272,9 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, onFie
           <GripVertical className="w-3.5 h-3.5" />
         </button>
       </td>
-      <td className="px-3 py-2.5 text-xs">
+      <td className="px-3.5 py-3.5 text-xs">
         {video.no_video ? (
-          <span className={cn("font-mono", video.no_video === 'VID-000' ? "text-text-muted/60" : "font-semibold text-text-primary")}>
+          <span className={cn("font-mono", video.no_video === 'VID-000' ? "text-text-muted/60" : "font-semibold text-teal-800 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200/60")}>
             {video.no_video}
           </span>
         ) : (
@@ -285,20 +285,20 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, onFie
           </span>
         )}
       </td>
-      <td className="px-3 py-2.5 max-w-[200px]">
-        <p className="font-medium text-text-primary text-sm truncate">{video.judul}</p>
+      <td className="px-3.5 py-3.5 max-w-[220px]">
+        <p className="font-semibold text-text-primary text-sm truncate leading-snug">{video.judul}</p>
       </td>
-      <td className="px-3 py-2.5 text-xs text-text-secondary max-w-[150px]" onClick={(e) => e.stopPropagation()}>
+      <td className="px-3.5 py-3.5 text-xs text-text-secondary max-w-[150px]" onClick={(e) => e.stopPropagation()}>
         <TemaCell video={video} save={onFieldSave} temaOptions={temaOptions} />
       </td>
-      <td className="px-3 py-2.5 text-xs text-text-secondary max-w-[120px]" onClick={(e) => e.stopPropagation()}>
+      <td className="px-3.5 py-3.5 text-xs text-text-secondary max-w-[120px]" onClick={(e) => e.stopPropagation()}>
         <PilarCell video={video} save={onFieldSave} />
       </td>
-      <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+      <td className="px-3.5 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
         <AsetCell video={video} save={onFieldSave} />
       </td>
-      <td className="px-3 py-2.5">
-        <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium border', getStatusBadgeClass(video.status as VideoStatus))}>
+      <td className="px-3.5 py-3.5">
+        <span className={getStatusBadgeClass(video.status as VideoStatus)}>
           {STATUS_CONFIG[video.status as VideoStatus]?.label ?? video.status}
         </span>
       </td>

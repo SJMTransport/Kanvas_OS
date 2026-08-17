@@ -146,7 +146,7 @@ export default function BrandPage() {
               return (
                 <div
                   key={status}
-                  className="w-64 shrink-0 flex flex-col gap-2"
+                  className="w-64 shrink-0 flex flex-col gap-2 bg-surface-secondary rounded-2xl border border-border/80 p-2 shadow-subtle"
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
                     e.preventDefault()
@@ -154,11 +154,11 @@ export default function BrandPage() {
                     if (id) handleDrop(id, status)
                   }}
                 >
-                  <div className="flex items-center justify-between px-1">
-                    <span className="text-xs font-semibold text-text-secondary uppercase tracking-wide">{STATUS_LABELS[status]}</span>
-                    <span className="text-xs text-text-muted bg-subtle rounded-full w-5 h-5 flex items-center justify-center font-mono">{columnBrands.length}</span>
+                  <div className="flex items-center justify-between px-2 pt-1 pb-2 border-b border-border/50">
+                    <span className="text-xs font-semibold text-text-secondary tracking-wide">{STATUS_LABELS[status]}</span>
+                    <span className="text-xs font-bold text-text-muted bg-white border border-border/60 rounded-full w-5 h-5 flex items-center justify-center">{columnBrands.length}</span>
                   </div>
-                  <div className="min-h-[120px] space-y-2 rounded-xl bg-subtle/50 p-2">
+                  <div className="min-h-[120px] space-y-2.5">
                     {columnBrands.map((brand) => {
                       const isOverdue = brand.next_followup_date && brand.next_followup_date < today
                       return (
@@ -168,13 +168,13 @@ export default function BrandPage() {
                           onDragStart={(e) => { e.dataTransfer.setData('brandId', brand.id); setDragging(brand.id) }}
                           onDragEnd={() => setDragging(null)}
                           className={cn(
-                            'bg-white border rounded-xl p-3 cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all border-t-4',
+                            'bg-white border rounded-xl p-3.5 cursor-grab active:cursor-grabbing shadow-card hover:shadow-subtle transition-all border-t-4',
                             STATUS_COLORS[status],
                             isOverdue && 'ring-1 ring-error',
                             dragging === brand.id && 'opacity-50',
                           )}
                         >
-                          <p className="font-semibold text-sm text-text-primary">{brand.nama_brand}</p>
+                          <p className="font-bold text-sm text-text-primary">{brand.nama_brand}</p>
                           {brand.industri && <p className="text-xs text-text-muted mt-0.5">{brand.industri}</p>}
                           {brand.pic_name && <p className="text-xs text-text-secondary mt-1">PIC: {brand.pic_name}</p>}
                           {brand.next_followup_date && (

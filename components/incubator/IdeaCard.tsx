@@ -67,7 +67,7 @@ export function IdeaCard({ card, onClick }: Props) {
   return (
     <>
       <div
-        className="group bg-white border border-border rounded-xl overflow-hidden cursor-pointer hover:border-amber-400/40 hover:shadow-md transition-all duration-200 mb-3 break-inside-avoid"
+        className="group bg-white border border-border/70 rounded-2xl overflow-hidden cursor-pointer hover:border-teal-500 hover:shadow-card transition-all duration-200 mb-3.5 break-inside-avoid"
         onClick={() => onClick(card)}
       >
         <div className="h-1 w-full" style={{ background: STATUS_ACCENT[card.status] ?? '#9AA3AF' }} />

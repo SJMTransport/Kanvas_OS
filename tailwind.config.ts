@@ -16,34 +16,35 @@ const config: Config = {
     },
     extend: {
       colors: {
-        background: '#F1F7F5',
+        background: '#EAF4F1',
         surface: '#FFFFFF',
+        'surface-secondary': '#F7FAF9',
         'surface-warm': '#FFFDFC',
-        subtle: '#EAF4F1',
-        border: '#DDE7E4',
+        subtle: '#EFF7F5',
+        border: '#E8EEEC',
         'border-strong': '#CBD9D5',
         'text-primary': '#202524',
         'text-secondary': '#68716F',
         'text-muted': '#98A19F',
         teal: {
-          50: '#F1F7F5',
-          100: '#EAF4F1',
-          200: '#DCEEEA',
-          300: '#B4DAD2',
-          400: '#7BB8B2',
-          500: '#49878A',
-          600: '#3A6F72',
-          700: '#2E585B',
-          800: '#234244',
-          900: '#1A3032',
+          50: '#EFF7F5',
+          100: '#DCEFED',
+          200: '#B8DFC',
+          300: '#8AC7C5',
+          400: '#67B1B0',
+          500: '#4C9998',
+          600: '#287978',
+          700: '#1E5E5D',
+          800: '#154544',
+          900: '#0F302F',
         },
         accent: {
-          DEFAULT: '#49878A',
-          light: '#EAF4F1',
+          DEFAULT: '#4C9998',
+          light: '#EFF7F5',
         },
-        success: '#15803D',
-        warning: '#B45309',
-        error: '#DC2626',
+        success: '#10B981',
+        warning: '#F59E0B',
+        error: '#EF4444',
         tiktok: '#000000',
         instagram: '#E1306C',
         youtube: '#FF0000',
@@ -51,25 +52,27 @@ const config: Config = {
         foreground: '#202524',
         card: { DEFAULT: '#FFFFFF', foreground: '#202524' },
         popover: { DEFAULT: '#FFFFFF', foreground: '#202524' },
-        primary: { DEFAULT: '#49878A', foreground: '#FFFFFF' },
+        primary: { DEFAULT: '#4C9998', foreground: '#FFFFFF' },
         secondary: { DEFAULT: '#FFFFFF', foreground: '#202524' },
-        muted: { DEFAULT: '#EAF4F1', foreground: '#68716F' },
-        destructive: { DEFAULT: '#DC2626', foreground: '#FFFFFF' },
-        input: '#DDE7E4',
-        ring: '#49878A',
+        muted: { DEFAULT: '#EFF7F5', foreground: '#68716F' },
+        destructive: { DEFAULT: '#EF4444', foreground: '#FFFFFF' },
+        input: '#E8EEEC',
+        ring: '#4C9998',
       },
       borderRadius: {
         xs: '0.375rem',  // 6px
         sm: '0.5rem',    // 8px
-        md: '0.625rem',  // 10px
-        lg: '0.875rem',  // 14px
-        xl: '1rem',      // 16px
+        md: '0.75rem',   // 12px
+        lg: '1rem',      // 16px
+        xl: '1.25rem',   // 20px
+        '2xl': '1.5rem', // 24px
         full: '9999px',
       },
       boxShadow: {
-        subtle: '0 1px 3px rgba(30, 70, 65, 0.06)',
-        popover: '0 4px 12px rgba(30, 70, 65, 0.08)',
-        modal: '0 8px 24px rgba(30, 70, 65, 0.10)',
+        subtle: '0 1px 3px rgba(30, 70, 65, 0.04)',
+        popover: '0 4px 16px rgba(30, 70, 65, 0.06)',
+        modal: '0 12px 32px rgba(30, 70, 65, 0.08)',
+        card: '0 2px 8px rgba(30, 70, 65, 0.04)',
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],

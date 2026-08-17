@@ -138,25 +138,25 @@ export function CalendarView() {
             {headerLabel}
           </h2>
           {/* Nav */}
-          <button onClick={() => navigate(-1)} className="p-1.5 rounded-md hover:bg-subtle text-accent">
+          <button onClick={() => navigate(-1)} className="p-1.5 rounded-md hover:bg-subtle text-teal-700 transition-colors">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <button onClick={() => navigate(1)} className="p-1.5 rounded-md hover:bg-subtle text-accent">
+          <button onClick={() => navigate(1)} className="p-1.5 rounded-md hover:bg-subtle text-teal-700 transition-colors">
             <ChevronRight className="w-4 h-4" />
           </button>
-          <Button variant="outline" size="sm" onClick={goToday} className="h-8 text-xs">Hari Ini</Button>
+          <Button variant="outline" size="sm" onClick={goToday} className="h-8 text-xs border-border bg-white text-text-primary hover:bg-subtle">Hari Ini</Button>
 
           <div className="flex-1" />
 
           {/* View toggle */}
-          <div className="flex items-center border border-border rounded-md overflow-hidden">
+          <div className="flex items-center border border-border rounded-md overflow-hidden bg-white">
             {([['month', LayoutGrid], ['week', CalendarDays], ['list', List]] as [ViewMode, typeof List][]).map(([mode, Icon]) => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
                 className={cn(
-                  'px-2.5 py-1.5 text-xs transition-colors flex items-center gap-1',
-                  viewMode === mode ? 'bg-accent text-white' : 'text-text-secondary hover:bg-subtle'
+                  'px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5',
+                  viewMode === mode ? 'bg-teal-500 text-white' : 'text-text-secondary hover:bg-subtle'
                 )}
               >
                 <Icon className="w-3.5 h-3.5" />

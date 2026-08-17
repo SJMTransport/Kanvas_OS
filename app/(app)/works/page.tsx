@@ -157,16 +157,16 @@ export default function WorksPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((w) => (
-            <div key={w.id} className="group bg-white border border-border rounded-xl p-4 hover:border-accent hover:shadow-sm transition-all">
+            <div key={w.id} className="group bg-white border border-border/70 rounded-2xl p-5 hover:border-teal-500 hover:shadow-card transition-all">
               <div className="flex items-start justify-between mb-2">
                 <Link href={`/works/${w.id}`} className="flex-1 min-w-0">
-                  <h3 className="font-heading font-semibold text-text-primary truncate group-hover:text-accent transition-colors">
+                  <h3 className="font-heading font-bold text-text-primary text-base truncate group-hover:text-teal-700 transition-colors">
                     {w.title}
                   </h3>
                 </Link>
                 <div className="flex items-center gap-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => openEdit(w)} className="p-1 rounded hover:bg-surface"><Pencil className="w-3.5 h-3.5 text-text-muted" /></button>
-                  <button onClick={() => setDeleteTarget(w)} className="p-1 rounded hover:bg-error/10"><Trash2 className="w-3.5 h-3.5 text-error" /></button>
+                  <button onClick={() => openEdit(w)} className="p-1.5 rounded-lg hover:bg-subtle text-text-muted hover:text-teal-700 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => setDeleteTarget(w)} className="p-1.5 rounded-lg hover:bg-red-50 text-text-muted hover:text-error transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                 </div>
               </div>
               {w.description && (

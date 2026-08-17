@@ -35,16 +35,16 @@ function EventChip({ ev, onEventClick }: { ev: ScheduleEvent; onEventClick: (e: 
       {...attributes}
       style={{ transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.5 : 1 }}
       className={cn(
-        'w-full flex items-center gap-1.5 text-left text-[11px] px-1.5 py-1 rounded-md bg-white border border-border leading-tight',
-        'hover:border-accent hover:shadow-sm transition-all cursor-grab active:cursor-grabbing touch-none',
-        isDragging && 'shadow-lg ring-2 ring-accent/40',
+        'w-full flex items-center gap-1.5 text-left text-[11px] px-2 py-1 rounded-lg bg-white border border-border/80 leading-tight font-medium',
+        'hover:border-teal-500 hover:shadow-subtle transition-all cursor-grab active:cursor-grabbing touch-none',
+        isDragging && 'shadow-modal ring-2 ring-teal-500/40',
         isTarget && 'border-dashed'
       )}
       onClick={(e) => { e.stopPropagation(); onEventClick(ev) }}
       title={`${ev.platform} · ${ev.videos?.judul ?? ''}${isTarget ? ' (Target/Reminder)' : ''}`}
     >
       <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', getPlatformDot(ev.platform))} />
-      {ev.jam_post && <span className="text-text-muted shrink-0">{ev.jam_post.slice(0, 5)}</span>}
+      {ev.jam_post && <span className="text-text-muted shrink-0 text-[10px]">{ev.jam_post.slice(0, 5)}</span>}
       <span className="truncate text-text-primary">{ev.videos?.judul ?? 'Video'}</span>
     </button>
   )
@@ -58,9 +58,9 @@ function DayCell({ dateStr, children, muted, onClick }: {
     <div
       ref={setNodeRef}
       className={cn(
-        'min-h-[108px] rounded-xl p-2 relative cursor-pointer transition-all border',
-        muted ? 'bg-transparent border-transparent' : 'bg-subtle/40 border-transparent hover:bg-subtle hover:border-border',
-        isOver && 'bg-accent-light border-accent ring-1 ring-accent'
+        'min-h-[108px] rounded-xl p-2 relative cursor-pointer transition-all border shadow-subtle',
+        muted ? 'bg-subtle/20 border-transparent text-text-muted/50' : 'bg-white border-border/60 hover:border-teal-500 hover:shadow-card',
+        isOver && 'bg-teal-50 border-teal-500 ring-2 ring-teal-500/30'
       )}
       onClick={onClick}
     >
@@ -105,7 +105,7 @@ export function MonthView({ activeDate, events, onDayClick, onEventClick }: Prop
               <div className="flex items-center justify-end mb-1">
                 <span className={cn(
                   'w-6 h-6 flex items-center justify-center rounded-full text-xs font-semibold',
-                  today ? 'bg-accent text-white' : isCurrentMonth ? 'text-text-primary' : 'text-text-muted/50'
+                  today ? 'bg-teal-500 text-white shadow-subtle' : isCurrentMonth ? 'text-text-primary' : 'text-text-muted/50'
                 )}>
                   {format(day, 'd')}
                 </span>
