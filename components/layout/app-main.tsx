@@ -8,7 +8,7 @@ export function AppMain({ children }: { children: React.ReactNode }) {
   return (
     <main
       className={cn(
-        'pt-14 pb-16 lg:pb-0 h-screen overflow-y-auto transition-all duration-200',
+        'pt-14 pb-16 lg:pb-0 h-screen overflow-y-auto transition-[padding-left] duration-200 ease-in-out',
         collapsed ? 'lg:pl-16' : 'lg:pl-60'
       )}
     >

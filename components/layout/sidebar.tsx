@@ -46,7 +46,7 @@ export const Sidebar = React.memo(function Sidebar() {
   return (
     <aside
       className={cn(
-        'hidden lg:flex flex-col fixed left-0 top-0 h-screen bg-white border-r border-border z-30 transition-all duration-200',
+        'hidden lg:flex flex-col fixed left-0 top-0 h-screen bg-white border-r border-border z-30 transition-[width] duration-200 ease-in-out',
         sidebarCollapsed ? 'w-16' : 'w-60'
       )}
     >

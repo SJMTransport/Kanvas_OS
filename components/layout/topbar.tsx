@@ -35,7 +35,7 @@ export function Topbar({ user }: TopbarProps) {
   return (
     <header
       className={cn(
-        'fixed top-0 right-0 h-14 bg-white border-b border-border z-20 flex items-center justify-between px-4 transition-all duration-200',
+        'fixed top-0 right-0 h-14 bg-white border-b border-border z-20 flex items-center justify-between px-4 transition-[left] duration-200 ease-in-out',
         'lg:left-60',
         sidebarCollapsed && 'lg:left-16',
         'left-0'

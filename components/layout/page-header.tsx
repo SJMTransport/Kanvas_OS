@@ -29,7 +29,7 @@ export function PageHeader({
   className?: string
 }) {
   return (
-    <div className={cn('flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6', className)}>
+    <div className={cn('flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 min-h-[52px] shrink-0', className)}>
       <div className="min-w-0">
         <h1 className="font-heading text-2xl font-bold text-text-primary truncate">{title}</h1>
         {subtitle && <p className="text-sm text-text-secondary mt-0.5">{subtitle}</p>}
