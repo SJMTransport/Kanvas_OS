@@ -289,7 +289,7 @@ export default function ShotListPage() {
       />
 
       {/* Data Table */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 flex flex-col min-h-0">
         {isLoading ? (
           <div className="p-4 space-y-2">
             {Array.from({ length: 8 }).map((_, i) => (
@@ -297,9 +297,9 @@ export default function ShotListPage() {
             ))}
           </div>
         ) : (
-          <div className="bg-white border border-[#E8EEEC] rounded-[16px] overflow-hidden shadow-subtle">
+          <div className="flex-1 overflow-auto min-h-0 bg-white">
             <table className="w-full text-left border-collapse">
-              <thead>
+              <thead className="sticky top-0 bg-[#F7FAF9] border-b border-[#E8EEEC] z-10">
                 <tr>
                   <WorkspaceTableHeaderCell>Thumbnail</WorkspaceTableHeaderCell>
                   <WorkspaceTableHeaderCell>Shot</WorkspaceTableHeaderCell>
