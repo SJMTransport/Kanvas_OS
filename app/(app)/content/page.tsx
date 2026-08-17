@@ -8,26 +8,20 @@ import { useVideos } from '@/lib/hooks/useVideos'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
 import { TableView } from './table-view'
 import { KanbanView } from './kanban-view'
+import { CalendarView } from '@/app/(app)/calendar/calendar-view'
+import { PerformanceView } from '@/app/(app)/performance/page'
 import { AddVideoSheet } from './add-video-sheet'
 import { ImportExcelDialog } from './import-excel-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { LayoutList, Columns, Search, Upload, Plus, X, ChevronDown, ListOrdered, Loader2 } from 'lucide-react'
+import { LayoutList, Columns, CalendarDays, BarChart2, Search, Upload, Plus, X, ListOrdered, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { STATUS_ORDER, STATUS_CONFIG } from '@/lib/utils/status'
 import { toast } from 'sonner'
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu'
 import type { VideoWithSchedules } from '@/lib/hooks/useVideos'
 import type { VideoStatus, ContentType, Platform } from '@/lib/types'
 
-type ViewMode = 'table' | 'kanban'
+type ViewMode = 'table' | 'kanban' | 'calendar' | 'performance'
 const PAGE_SIZE = 200
 
 export default function ContentPage() {
@@ -38,8 +32,14 @@ export default function ContentPage() {
 
   const initialStatusParam = searchParams.get('status')
   const initialMonthParam = searchParams.get('month')
+  const initialViewParam = searchParams.get('view') as ViewMode | null
 
-  const [viewMode, setViewMode] = useState<ViewMode>('table')
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (initialViewParam && ['table', 'kanban', 'calendar', 'performance'].includes(initialViewParam)) {
+      return initialViewParam
+    }
+    return 'table'
+  })
   const [search, setSearch] = useState(searchParams.get('search') ?? '')
   const [statusFilter, setStatusFilter] = useState<VideoStatus[] | 'all'>(
     initialStatusParam ? (initialStatusParam.split(',') as VideoStatus[]) : 'all'
@@ -55,6 +55,26 @@ export default function ContentPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [numberingSaving, setNumberingSaving] = useState(false)
+
+  function changeView(v: ViewMode) {
+    setViewMode(v)
+    if (workspaceId) localStorage.setItem(`view-content-${workspaceId}`, v)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('view', v)
+    router.replace(`/content?${params.toString()}`)
+  }
+
+  // Restore view from URL or localStorage
+  useEffect(() => {
+    if (initialViewParam && ['table', 'kanban', 'calendar', 'performance'].includes(initialViewParam)) {
+      setViewMode(initialViewParam)
+    } else if (workspaceId) {
+      const saved = localStorage.getItem(`view-content-${workspaceId}`)
+      if (saved && ['table', 'kanban', 'calendar', 'performance'].includes(saved)) {
+        setViewMode(saved as ViewMode)
+      }
+    }
+  }, [workspaceId, initialViewParam])
 
   async function handleNumbering() {
     if (!workspaceId) return
@@ -87,16 +107,7 @@ export default function ContentPage() {
     staleTime: 1000 * 60 * 5,
   })
 
-  // Restore view from localStorage
-  useEffect(() => {
-    if (workspaceId) {
-      const saved = localStorage.getItem(`view-content-${workspaceId}`)
-      if (saved === 'kanban' || saved === 'table') setViewMode(saved)
-    }
-  }, [workspaceId])
-
-  // Auto-promote scheduled videos to live once they have a posting link and
-  // their tayang date has arrived. Runs once when the content list opens.
+  // Auto-promote scheduled videos to live once their posting link exists & tayang date arrived
   useEffect(() => {
     if (!workspaceId) return
     const supabase = createClient()
@@ -108,15 +119,13 @@ export default function ContentPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId])
 
-  function changeView(v: ViewMode) {
-    setViewMode(v)
-    if (workspaceId) localStorage.setItem(`view-content-${workspaceId}`, v)
-  }
-
   function handleSort(col: string) {
-    if (col === sortBy) setSortDir((d) => d === 'asc' ? 'desc' : 'asc')
-    else { setSortBy(col); setSortDir('asc') }
-    setPage(0)
+    if (col === sortBy) {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortBy(col)
+      setSortDir('asc')
+    }
   }
 
   const handleStatusChange = (status: VideoStatus, checked: boolean) => {
@@ -195,8 +204,7 @@ export default function ContentPage() {
     enabled: viewMode === 'table',
   })
 
-  // For kanban we need all videos (no pagination). Only fetch when kanban is active
-  // so the default table view doesn't pay for a second full videos fetch.
+  // For kanban we need all videos (no pagination) — only run when kanban is active
   const allVideosQuery = useVideos({
     status: null,
     search: search || undefined,
@@ -263,47 +271,77 @@ export default function ContentPage() {
       {/* Toolbar */}
       <div className="bg-white border-b border-border px-4 py-2.5 flex flex-wrap items-center gap-2">
         {/* Search */}
-        <div className="relative flex-1 min-w-[180px] max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
-          <Input
-            placeholder="Cari judul..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 h-8 text-sm"
-          />
-          {search && (
-            <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
+        {viewMode !== 'calendar' && (
+          <div className="relative flex-1 min-w-[180px] max-w-xs">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
+            <Input
+              placeholder="Cari judul..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 h-8 text-sm"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="flex-1" />
 
-        {/* View toggle */}
-        <div className="flex items-center border border-border rounded-md overflow-hidden">
-          <button onClick={() => changeView('table')} className={cn('p-1.5 transition-colors', viewMode === 'table' ? 'bg-accent text-white' : 'text-text-secondary hover:bg-subtle')}>
-            <LayoutList className="w-4 h-4" />
+        {/* View toggle (4 View Modes: Tabel, Kanban, Kalender, Performa) */}
+        <div className="flex items-center border border-border rounded-md overflow-hidden bg-white">
+          <button
+            onClick={() => changeView('table')}
+            className={cn('flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-colors', viewMode === 'table' ? 'bg-accent text-white' : 'text-text-secondary hover:bg-subtle')}
+            title="Tampilan Tabel"
+          >
+            <LayoutList className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Tabel</span>
           </button>
-          <button onClick={() => changeView('kanban')} className={cn('p-1.5 transition-colors', viewMode === 'kanban' ? 'bg-accent text-white' : 'text-text-secondary hover:bg-subtle')}>
-            <Columns className="w-4 h-4" />
+          <button
+            onClick={() => changeView('kanban')}
+            className={cn('flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-colors', viewMode === 'kanban' ? 'bg-accent text-white' : 'text-text-secondary hover:bg-subtle')}
+            title="Tampilan Kanban"
+          >
+            <Columns className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Kanban</span>
+          </button>
+          <button
+            onClick={() => changeView('calendar')}
+            className={cn('flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-colors', viewMode === 'calendar' ? 'bg-accent text-white' : 'text-text-secondary hover:bg-subtle')}
+            title="Tampilan Kalender"
+          >
+            <CalendarDays className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Kalender</span>
+          </button>
+          <button
+            onClick={() => changeView('performance')}
+            className={cn('flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-colors', viewMode === 'performance' ? 'bg-accent text-white' : 'text-text-secondary hover:bg-subtle')}
+            title="Tampilan Performa"
+          >
+            <BarChart2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Performa</span>
           </button>
         </div>
 
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="h-8 gap-1.5 text-xs border-border bg-white text-text-primary hover:bg-subtle" 
-          onClick={handleNumbering}
-          disabled={numberingSaving || !workspaceId}
-        >
-          {numberingSaving ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <ListOrdered className="w-3.5 h-3.5" />
-          )}
-          <span>Numbering</span>
-        </Button>
+        {viewMode === 'table' && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-8 gap-1.5 text-xs border-border bg-white text-text-primary hover:bg-subtle" 
+            onClick={handleNumbering}
+            disabled={numberingSaving || !workspaceId}
+          >
+            {numberingSaving ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <ListOrdered className="w-3.5 h-3.5" />
+            )}
+            <span>Numbering</span>
+          </Button>
+        )}
 
         <Button variant="secondary" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setImportOpen(true)}>
           <Upload className="w-3.5 h-3.5" />
@@ -316,7 +354,7 @@ export default function ContentPage() {
       </div>
 
       {/* Active filter chip */}
-      {hasActiveFilter && (
+      {hasActiveFilter && viewMode === 'table' && (
         <div className="bg-white border-b border-border px-4 py-1.5 flex items-center gap-2 flex-wrap">
           <span className="text-[11px] text-text-muted">Filter aktif:</span>
           {statusFilter !== 'all' && (
@@ -355,7 +393,7 @@ export default function ContentPage() {
         </div>
       )}
 
-      {/* Content area */}
+      {/* Content area based on active viewMode */}
       <div className="flex-1 overflow-auto relative min-h-0">
         {viewMode === 'table' ? (
           <TableView
@@ -402,11 +440,15 @@ export default function ContentPage() {
               },
             }}
           />
-        ) : (
+        ) : viewMode === 'kanban' ? (
           <KanbanView
             videos={allVideosQuery.data ?? []}
             onCardClick={handleRowClick}
           />
+        ) : viewMode === 'calendar' ? (
+          <CalendarView />
+        ) : (
+          <PerformanceView />
         )}
       </div>
 

@@ -28,7 +28,7 @@ interface PerfVideo {
   video_performance: { platform: string; views: number; likes: number; comments: number; recorded_at: string }[]
 }
 
-export default function PerformancePage() {
+export function PerformanceView() {
   const router = useRouter()
   const { workspaceId } = useWorkspace()
   const [search, setSearch] = useState('')
@@ -170,3 +170,8 @@ export default function PerformancePage() {
     </div>
   )
 }
+
+export default function PerformancePage() {
+  return <PerformanceView />
+}
+
