@@ -14,9 +14,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
-import { LayoutGrid, List, Layers, Trash2, Plus, Lightbulb } from 'lucide-react'
+import { LayoutGrid, List, Layers, Trash2, Plus, Lightbulb, Pin } from 'lucide-react'
 import { PageContainer, PageHeader } from '@/components/layout/page-header'
 import { PageToolbar, SearchInput } from '@/components/layout/page-toolbar'
+import { SegmentedTabs, type TabOption } from '@/components/ui/segmented-tabs'
+import { WorkspaceTableRow, WorkspaceTableCell, WorkspaceTableHeaderCell } from '@/components/ui/table-row'
+import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
@@ -213,6 +216,11 @@ export default function IdeaPage() {
     }
   }
 
+  const viewOptions: TabOption<ViewMode>[] = [
+    { value: 'list', label: 'Tabel', icon: List },
+    { value: 'grid', label: 'Board', icon: LayoutGrid },
+  ]
+
   return (
     <PageContainer className="flex flex-col h-full space-y-4">
       <PageHeader title="Ide" subtitle="Tangkap & kembangkan ide konten" className="mb-0" />
@@ -224,7 +232,7 @@ export default function IdeaPage() {
             <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari ide..." />
 
             <Select value={boardFilter} onValueChange={setBoardFilter}>
-              <SelectTrigger className="h-9 text-xs w-32 rounded-md border-border"><SelectValue placeholder="Board" /></SelectTrigger>
+              <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-border bg-white"><SelectValue placeholder="Board" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Semua Board</SelectItem>
                 {boards.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
@@ -232,7 +240,7 @@ export default function IdeaPage() {
             </Select>
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-9 text-xs w-32 rounded-md border-border"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-border bg-white"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Semua Status</SelectItem>
                 {['raw', 'developing', 'ready', 'converted', 'archived'].map((s) => (
@@ -243,7 +251,7 @@ export default function IdeaPage() {
 
             {allTags.length > 0 && (
               <Select value={tagFilter} onValueChange={setTagFilter}>
-                <SelectTrigger className="h-9 text-xs w-32 rounded-md border-border"><SelectValue placeholder="Tag" /></SelectTrigger>
+                <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-border bg-white"><SelectValue placeholder="Tag" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Semua Tag</SelectItem>
                   {allTags.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
@@ -252,25 +260,20 @@ export default function IdeaPage() {
             )}
           </div>
         }
+        center={<SegmentedTabs options={viewOptions} value={viewMode} onChange={changeView} />}
         right={
           <div className="flex items-center gap-2">
-            <div className="flex items-center border border-border rounded-md overflow-hidden p-0.5 bg-subtle">
-              <button onClick={() => changeView('grid')} className={cn('p-1.5 rounded-sm transition-all', viewMode === 'grid' ? 'bg-white text-teal-700 font-semibold shadow-subtle' : 'text-text-secondary hover:text-text-primary')}>
-                <LayoutGrid className="w-4 h-4" />
-              </button>
-              <button onClick={() => changeView('list')} className={cn('p-1.5 rounded-sm transition-all', viewMode === 'list' ? 'bg-white text-teal-700 font-semibold shadow-subtle' : 'text-text-secondary hover:text-text-primary')}>
-                <List className="w-4 h-4" />
-              </button>
-            </div>
-
-            <Button variant="secondary" size="sm" className="h-9 gap-1.5 text-xs" onClick={() => setNewBoardOpen(true)}>
-              <Layers className="w-3.5 h-3.5" /> Board
+            <Button variant="secondary" size="default" className="h-9 gap-1.5 text-xs rounded-[12px]" onClick={() => setNewBoardOpen(true)}>
+              <Layers className="w-3.5 h-3.5" /> Board Baru
+            </Button>
+            <Button size="lg" className="h-10 gap-1.5 text-sm font-semibold rounded-[12px] bg-[#4C9998] hover:bg-[#287978] text-white" onClick={() => { setSelectedCard(null); setCardModalOpen(true) }}>
+              <Plus className="w-4 h-4" /> Tambah Ide
             </Button>
           </div>
         }
       />
 
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div className="flex-1 overflow-y-auto">
         {/* Boards strip */}
         {boards.length > 0 && boardFilter === 'all' && (
           <div className="flex gap-2 mb-4 flex-wrap">
@@ -279,19 +282,19 @@ export default function IdeaPage() {
               return (
                 <div
                   key={b.id}
-                  className="group flex items-center gap-1.5 px-3 py-1.5 bg-white border border-border rounded-lg text-sm hover:border-accent transition-colors"
+                  className="group flex items-center gap-1.5 px-3 py-1.5 bg-white border border-border rounded-[12px] text-sm hover:border-[#4C9998] transition-colors"
                 >
-                  <button onClick={() => setBoardFilter(b.id)} className="flex items-center gap-1.5 hover:text-accent">
-                    <span>📌</span>
-                    <span>{b.name}</span>
-                    <span className="text-xs text-text-muted">{count}</span>
+                  <button onClick={() => setBoardFilter(b.id)} className="flex items-center gap-1.5 hover:text-[#4C9998]">
+                    <Pin className="w-3.5 h-3.5 text-[#4C9998]" />
+                    <span className="font-medium">{b.name}</span>
+                    <span className="text-xs text-text-muted">({count})</span>
                   </button>
                   <button
                     onClick={() => setDeleteBoardTarget(b)}
-                    className="text-text-muted hover:text-error opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="text-text-muted hover:text-error opacity-0 group-hover:opacity-100 transition-opacity ml-1"
                     title="Hapus board"
                   >
-                    <Trash2 className="w-3 h-3" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               )
@@ -302,57 +305,82 @@ export default function IdeaPage() {
         {isLoading ? (
           <div className="columns-2 md:columns-3 lg:columns-4 gap-3">
             {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="w-full h-36 rounded-xl mb-3 break-inside-avoid" />
+              <Skeleton key={i} className="w-full h-36 rounded-[16px] mb-3 break-inside-avoid" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-20 text-center">
-            <Lightbulb className="w-12 h-12 text-amber-300 mx-auto mb-3" />
+          <div className="py-20 text-center bg-white rounded-[16px] border border-border">
+            <Lightbulb className="w-12 h-12 text-[#4C9998]/40 mx-auto mb-3" />
             <p className="text-text-muted font-medium">Belum ada ide</p>
-            <p className="text-sm text-text-muted mt-1">Gunakan tombol 💡 di pojok kanan bawah untuk capture ide</p>
+            <p className="text-xs text-text-muted mt-1">Klik Tambah Ide untuk membuat ide baru.</p>
           </div>
         ) : viewMode === 'list' ? (
-          <div className="bg-white border border-border rounded-xl divide-y divide-border overflow-hidden">
-            {filtered.map((card) => (
-              <div
-                key={card.id}
-                onClick={() => handleCardClick(card)}
-                className="flex items-center gap-3 px-3 py-2.5 hover:bg-surface cursor-pointer transition-colors group/row"
-              >
-                <div className="w-1 h-8 rounded-full shrink-0" style={{ background: STATUS_ACCENT[card.status] ?? '#9AA3AF' }} />
-                <span className="text-lg shrink-0">{CARD_ICONS[card.type] ?? '📎'}</span>
-                <p className="flex-1 min-w-0 font-medium text-sm text-text-primary truncate">{card.title || 'Tanpa judul'}</p>
-                <div className="hidden sm:flex items-center gap-1 shrink-0">
-                  {(card.tags ?? []).slice(0, 3).map((t) => (
-                    <TagChip key={t} name={t} color={tagColor(workspaceTags, t)} />
-                  ))}
-                </div>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-subtle text-text-secondary shrink-0">
-                  {card.status}
-                </span>
-                <span className="text-[10px] text-text-muted shrink-0 hidden sm:inline">
-                  {formatDistanceToNow(new Date(card.created_at), { locale: localeId, addSuffix: true })}
-                </span>
-                <button
-                  onClick={async (e) => {
-                    e.stopPropagation()
-                    if (!confirm('Apakah Anda yakin ingin menghapus ide ini?')) return
-                    const supabase = createClient()
-                    const { error } = await supabase.from('idea_cards').delete().eq('id', card.id)
-                    if (error) {
-                      toast.error('Gagal menghapus ide: ' + error.message)
-                    } else {
-                      toast.success('Ide berhasil dihapus')
-                      queryClient.invalidateQueries({ queryKey: ['idea-cards', workspaceId] })
-                    }
-                  }}
-                  className="p-1 text-text-muted hover:text-error rounded hover:bg-subtle shrink-0 transition-colors opacity-0 group-hover/row:opacity-100"
-                  title="Hapus Ide"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
+          <div className="bg-white border border-border/80 rounded-[16px] overflow-hidden shadow-subtle">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr>
+                  <WorkspaceTableHeaderCell>Judul Ide</WorkspaceTableHeaderCell>
+                  <WorkspaceTableHeaderCell>Tag</WorkspaceTableHeaderCell>
+                  <WorkspaceTableHeaderCell>Status</WorkspaceTableHeaderCell>
+                  <WorkspaceTableHeaderCell>Diupdate</WorkspaceTableHeaderCell>
+                  <WorkspaceTableHeaderCell align="right">Aksi</WorkspaceTableHeaderCell>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((card) => (
+                  <WorkspaceTableRow
+                    key={card.id}
+                    onClick={() => handleCardClick(card)}
+                  >
+                    <WorkspaceTableCell className="max-w-[280px]">
+                      <div className="flex items-center gap-2.5">
+                        <Lightbulb className="w-4 h-4 text-[#4C9998] shrink-0" />
+                        <span className="font-semibold text-text-primary text-sm truncate">{card.title || 'Tanpa judul'}</span>
+                      </div>
+                    </WorkspaceTableCell>
+
+                    <WorkspaceTableCell>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {(card.tags ?? []).slice(0, 3).map((t) => (
+                          <TagChip key={t} name={t} color={tagColor(workspaceTags, t)} />
+                        ))}
+                      </div>
+                    </WorkspaceTableCell>
+
+                    <WorkspaceTableCell>
+                      <Badge variant="outline" className="h-6 rounded-full px-2.5 text-xs font-medium bg-teal-50 text-teal-700 border-teal-200">
+                        {card.status}
+                      </Badge>
+                    </WorkspaceTableCell>
+
+                    <WorkspaceTableCell className="text-text-secondary text-xs">
+                      {formatDistanceToNow(new Date(card.created_at), { locale: localeId, addSuffix: true })}
+                    </WorkspaceTableCell>
+
+                    <WorkspaceTableCell align="right" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          if (!confirm('Apakah Anda yakin ingin menghapus ide ini?')) return
+                          const supabase = createClient()
+                          const { error } = await supabase.from('idea_cards').delete().eq('id', card.id)
+                          if (error) {
+                            toast.error('Gagal menghapus ide: ' + error.message)
+                          } else {
+                            toast.success('Ide berhasil dihapus')
+                            queryClient.invalidateQueries({ queryKey: ['idea-cards', workspaceId] })
+                          }
+                        }}
+                        className="p-1 text-text-muted hover:text-error rounded-[8px] hover:bg-subtle transition-colors"
+                        title="Hapus Ide"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </WorkspaceTableCell>
+                  </WorkspaceTableRow>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : (
           <Masonry breakpointCols={BREAKPOINTS} className="flex gap-3 -ml-3 w-auto" columnClassName="pl-3">

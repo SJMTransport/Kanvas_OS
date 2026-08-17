@@ -12,7 +12,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Search, X, Plus, Loader2, Trash2, Pencil, Clapperboard, Play, ChevronLeft, ChevronRight, Maximize2 } from 'lucide-react'
-import { PageHeader } from '@/components/layout/page-header'
+import { PageContainer, PageHeader } from '@/components/layout/page-header'
+import { PageToolbar, SearchInput } from '@/components/layout/page-toolbar'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { KATEGORI_SHOT, TIPE_SHOT, type ShotListReference, type KategoriShot, type TipeShot } from '@/lib/types/incubator'
@@ -236,79 +237,72 @@ export default function ShotListPage() {
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      {/* Title header — consistent across the app */}
-      <div className="bg-white border-b border-border px-4 sm:px-6 pt-4 pb-3">
-        <PageHeader
-          title="Shot List"
-          subtitle="Pustaka referensi shot untuk produksi"
-          className="mb-0"
-          action={<Button size="sm" className="h-8 gap-1.5 text-xs" onClick={openAdd}><Plus className="w-3.5 h-3.5" /> Tambah Referensi</Button>}
-        />
-      </div>
+    <PageContainer className="h-full flex flex-col space-y-4">
+      <PageHeader
+        title="Shot List"
+        subtitle="Pustaka referensi shot untuk produksi"
+        className="mb-0"
+      />
 
       {/* Toolbar — search & filters */}
-      <div className="bg-white border-b border-border px-4 py-2.5 flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[180px] max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
-          <Input
-            placeholder="Cari deskripsi, tags..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 h-8 text-sm"
-          />
-          {search && (
-            <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
+      <PageToolbar
+        left={
+          <div className="flex items-center gap-2 flex-wrap">
+            <SearchInput
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cari deskripsi, tags..."
+            />
 
-        <Select value={kategoriFilter ?? 'all'} onValueChange={(v) => setKategoriFilter(v === 'all' ? null : v)}>
-          <SelectTrigger className="h-8 text-sm w-40">
-            <SelectValue placeholder="Kategori Shot" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua Kategori</SelectItem>
-            {KATEGORI_SHOT.map((k) => (
-              <SelectItem key={k} value={k}>{k}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            <Select value={kategoriFilter ?? 'all'} onValueChange={(v) => setKategoriFilter(v === 'all' ? null : v)}>
+              <SelectTrigger className="h-10 text-sm w-40 rounded-[12px] border-border bg-white">
+                <SelectValue placeholder="Kategori Shot" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Kategori</SelectItem>
+                {KATEGORI_SHOT.map((k) => (
+                  <SelectItem key={k} value={k}>{k}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        <Select value={tipeFilter ?? 'all'} onValueChange={(v) => setTipeFilter(v === 'all' ? null : v)}>
-          <SelectTrigger className="h-8 text-sm w-36">
-            <SelectValue placeholder="Tipe Shot" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua Tipe</SelectItem>
-            {TIPE_SHOT.map((t) => (
-              <SelectItem key={t} value={t}>{t}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <div className="flex-1" />
-        <span className="text-xs text-text-muted">{filtered.length} referensi</span>
-      </div>
+            <Select value={tipeFilter ?? 'all'} onValueChange={(v) => setTipeFilter(v === 'all' ? null : v)}>
+              <SelectTrigger className="h-10 text-sm w-36 rounded-[12px] border-border bg-white">
+                <SelectValue placeholder="Tipe Shot" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Tipe</SelectItem>
+                {TIPE_SHOT.map((t) => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        }
+        right={
+          <Button size="lg" className="h-10 gap-1.5 text-sm font-semibold rounded-[12px] bg-[#4C9998] hover:bg-[#287978] text-white" onClick={openAdd}>
+            <Plus className="w-4 h-4" /> Tambah Referensi
+          </Button>
+        }
+      />
 
       {/* Grid */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
             {Array.from({ length: 12 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-[9/16] w-full rounded-lg" />
+              <Skeleton key={i} className="aspect-[9/16] w-full rounded-[16px]" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-16 flex flex-col items-center justify-center text-center">
-            <Clapperboard className="w-10 h-10 text-border mb-2" />
-            <p className="text-sm text-text-muted mb-3">
+          <div className="py-20 flex flex-col items-center justify-center text-center bg-white rounded-[16px] border border-border">
+            <Clapperboard className="w-12 h-12 text-[#4C9998]/40 mb-3" />
+            <p className="text-text-muted font-medium mb-3">
               {items.length === 0 ? 'Belum ada referensi shot list' : 'Tidak ada referensi sesuai filter'}
             </p>
             {items.length === 0 && (
-              <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={openAdd}>
-                <Plus className="w-3.5 h-3.5" /> Tambah Referensi
+              <Button size="lg" className="h-10 gap-1.5 text-sm font-semibold rounded-[12px] bg-[#4C9998] text-white" onClick={openAdd}>
+                <Plus className="w-4 h-4" /> Tambah Referensi
               </Button>
             )}
           </div>
@@ -317,7 +311,7 @@ export default function ShotListPage() {
             {filtered.map((item, index) => {
               const isPlaying = playingId === item.id
               return (
-                <div key={item.id} className="group flex flex-col rounded-lg border border-border bg-white overflow-hidden hover:shadow-sm transition-shadow">
+                <div key={item.id} className="group flex flex-col rounded-[16px] border border-border/80 bg-white overflow-hidden hover:border-[#4C9998] hover:shadow-subtle transition-all">
                   <div className="relative w-full aspect-[9/16] bg-black overflow-hidden">
                     {isPlaying ? (
                       <iframe
@@ -596,6 +590,6 @@ export default function ShotListPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageContainer>
   )
 }

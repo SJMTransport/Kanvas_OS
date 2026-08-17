@@ -14,6 +14,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { Search, X, Play, Bookmark, Plus, Loader2, Trash2, Hash, Tv2, List, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import { PageContainer, PageHeader } from '@/components/layout/page-header'
 import { PageToolbar, SearchInput } from '@/components/layout/page-toolbar'
+import { SegmentedTabs, type TabOption } from '@/components/ui/segmented-tabs'
+import { WorkspaceTableRow, WorkspaceTableCell, WorkspaceTableHeaderCell } from '@/components/ui/table-row'
+import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
@@ -594,7 +597,7 @@ export default function SavedContentPage() {
             <div className="p-3 border-t border-white/10 flex gap-2">
               <button
                 onClick={() => openContent(feedItem)}
-                className="flex-1 text-xs py-1.5 rounded-md bg-teal-500 hover:bg-teal-600 text-white font-semibold transition-colors"
+                className="flex-1 text-xs py-1.5 rounded-md bg-[#4C9998] hover:bg-[#287978] text-white font-semibold transition-colors"
               >
                 Buka & Edit Analisis
               </button>
@@ -606,87 +609,99 @@ export default function SavedContentPage() {
         </div>
       )}
 
-      {/* List */}
+      {/* List Mode Table */}
       <div className={cn('flex-1 overflow-y-auto', feedMode && 'hidden')}>
         {isLoading ? (
           <div className="p-4 space-y-2">
             {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="h-14 w-full rounded-lg" />
+              <Skeleton key={i} className="h-12 w-full rounded-[12px]" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-16 text-center">
-            <Bookmark className="w-10 h-10 text-border mx-auto mb-2" />
-            <p className="text-sm text-text-muted">
+          <div className="py-20 text-center bg-white rounded-[16px] border border-border">
+            <Bookmark className="w-12 h-12 text-[#4C9998]/40 mx-auto mb-3" />
+            <p className="text-text-muted font-medium">
               {items.length === 0 ? 'Belum ada konten disimpan' : 'Tidak ada konten sesuai filter'}
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-border">
-            {filtered.map((item) => {
-              const hook = item.analysis?.hook
-              const filled = aspectCount(item)
-              const creatorLabel = getCreatorLabel(item)
-              return (
-                <div
-                  key={item.id}
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-subtle transition-colors group"
-                  onClick={() => enterFeed(filtered.indexOf(item))}
-                >
-                  <Play className="w-4 h-4 text-text-muted shrink-0" />
+          <div className="bg-white border border-border/80 rounded-[16px] overflow-hidden shadow-subtle">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr>
+                  <WorkspaceTableHeaderCell>Judul / Hook</WorkspaceTableHeaderCell>
+                  <WorkspaceTableHeaderCell>Creator</WorkspaceTableHeaderCell>
+                  <WorkspaceTableHeaderCell>Platform</WorkspaceTableHeaderCell>
+                  <WorkspaceTableHeaderCell>Bedah</WorkspaceTableHeaderCell>
+                  <WorkspaceTableHeaderCell>Tanggal</WorkspaceTableHeaderCell>
+                  <WorkspaceTableHeaderCell align="right">Aksi</WorkspaceTableHeaderCell>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((item) => {
+                  const hook = item.analysis?.hook
+                  const filled = aspectCount(item)
+                  const creatorLabel = getCreatorLabel(item)
+                  return (
+                    <WorkspaceTableRow
+                      key={item.id}
+                      onClick={() => enterFeed(filtered.indexOf(item))}
+                    >
+                      <WorkspaceTableCell className="max-w-[320px]">
+                        <div className="flex items-center gap-2.5">
+                          <Bookmark className="w-4 h-4 text-[#4C9998] shrink-0" />
+                          <span className="font-semibold text-text-primary text-sm truncate">
+                            {hook || item.title || item.url}
+                          </span>
+                        </div>
+                      </WorkspaceTableCell>
 
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-text-primary truncate">
-                      {hook || item.title || item.url}
-                    </p>
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      {creatorLabel && <span className="text-[11px] text-text-muted">{creatorLabel}</span>}
-                      {hook && item.title && (
-                        <span className="text-[11px] text-text-muted truncate max-w-[200px]">{item.title}</span>
-                      )}
-                      {(item.hashtags ?? []).map((h) => (
-                        <span key={h} className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 font-medium border border-amber-200">#{h}</span>
-                      ))}
-                    </div>
-                  </div>
+                      <WorkspaceTableCell>
+                        <span className="text-xs text-text-secondary">
+                          {creatorLabel ? `@${creatorLabel}` : '-'}
+                        </span>
+                      </WorkspaceTableCell>
 
-                  {item.platform && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-subtle text-text-muted capitalize shrink-0">
-                      {item.platform}
-                    </span>
-                  )}
+                      <WorkspaceTableCell>
+                        {item.platform ? (
+                          <Badge variant="outline" className="h-6 rounded-full px-2.5 text-xs font-medium capitalize bg-teal-50 text-teal-700 border-teal-200">
+                            {item.platform}
+                          </Badge>
+                        ) : (
+                          <span className="text-text-muted/40 font-mono text-xs">-</span>
+                        )}
+                      </WorkspaceTableCell>
 
-                  {item.view_count != null && item.view_count > 0 && (
-                    <span className="text-[10px] text-text-muted shrink-0">
-                      {item.view_count >= 1000000
-                        ? `${(item.view_count / 1000000).toFixed(1)}M`
-                        : item.view_count >= 1000
-                          ? `${(item.view_count / 1000).toFixed(1)}K`
-                          : item.view_count} views
-                    </span>
-                  )}
+                      <WorkspaceTableCell>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            'h-6 rounded-full px-2.5 text-xs font-medium',
+                            filled > 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-600 border-slate-200'
+                          )}
+                        >
+                          {filled}/8 Bedah
+                        </Badge>
+                      </WorkspaceTableCell>
 
-                  <span className={cn(
-                    'text-[10px] px-2 py-0.5 rounded-full shrink-0 font-medium',
-                    filled > 0 ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-text-muted'
-                  )}>
-                    {filled}/8
-                  </span>
+                      <WorkspaceTableCell className="text-text-secondary text-xs">
+                        {format(new Date(item.created_at), 'd MMM yyyy', { locale: localeId })}
+                      </WorkspaceTableCell>
 
-                  <span className="text-[10px] text-text-muted shrink-0">
-                    {format(new Date(item.created_at), 'd MMM', { locale: localeId })}
-                  </span>
-
-                  <button
-                    onClick={(e) => handleDelete(e, item)}
-                    className="p-1 rounded hover:bg-red-50 text-text-muted hover:text-error transition-colors opacity-0 group-hover:opacity-100"
-                    title="Hapus"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )
-            })}
+                      <WorkspaceTableCell align="right" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={(e) => handleDelete(e, item)}
+                          className="p-1 rounded-[8px] hover:bg-subtle text-text-muted hover:text-error transition-colors"
+                          title="Hapus"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </WorkspaceTableCell>
+                    </WorkspaceTableRow>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

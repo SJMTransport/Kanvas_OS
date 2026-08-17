@@ -31,7 +31,7 @@ export function CreatorCard({ creator, onClick }: Props) {
 
   return (
     <div
-      className="bg-white border border-border rounded-xl p-4 cursor-pointer hover:shadow-md transition-shadow flex flex-col gap-3"
+      className="bg-white border border-border/80 rounded-[16px] p-5 cursor-pointer hover:border-[#4C9998] hover:shadow-subtle transition-all flex flex-col gap-3"
       onClick={() => onClick(creator)}
     >
       <div className="flex items-start gap-3">
