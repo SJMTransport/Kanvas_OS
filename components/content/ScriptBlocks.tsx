@@ -258,7 +258,7 @@ export function ScriptBlocks({ videoId, videoTitle, initialBlocks, onSave }: Scr
           <DialogContent className="max-w-xl bg-white border border-border rounded-xl shadow-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-text-primary font-heading font-bold text-lg">
-                <Sparkles className="w-5 h-5 text-accent animate-pulse" /> AI Script Assistant
+                <Sparkles className="w-5 h-5 text-teal-600 animate-pulse" /> AI Script Assistant
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-2">
@@ -268,7 +268,7 @@ export function ScriptBlocks({ videoId, videoTitle, initialBlocks, onSave }: Scr
                   value={aiTopic}
                   onChange={(e) => setAiTopic(e.target.value)}
                   placeholder="Misal: 3 tips produktif bangun jam 5 pagi, review gadget baru..."
-                  className="w-full text-xs border border-border rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-accent focus:border-accent min-h-[60px]"
+                  className="w-full text-xs border border-border rounded-md p-2.5 outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 min-h-[60px]"
                 />
               </div>
 
@@ -322,7 +322,7 @@ export function ScriptBlocks({ videoId, videoTitle, initialBlocks, onSave }: Scr
               <button
                 onClick={handleAiGenerate}
                 disabled={aiLoading}
-                className="w-full py-2 bg-accent text-white text-xs font-bold rounded-lg hover:bg-accent/90 flex items-center justify-center gap-1.5 disabled:opacity-50 transition-colors shadow-sm"
+                className="w-full py-2 bg-teal-500 text-white text-xs font-bold rounded-md hover:bg-teal-600 flex items-center justify-center gap-1.5 disabled:opacity-50 transition-colors shadow-subtle"
               >
                 {aiLoading ? (
                   <>

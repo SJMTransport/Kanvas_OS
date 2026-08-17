@@ -466,8 +466,8 @@ export default function SavedContentPage() {
                         className={cn(
                           'text-[10px] px-2 py-0.5 rounded-full border font-medium transition-colors',
                           selected
-                            ? 'bg-amber-500 border-amber-500 text-white'
-                            : 'bg-white border-border text-text-muted hover:border-amber-300 hover:text-amber-600'
+                            ? 'bg-teal-500 border-teal-500 text-white'
+                            : 'bg-white border-border text-text-muted hover:border-teal-300 hover:text-teal-700'
                         )}
                       >
                         #{h}
@@ -479,7 +479,7 @@ export default function SavedContentPage() {
             </div>
 
             <div className="flex gap-2">
-              <Button size="sm" onClick={handleAddContent} disabled={adding || !addUrl.trim()} className="h-7 text-xs">
+              <Button size="sm" onClick={handleAddContent} disabled={adding || !addUrl.trim()} className="h-7 text-xs bg-teal-500 hover:bg-teal-600 text-white">
                 {adding ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> Menyimpan...</> : 'Simpan'}
               </Button>
               <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAddOpen(false)}>Batal</Button>
@@ -503,8 +503,6 @@ export default function SavedContentPage() {
                   const isCurrent = offset === 0
                   const embedUrl = getEmbedUrl(item, isCurrent)
                   const isYT = embedUrl?.includes('youtube.com/embed')
-                  // YouTube: same key always (postMessage controls play/pause, no reload)
-                  // TikTok/Instagram: key includes feedIndex only when current so src change triggers reload with autoplay
                   const iframeKey = isYT ? item.id : isCurrent ? `${item.id}-${feedIndex}` : item.id
                   return (
                     <div key={item.id} className={cn('absolute inset-0', isCurrent ? 'z-10' : 'z-0 opacity-0 pointer-events-none')}>
@@ -520,7 +518,7 @@ export default function SavedContentPage() {
                       ) : isCurrent ? (
                         <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-white/50">
                           <p className="text-sm">Embed tidak tersedia</p>
-                          <a href={item.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-amber-400 hover:underline">
+                          <a href={item.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-teal-400 hover:underline">
                             Buka di tab baru <ExternalLink className="w-3 h-3" />
                           </a>
                         </div>
@@ -563,7 +561,7 @@ export default function SavedContentPage() {
               })()}
               <div className="flex flex-wrap gap-1 mt-2">
                 {(feedItem.hashtags ?? []).map((h) => (
-                  <span key={h} className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-medium">#{h}</span>
+                  <span key={h} className="text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-400 font-medium">#{h}</span>
                 ))}
               </div>
             </div>
@@ -580,8 +578,8 @@ export default function SavedContentPage() {
                 )
               })}
               {feedItem.analysis?.learnings && (
-                <div className="mt-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                  <p className="text-[10px] uppercase tracking-wide text-amber-400 font-semibold mb-1">Learnings</p>
+                <div className="mt-2 p-3 rounded-xl bg-teal-500/10 border border-teal-500/20">
+                  <p className="text-[10px] uppercase tracking-wide text-teal-400 font-semibold mb-1">Learnings</p>
                   <p className="text-white/80 text-xs leading-relaxed">{feedItem.analysis.learnings}</p>
                 </div>
               )}
@@ -598,7 +596,7 @@ export default function SavedContentPage() {
             <div className="p-3 border-t border-white/10 flex gap-2">
               <button
                 onClick={() => openContent(feedItem)}
-                className="flex-1 text-xs py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-medium transition-colors"
+                className="flex-1 text-xs py-1.5 rounded-md bg-teal-500 hover:bg-teal-600 text-white font-semibold transition-colors"
               >
                 Buka & Edit Analisis
               </button>

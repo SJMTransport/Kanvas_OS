@@ -247,10 +247,10 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
                   'Edukasi': 'bg-blue-500',
                   'Hiburan': 'bg-purple-500',
                   'Promosi': 'bg-rose-500',
-                  'Inspirasi': 'bg-amber-500',
-                  'Behind the Scenes': 'bg-teal-500',
+                  'Inspirasi': 'bg-teal-500',
+                  'Behind the Scenes': 'bg-emerald-500',
                 }
-                const color = colors[item.name] || 'bg-accent'
+                const color = colors[item.name] || 'bg-teal-500'
                 return (
                   <div key={item.name} className="space-y-1">
                     <div className="flex justify-between text-xs font-medium">

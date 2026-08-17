@@ -494,7 +494,7 @@ export default function BrandDetailPage() {
                           <div 
                             className={cn(
                               "h-full rounded-full transition-all duration-300",
-                              progress === 100 ? "bg-green-500" : progress >= 75 ? "bg-blue-500" : "bg-amber-500"
+                              progress === 100 ? "bg-emerald-500" : progress >= 75 ? "bg-teal-500" : "bg-teal-400"
                             )}
                             style={{ width: `${progress}%` }} 
                           />
