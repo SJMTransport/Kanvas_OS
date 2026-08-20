@@ -89,6 +89,7 @@ interface Props {
   onRowClick: (video: VideoWithSchedules) => void
   total: number
   pageSize: number
+  onPageSizeChange?: (size: number) => void
   activePlatformFilter?: Platform[] | null
   columnFilters?: ColumnFilters
 }
@@ -487,7 +488,7 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, onFie
   )
 }
 
-export function TableView({ videos: initialVideos, loading, sortBy, sortDir, page, onSort, onPageChange, onRowClick, total, pageSize, activePlatformFilter, columnFilters }: Props) {
+export function TableView({ videos: initialVideos, loading, sortBy, sortDir, page, onSort, onPageChange, onRowClick, total, pageSize, onPageSizeChange, activePlatformFilter, columnFilters }: Props) {
   const totalPages = Math.ceil(total / pageSize)
   const [localVideos, setLocalVideos] = useState<VideoWithSchedules[] | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
@@ -608,12 +609,26 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
         )}
       </div>
 
-      {/* Total Count */}
+      {/* Total Count & Page Size Selector */}
       {total > 0 && (
-        <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-white">
-          <p className="text-xs text-text-muted">
-            Menampilkan {total} video
+        <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-white text-xs text-text-muted">
+          <p>
+            {pageSize >= 10000 ? `Menampilkan Semua (${total} video)` : `Menampilkan ${total} video`}
           </p>
+          <div className="flex items-center gap-2">
+            <span>Tampilkan:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => onPageSizeChange?.(Number(e.target.value))}
+              className="text-xs border border-border rounded px-2 py-1 bg-white font-medium text-text-primary focus:outline-none focus:ring-1 focus:ring-accent cursor-pointer"
+            >
+              <option value={50}>50 video</option>
+              <option value={100}>100 video</option>
+              <option value={200}>200 video (Default)</option>
+              <option value={500}>500 video</option>
+              <option value={10000}>Tampilkan Semua ({total > 0 ? `${total}+` : 'Semua'})</option>
+            </select>
+          </div>
         </div>
       )}
     </div>

@@ -26,7 +26,7 @@ import type { VideoWithSchedules } from '@/lib/hooks/useVideos'
 import type { VideoStatus, ContentType, Platform } from '@/lib/types'
 
 type ViewMode = 'table' | 'kanban' | 'calendar' | 'performance'
-const PAGE_SIZE = 200
+const DEFAULT_PAGE_SIZE = 200
 
 export default function ContentPage() {
   const router = useRouter()
@@ -53,6 +53,7 @@ export default function ContentPage() {
   const [sortBy, setSortBy] = useState('sort_order')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE)
   const [temaFilter, setTemaFilter] = useState<string[] | 'all'>('all')
   const [contentTypeFilter, setContentTypeFilter] = useState<ContentType[] | 'all'>('all')
   const [pilarFilter, setPilarFilter] = useState<string[] | 'all'>('all')
@@ -204,7 +205,7 @@ export default function ContentPage() {
     sortBy,
     sortDir,
     page,
-    pageSize: PAGE_SIZE,
+    pageSize,
     enabled: viewMode === 'table',
   })
 
@@ -371,7 +372,8 @@ export default function ContentPage() {
             onPageChange={setPage}
             onRowClick={handleRowClick}
             total={total}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
+            onPageSizeChange={(newSize) => { setPageSize(newSize); setPage(0) }}
             activePlatformFilter={platformFilter === 'all' ? null : platformFilter}
             columnFilters={{
               status: {
