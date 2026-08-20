@@ -565,8 +565,12 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
     setDeletingSelected(true)
     try {
       const supabase = createClient()
-      const { error } = await supabase.from('videos').delete().in('id', selectedIds)
-      if (error) throw error
+      const BATCH_SIZE = 50
+      for (let i = 0; i < selectedIds.length; i += BATCH_SIZE) {
+        const chunk = selectedIds.slice(i, i + BATCH_SIZE)
+        const { error } = await supabase.from('videos').delete().in('id', chunk)
+        if (error) throw error
+      }
       toast.success(`${selectedIds.length} konten terpilih berhasil dihapus!`)
       setSelectedIds([])
       queryClient.invalidateQueries({ queryKey: ['videos'] })
