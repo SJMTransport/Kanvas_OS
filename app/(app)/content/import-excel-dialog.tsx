@@ -177,6 +177,7 @@ export function ImportExcelDialog({ open, onOpenChange }: Props) {
           status: hasPublishDate ? 'live' : 'ide',
         }
         Object.entries(mapping).forEach(([col, field]) => {
+          if (!field) return
           const val = row[col]
           if (field === 'no_video') {
             const strVal = val ? String(val).trim() : ''
