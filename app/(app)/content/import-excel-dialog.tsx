@@ -13,7 +13,12 @@ import { cn } from '@/lib/utils'
 
 // Column mapping: Excel header → DB field
 const COLUMN_MAP: Record<string, string> = {
+  'no': 'no_video',
+  'no.': 'no_video',
+  'nomor': 'no_video',
   'no video': 'no_video',
+  'no. video': 'no_video',
+  'no_video': 'no_video',
   'judul': 'judul',
   'format': 'format',
   'tema': 'tema',
@@ -157,20 +162,31 @@ export function ImportExcelDialog({ open, onOpenChange }: Props) {
     for (let i = 0; i < rows.length; i += BATCH) {
       const batch = rows.slice(i, i + BATCH)
       const records = batch.map((row, idx) => {
+        const hasPublishDate = Object.entries(mapping).some(([col, field]) => {
+          if (field.startsWith('platform_')) {
+            const val = row[col]
+            const dateStr = parseExcelDate(val)
+            return !!dateStr
+          }
+          return false
+        })
+
         const rec: Record<string, unknown> = {
           workspace_id: workspaceId,
           created_by: user?.id,
-          status: 'ide',
+          status: hasPublishDate ? 'live' : 'ide',
         }
         Object.entries(mapping).forEach(([col, field]) => {
           const val = row[col]
           if (field === 'no_video') {
             const strVal = val ? String(val).trim() : ''
             if (strVal) {
-              if (strVal.includes('.')) {
+              if (strVal.toUpperCase().startsWith('VID-')) {
+                rec.no_video = strVal.toUpperCase()
+              } else if (strVal.includes('.')) {
                 const parts = strVal.replace(/^VID-/i, '').split('.')
                 const mainDigits = parts[0].replace(/\D/g, '')
-                rec.no_video = `VID-${mainDigits.padStart(3, '0')}.${parts[1].trim()}`
+                rec.no_video = mainDigits ? `VID-${mainDigits.padStart(3, '0')}.${parts[1].trim()}` : strVal
               } else {
                 const digits = strVal.replace(/\D/g, '')
                 rec.no_video = digits ? `VID-${digits.padStart(3, '0')}` : strVal

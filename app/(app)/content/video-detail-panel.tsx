@@ -202,6 +202,11 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
       if (error) { toast.error(`Gagal menyimpan untuk ${p}: ${error.message}`); return }
     }
 
+    if (video.status !== 'live') {
+      await supabase.from('videos').update({ status: 'live' }).eq('id', video.id)
+      queryClient.invalidateQueries({ queryKey: ['videos'] })
+    }
+
     toast.success(platformsToSave.length > 1 ? 'Jadwal disimpan untuk semua platform pilihan!' : 'Jadwal disimpan!')
     queryClient.invalidateQueries({ queryKey: ['schedules-video', video.id] })
     queryClient.invalidateQueries({ queryKey: ['schedules'] })
