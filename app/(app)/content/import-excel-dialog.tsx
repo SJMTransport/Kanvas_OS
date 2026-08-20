@@ -17,6 +17,8 @@ const COLUMN_MAP: Record<string, string> = {
   'judul': 'judul',
   'format': 'format',
   'tema': 'tema',
+  'pilar': 'pilar_konten',
+  'pilar konten': 'pilar_konten',
   'nama alat': 'nama_alat',
   'storage bahan': 'storage_bahan',
   'storage video': 'storage_video',
@@ -25,13 +27,48 @@ const COLUMN_MAP: Record<string, string> = {
   'endorsement': 'is_endorsement',
   'deadline posting': 'deadline_posting',
   'video request': 'is_video_request',
+  // 1st Upload Dates
   'tiktok': 'platform_tiktok',
+  'tiktok 1': 'platform_tiktok',
+  'tiktok1': 'platform_tiktok',
   'instagram': 'platform_instagram',
+  'instagram 1': 'platform_instagram',
+  'instagram1': 'platform_instagram',
+  'ig': 'platform_instagram',
+  'ig 1': 'platform_instagram',
+  'ig1': 'platform_instagram',
   'yt': 'platform_youtube',
+  'yt 1': 'platform_youtube',
+  'yt1': 'platform_youtube',
   'youtube': 'platform_youtube',
+  'youtube 1': 'platform_youtube',
+  'youtube1': 'platform_youtube',
   'yt short': 'platform_youtube',
   'fb': 'platform_facebook',
+  'fb 1': 'platform_facebook',
+  'fb1': 'platform_facebook',
   'facebook': 'platform_facebook',
+  'facebook 1': 'platform_facebook',
+  'facebook1': 'platform_facebook',
+  // 2nd Upload Dates
+  'tiktok 2': 'platform_tiktok_2',
+  'tiktok2': 'platform_tiktok_2',
+  'tt 2': 'platform_tiktok_2',
+  'tt2': 'platform_tiktok_2',
+  'instagram 2': 'platform_instagram_2',
+  'instagram2': 'platform_instagram_2',
+  'ig 2': 'platform_instagram_2',
+  'ig2': 'platform_instagram_2',
+  'yt 2': 'platform_youtube_2',
+  'yt2': 'platform_youtube_2',
+  'youtube 2': 'platform_youtube_2',
+  'youtube2': 'platform_youtube_2',
+  'yt short 2': 'platform_youtube_2',
+  'fb 2': 'platform_facebook_2',
+  'fb2': 'platform_facebook_2',
+  'facebook 2': 'platform_facebook_2',
+  'facebook2': 'platform_facebook_2',
+  // Link & Caption
   'google drive': 'google_drive_link',
   'caption': 'caption_default',
 }
@@ -130,8 +167,14 @@ export function ImportExcelDialog({ open, onOpenChange }: Props) {
           if (field === 'no_video') {
             const strVal = val ? String(val).trim() : ''
             if (strVal) {
-              const digits = strVal.replace(/\D/g, '')
-              rec.no_video = digits ? `VID-${digits.padStart(3, '0')}` : strVal
+              if (strVal.includes('.')) {
+                const parts = strVal.replace(/^VID-/i, '').split('.')
+                const mainDigits = parts[0].replace(/\D/g, '')
+                rec.no_video = `VID-${mainDigits.padStart(3, '0')}.${parts[1].trim()}`
+              } else {
+                const digits = strVal.replace(/\D/g, '')
+                rec.no_video = digits ? `VID-${digits.padStart(3, '0')}` : strVal
+              }
             } else {
               rec.no_video = null
             }
@@ -139,6 +182,7 @@ export function ImportExcelDialog({ open, onOpenChange }: Props) {
           else if (field === 'is_endorsement') rec.is_endorsement = parseBool(val)
           else if (field === 'is_video_request') rec.is_video_request = parseBool(val)
           else if (field === 'tanggal_shooting' || field === 'deadline_posting') rec[field] = parseExcelDate(val)
+          else if (field === 'pilar_konten') rec.pilar_konten = val ? String(val).trim() : null
           else if (!field.startsWith('platform_')) rec[field] = val || null
         })
         return rec
@@ -153,18 +197,26 @@ export function ImportExcelDialog({ open, onOpenChange }: Props) {
         if (error) { failed += records.length; errors.push(`Batch ${i / BATCH + 1}: ${error.message}`) }
         else {
           success += (inserted ?? []).length
-          // Handle platform schedules
+          // Handle platform schedules (both 1st and 2nd upload dates)
           const scheduleInserts: object[] = []
           batch.forEach((row, idx) => {
             const videoId = (inserted ?? [])[idx]?.id
             if (!videoId) return
             const platforms = ['tiktok', 'instagram', 'youtube', 'facebook'] as const
             platforms.forEach((p) => {
-              const col = Object.entries(mapping).find(([, f]) => f === `platform_${p}`)?.[0]
-              if (!col) return
-              const val = row[col]
-              const dateStr = parseExcelDate(val)
-              if (dateStr) scheduleInserts.push({ video_id: videoId, platform: p, tanggal_tayang: dateStr, status: 'scheduled' })
+              // 1st schedule date
+              const col1 = Object.entries(mapping).find(([, f]) => f === `platform_${p}`)?.[0]
+              if (col1) {
+                const dateStr1 = parseExcelDate(row[col1])
+                if (dateStr1) scheduleInserts.push({ video_id: videoId, platform: p, tanggal_tayang: dateStr1, status: 'scheduled' })
+              }
+
+              // 2nd schedule date (e.g. Instagram2, FB 2, Yt 2, TikTok 2)
+              const col2 = Object.entries(mapping).find(([, f]) => f === `platform_${p}_2`)?.[0]
+              if (col2) {
+                const dateStr2 = parseExcelDate(row[col2])
+                if (dateStr2) scheduleInserts.push({ video_id: videoId, platform: p, tanggal_tayang: dateStr2, status: 'scheduled' })
+              }
             })
           })
           if (scheduleInserts.length) await supabase.from('video_platform_schedules').insert(scheduleInserts)
@@ -248,12 +300,19 @@ export function ImportExcelDialog({ open, onOpenChange }: Props) {
                       <option value="">[Abaikan]</option>
                       {Object.entries({
                         no_video: 'No Video', judul: 'Judul', format: 'Format',
-                        tema: 'Tema', nama_alat: 'Nama Alat', storage_bahan: 'Storage Bahan',
+                        tema: 'Tema', pilar_konten: 'Pilar Konten', nama_alat: 'Nama Alat', storage_bahan: 'Storage Bahan',
                         storage_video: 'Storage Video', tanggal_shooting: 'Tanggal Shooting',
                         is_endorsement: 'Endorsement', deadline_posting: 'Deadline Posting',
-                        is_video_request: 'Video Request', platform_tiktok: 'Jadwal TikTok',
-                        platform_instagram: 'Jadwal Instagram', platform_youtube: 'Jadwal YouTube',
-                        platform_facebook: 'Jadwal Facebook', google_drive_link: 'Google Drive',
+                        is_video_request: 'Video Request',
+                        platform_tiktok: 'Jadwal TikTok (Upload 1)',
+                        platform_tiktok_2: 'Jadwal TikTok (Upload 2)',
+                        platform_instagram: 'Jadwal Instagram (Upload 1)',
+                        platform_instagram_2: 'Jadwal Instagram (Upload 2)',
+                        platform_youtube: 'Jadwal YouTube (Upload 1)',
+                        platform_youtube_2: 'Jadwal YouTube (Upload 2)',
+                        platform_facebook: 'Jadwal Facebook (Upload 1)',
+                        platform_facebook_2: 'Jadwal Facebook (Upload 2)',
+                        google_drive_link: 'Google Drive',
                         caption_default: 'Caption',
                       }).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                     </select>
