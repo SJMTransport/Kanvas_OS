@@ -115,28 +115,109 @@ function Th({ children, col, sortBy, sortDir, onSort, className }: {
   )
 }
 
+function NoVideoCell({ video, index, page, pageSize, save }: {
+  video: VideoWithSchedules
+  index: number
+  page: number
+  pageSize: number
+  save: SaveFn
+}) {
+  const defaultDisplay = video.no_video || (
+    video.status === 'scheduled' || video.status === 'live'
+      ? `VID-${String(page * pageSize + index + 1).padStart(3, '0')}`
+      : 'VID-000'
+  )
+
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState(defaultDisplay)
+
+  useEffect(() => { if (!editing) setVal(defaultDisplay) }, [defaultDisplay, editing])
+
+  function commit() {
+    const trimmed = val.trim()
+    save(video.id, { no_video: trimmed || null })
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <div className="relative" onClick={(e) => e.stopPropagation()}>
+        <input
+          autoFocus
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false) }}
+          placeholder="misal VID-015.1"
+          className="w-24 text-xs h-7 border border-accent rounded px-1.5 font-mono bg-white font-semibold text-teal-800"
+        />
+      </div>
+    )
+  }
+
+  return (
+    <button onClick={(e) => { e.stopPropagation(); setEditing(true) }} className="group/num flex items-center gap-1 text-left" title="Klik untuk ubah penomoran / buat cabang (misal 15.1, 15.2)">
+      <span className={cn(
+        "font-mono transition-colors",
+        defaultDisplay === 'VID-000' ? "text-text-muted/60" : "font-semibold text-teal-800 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200/60 group-hover/num:border-teal-400"
+      )}>
+        {defaultDisplay}
+      </span>
+      <Pencil className="w-3 h-3 text-text-muted/0 group-hover/num:text-text-muted/50 transition-colors" />
+    </button>
+  )
+}
+
 const PILAR_OPTIONS = ['Edukasi', 'Hiburan', 'Promosi', 'Inspirasi', 'Behind the Scenes']
 
 type SaveFn = (id: string, patch: Record<string, unknown>) => void
 
-function PilarCell({ video, save }: { video: VideoWithSchedules; save: SaveFn }) {
+function PilarCell({ video, save, pilarOptions }: { video: VideoWithSchedules; save: SaveFn; pilarOptions?: string[] }) {
   const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState(video.pilar_konten ?? '')
+  useEffect(() => { if (!editing) setVal(video.pilar_konten ?? '') }, [video.pilar_konten, editing])
+
+  const options = Array.from(new Set([...PILAR_OPTIONS, ...(pilarOptions ?? [])]))
+  const suggestions = options
+    .filter((p) => p.toLowerCase().includes(val.toLowerCase().trim()))
+    .slice(0, 8)
+
+  function commit(nextVal?: string) {
+    const finalVal = (nextVal !== undefined ? nextVal : val).trim()
+    save(video.id, { pilar_konten: finalVal || null })
+    setEditing(false)
+  }
+
   if (editing) {
     return (
-      <select
-        autoFocus
-        defaultValue={video.pilar_konten ?? ''}
-        onChange={(e) => { save(video.id, { pilar_konten: e.target.value || null }); setEditing(false) }}
-        onBlur={() => setEditing(false)}
-        className="w-full text-xs h-7 border border-accent rounded px-1 bg-white"
-      >
-        <option value="">Tanpa Pilar</option>
-        {PILAR_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
-      </select>
+      <div className="relative" onClick={(e) => e.stopPropagation()}>
+        <input
+          autoFocus
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onBlur={() => setTimeout(() => commit(), 120)}
+          onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false) }}
+          placeholder="Ketik atau pilih pilar"
+          className="w-full text-xs h-7 border border-accent rounded px-1.5 bg-white font-medium text-accent"
+        />
+        {suggestions.length > 0 && (
+          <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
+            {suggestions.map((p) => (
+              <button
+                key={p}
+                onMouseDown={(e) => { e.preventDefault(); commit(p) }}
+                className="block w-full text-left px-2 py-1.5 text-xs text-text-primary hover:bg-surface font-medium"
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     )
   }
   return (
-    <button onClick={() => setEditing(true)} className="w-full text-left group/edit flex items-center gap-1">
+    <button onClick={(e) => { e.stopPropagation(); setEditing(true) }} className="w-full text-left group/edit flex items-center gap-1">
       {video.pilar_konten
         ? <span className="font-semibold text-accent">{video.pilar_konten}</span>
         : <span className="text-text-muted/30 font-mono">-</span>}
@@ -316,17 +397,7 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, onFie
         </button>
       </td>
       <td className="px-3.5 py-3.5 text-xs">
-        {video.no_video ? (
-          <span className={cn("font-mono", video.no_video === 'VID-000' ? "text-text-muted/60" : "font-semibold text-teal-800 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200/60")}>
-            {video.no_video}
-          </span>
-        ) : (
-          <span className="text-text-muted/60 font-mono">
-            {video.status === 'scheduled' || video.status === 'live'
-              ? `VID-${String(page * pageSize + index + 1).padStart(3, '0')}`
-              : 'VID-000'}
-          </span>
-        )}
+        <NoVideoCell video={video} index={index} page={page} pageSize={pageSize} save={onFieldSave} />
       </td>
       <td className="px-3.5 py-3.5 max-w-[220px]">
         <p className="font-semibold text-text-primary text-sm truncate leading-snug">{video.judul}</p>
@@ -335,7 +406,7 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, onFie
         <TemaCell video={video} save={onFieldSave} temaOptions={temaOptions} />
       </td>
       <td className="px-3.5 py-3.5 text-xs text-text-secondary max-w-[120px]" onClick={(e) => e.stopPropagation()}>
-        <PilarCell video={video} save={onFieldSave} />
+        <PilarCell video={video} save={onFieldSave} pilarOptions={temaOptions} />
       </td>
       <td className="px-3.5 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
         <AsetCell video={video} save={onFieldSave} />
@@ -389,9 +460,13 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, onFie
                 const icon = video.status === 'live' ? '🚀' : '📅'
                 const textClass = video.status === 'live' ? 'text-emerald-600 font-medium' : 'text-accent font-medium'
                 return (
-                  <span className={cn("flex items-center gap-1", textClass)} title={video.status === 'live' ? "Tanggal Tayang (Live)" : "Tanggal Tayang (Scheduled)"}>
-                    <span>{icon}</span> {format(new Date(sorted[0].tanggal_tayang), 'd MMM', { locale: localeId })}
-                  </span>
+                  <div className="flex flex-col gap-0.5">
+                    {sorted.map((s, sIdx) => (
+                      <span key={s.id ?? sIdx} className={cn("flex items-center gap-1", textClass)} title={`${s.platform}: ${format(new Date(s.tanggal_tayang), 'd MMM yyyy', { locale: localeId })}`}>
+                        <span>{icon}</span> {format(new Date(s.tanggal_tayang), 'd MMM', { locale: localeId })}
+                      </span>
+                    ))}
+                  </div>
                 )
               }
             }

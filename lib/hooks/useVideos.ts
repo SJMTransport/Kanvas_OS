@@ -6,7 +6,7 @@ import { useWorkspace } from './useWorkspace'
 import type { VideoStatus, ContentType, Video, Platform } from '@/lib/types'
 
 export interface VideoWithSchedules extends Video {
-  video_platform_schedules: { platform: string; tanggal_tayang: string; status: string }[]
+  video_platform_schedules: { id?: string; platform: string; tanggal_tayang: string; status: string }[]
   video_performance?: { platform: string; views: number; likes: number; comments: number; recorded_at: string }[]
   brands?: { nama_brand: string } | null
   users?: { full_name: string | null; avatar_url: string | null } | null

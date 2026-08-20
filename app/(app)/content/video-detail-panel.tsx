@@ -73,13 +73,27 @@ function InlineField({ label, value, onSave, type = 'text', options }: {
   )
 }
 
+function formatNoVideo(val: string): string {
+  const clean = val.trim().replace(/[^0-9.a-zA-Z-]/g, '')
+  if (!clean) return ''
+  if (clean.toUpperCase().startsWith('VID-')) return clean.toUpperCase()
+  if (clean.includes('.')) {
+    const [main, sub] = clean.split('.')
+    return `VID-${main.padStart(3, '0')}.${sub}`
+  }
+  if (/^\d+$/.test(clean)) {
+    return `VID-${clean.padStart(3, '0')}`
+  }
+  return clean
+}
+
 function InfoTab({ video }: { video: VideoWithSchedules }) {
   const queryClient = useQueryClient()
 
   async function save(field: string, value: string) {
     const supabase = createClient()
     const parsed: Record<string, unknown> = {}
-    if (field === 'no_video') parsed[field] = value ? `VID-${value.replace(/\D/g, '').padStart(3, '0')}` : null
+    if (field === 'no_video') parsed[field] = value ? formatNoVideo(value) : null
     else if (field === 'is_endorsement' || field === 'is_video_request') parsed[field] = value === 'true'
     else parsed[field] = value || null
 
@@ -181,15 +195,10 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
         status: 'scheduled' as const,
       }
 
-      const existing = (schedules ?? []).find((s: { platform: string }) => s.platform === p)
-      let error
-      if (existing) {
-        ({ error } = await supabase.from('video_platform_schedules').update(pPayload).eq('id', existing.id))
-      } else {
-        ({ error } = await supabase.from('video_platform_schedules').insert({
-          video_id: video.id, platform: p, ...pPayload,
-        }))
-      }
+      const { error } = await supabase.from('video_platform_schedules').insert({
+        video_id: video.id, platform: p, ...pPayload,
+      })
+
       if (error) { toast.error(`Gagal menyimpan untuk ${p}: ${error.message}`); return }
     }
 
@@ -219,9 +228,14 @@ function ScheduleTab({ video }: { video: VideoWithSchedules }) {
               <div className="flex items-center gap-2">
                 <div className={cn('w-2.5 h-2.5 rounded-full', getPlatformDot(platform))} />
                 <span className="text-sm font-semibold text-text-primary">{PLATFORM_LABELS[platform]}</span>
+                {platformSchedules.length > 0 && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-accent-light/40 text-accent border border-accent/20">
+                    {platformSchedules.length}x Tayang
+                  </span>
+                )}
               </div>
               <Button size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={() => setAdding(platform === adding ? null : platform)}>
-                <Plus className="w-3 h-3" /> Jadwal
+                <Plus className="w-3 h-3" /> {platformSchedules.length > 0 ? '+ Tanggal Baru' : 'Jadwal'}
               </Button>
             </div>
 
