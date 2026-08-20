@@ -15,7 +15,8 @@ import { ImportExcelDialog } from './import-excel-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
-import { Upload, Plus, ListOrdered, Loader2, MoreHorizontal } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Upload, Plus, ListOrdered, Loader2, MoreHorizontal, Trash2, AlertTriangle } from 'lucide-react'
 import { PageContainer, PageHeader } from '@/components/layout/page-header'
 import { PageToolbar, SearchInput } from '@/components/layout/page-toolbar'
 import { SegmentedTabs, type TabOption } from '@/components/ui/segmented-tabs'
@@ -60,6 +61,25 @@ export default function ContentPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [numberingSaving, setNumberingSaving] = useState(false)
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false)
+  const [deletingAll, setDeletingAll] = useState(false)
+
+  async function handleDeleteAll() {
+    if (!workspaceId) return
+    setDeletingAll(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('videos').delete().eq('workspace_id', workspaceId)
+      if (error) throw error
+      toast.success('Seluruh data konten di workspace berhasil dihapus!')
+      queryClient.invalidateQueries({ queryKey: ['videos'] })
+      setDeleteAllOpen(false)
+    } catch (err: any) {
+      toast.error('Gagal menghapus data: ' + err.message)
+    } finally {
+      setDeletingAll(false)
+    }
+  }
 
   function changeView(v: ViewMode) {
     setViewMode(v)
@@ -308,6 +328,10 @@ export default function ContentPage() {
                   <Upload className="w-3.5 h-3.5" />
                   <span>Import Excel</span>
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setDeleteAllOpen(true)} className="gap-2 text-xs text-error focus:text-error focus:bg-red-50 cursor-pointer">
+                  <Trash2 className="w-3.5 h-3.5 text-error" />
+                  <span>Hapus Semua Konten</span>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -421,6 +445,29 @@ export default function ContentPage() {
 
       <AddVideoSheet open={addOpen} onOpenChange={setAddOpen} />
       <ImportExcelDialog open={importOpen} onOpenChange={setImportOpen} />
+
+      <Dialog open={deleteAllOpen} onOpenChange={setDeleteAllOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center mb-2">
+              <AlertTriangle className="w-5 h-5 text-error" />
+            </div>
+            <DialogTitle className="text-base text-text-primary">Hapus Seluruh Data Konten?</DialogTitle>
+            <DialogDescription className="text-xs text-text-secondary leading-relaxed pt-1">
+              Tindakan ini akan menghapus <strong>SELURUH {total} data konten</strong> di workspace ini secara permanen. Setelah dihapus, Anda dapat mengunggah ulang file Excel yang bersih.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex gap-2 justify-end">
+            <Button variant="outline" size="sm" onClick={() => setDeleteAllOpen(false)} disabled={deletingAll}>
+              Batal
+            </Button>
+            <Button variant="destructive" size="sm" onClick={handleDeleteAll} disabled={deletingAll} className="gap-1.5 bg-error hover:bg-error/90 text-white font-semibold">
+              {deletingAll ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+              Ya, Hapus Semua Konten
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   )
 }
