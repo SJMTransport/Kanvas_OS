@@ -123,11 +123,7 @@ function NoVideoCell({ video, index, page, pageSize, save }: {
   pageSize: number
   save: SaveFn
 }) {
-  const defaultDisplay = video.no_video || (
-    video.status === 'scheduled' || video.status === 'live'
-      ? `VID-${String(page * pageSize + index + 1).padStart(3, '0')}`
-      : 'VID-000'
-  )
+  const defaultDisplay = video.no_video || `VID-${String(page * pageSize + index + 1).padStart(3, '0')}`
 
   const [editing, setEditing] = useState(false)
   const [val, setVal] = useState(defaultDisplay)

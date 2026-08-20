@@ -180,21 +180,8 @@ export function ImportExcelDialog({ open, onOpenChange }: Props) {
           if (!field) return
           const val = row[col]
           if (field === 'no_video') {
-            const strVal = val ? String(val).trim() : ''
-            if (strVal) {
-              if (strVal.toUpperCase().startsWith('VID-')) {
-                rec.no_video = strVal.toUpperCase()
-              } else if (strVal.includes('.')) {
-                const parts = strVal.replace(/^VID-/i, '').split('.')
-                const mainDigits = parts[0].replace(/\D/g, '')
-                rec.no_video = mainDigits ? `VID-${mainDigits.padStart(3, '0')}.${parts[1].trim()}` : strVal
-              } else {
-                const digits = strVal.replace(/\D/g, '')
-                rec.no_video = digits ? `VID-${digits.padStart(3, '0')}` : strVal
-              }
-            } else {
-              rec.no_video = null
-            }
+            const strVal = val !== undefined && val !== null ? String(val).trim() : ''
+            rec.no_video = strVal || null
           }
           else if (field === 'is_endorsement') rec.is_endorsement = parseBool(val)
           else if (field === 'is_video_request') rec.is_video_request = parseBool(val)
