@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import { ChevronUp, ChevronDown, Video, Trash2, GripVertical, Pencil, Plus, Filter } from 'lucide-react'
+import { ChevronUp, ChevronDown, Video, Trash2, GripVertical, Pencil, Plus, Filter, Copy, Check } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuSeparator,
@@ -240,6 +240,49 @@ function AsetCell({ video, save }: { video: VideoWithSchedules; save: SaveFn }) 
   )
 }
 
+function CaptionCopyCell({ caption }: { caption: string | null | undefined }) {
+  const [copied, setCopied] = useState(false)
+
+  if (!caption || !caption.trim()) {
+    return <span className="text-text-muted/30 font-mono text-xs text-center block">-</span>
+  }
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    navigator.clipboard.writeText(caption)
+    toast.success('Caption berhasil disalin!')
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={handleCopy}
+        title={caption}
+        className={cn(
+          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all shadow-subtle cursor-pointer select-none",
+          copied
+            ? "bg-emerald-600 text-white border border-emerald-600"
+            : "bg-teal-50 text-[#287978] border border-teal-200 hover:bg-[#4C9998] hover:text-white hover:border-[#4C9998]"
+        )}
+      >
+        {copied ? (
+          <>
+            <Check className="w-3.5 h-3.5" />
+            <span>Tersalin!</span>
+          </>
+        ) : (
+          <>
+            <Copy className="w-3.5 h-3.5" />
+            <span>Copy</span>
+          </>
+        )}
+      </button>
+    </div>
+  )
+}
+
 function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, onFieldSave, temaOptions, activePlatformFilter }: {
   video: VideoWithSchedules
   index: number
@@ -296,6 +339,9 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, onFie
       </td>
       <td className="px-3.5 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
         <AsetCell video={video} save={onFieldSave} />
+      </td>
+      <td className="px-3.5 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+        <CaptionCopyCell caption={video.caption_default} />
       </td>
       <td className="px-3.5 py-3.5">
         <span className={getStatusBadgeClass(video.status as VideoStatus)}>
@@ -443,6 +489,7 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
               <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-40">Tema <HeaderFilter label="Tema" spec={columnFilters?.tema} /></Th>
               <Th col="pilar_konten" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-32">Pilar <HeaderFilter label="Pilar" spec={columnFilters?.pilar} /></Th>
               <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-14 text-center">Aset</Th>
+              <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-24 text-center">Caption</Th>
               <Th col="status" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Status <HeaderFilter label="Status" spec={columnFilters?.status} /></Th>
               <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Platform <HeaderFilter label="Platform" spec={columnFilters?.platform} /></Th>
               <Th col="updated_at" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-36">Tanggal</Th>
@@ -455,7 +502,7 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
                 {loading
                   ? Array.from({ length: 8 }).map((_, i) => (
                       <tr key={i}>
-                        {Array.from({ length: 8 }).map((_, j) => (
+                        {Array.from({ length: 9 }).map((_, j) => (
                           <td key={j} className="px-3 py-2.5"><Skeleton className="h-4 w-full" /></td>
                         ))}
                       </tr>
