@@ -129,11 +129,24 @@ export function ImportExcelDialog({ open, onOpenChange }: Props) {
     setHeaders(hdrs)
     setRows(data)
 
-    // Auto-map
+    // Smart Auto-map: prefers non-empty columns over empty columns
     const autoMap: Record<string, string> = {}
     hdrs.forEach((h) => {
       const lower = h.toLowerCase().trim()
-      if (COLUMN_MAP[lower]) autoMap[h] = COLUMN_MAP[lower]
+      const targetField = COLUMN_MAP[lower]
+      if (targetField) {
+        const existingCol = Object.entries(autoMap).find(([, f]) => f === targetField)?.[0]
+        if (existingCol) {
+          const currentHasVal = data.some((r) => r[h] !== undefined && r[h] !== null && String(r[h]).trim() !== '')
+          const existingHasVal = data.some((r) => r[existingCol] !== undefined && r[existingCol] !== null && String(r[existingCol]).trim() !== '')
+          if (currentHasVal && !existingHasVal) {
+            delete autoMap[existingCol]
+            autoMap[h] = targetField
+          }
+        } else {
+          autoMap[h] = targetField
+        }
+      }
     })
     setMapping(autoMap)
     setStep(2)
