@@ -38,7 +38,7 @@ export function useVideos(opts: UseVideosOptions = {}) {
   const { status, contentType, platform, search, tema, monthCurrent, sortBy = 'sort_order', sortDir = 'asc', page = 0, pageSize = 25, pilarKonten, enabled = true } = opts
 
   return useQuery<VideoWithSchedules[]>({
-    queryKey: ['videos', workspaceId, status, contentType, platform, search, tema, monthCurrent, sortBy, sortDir, page, pilarKonten],
+    queryKey: ['videos', workspaceId, status, contentType, platform, search, tema, monthCurrent, sortBy, sortDir, page, pageSize, pilarKonten],
     queryFn: async () => {
       if (!workspaceId) return []
       const supabase = createClient()
@@ -77,8 +77,10 @@ export function useVideos(opts: UseVideosOptions = {}) {
         q = q.gte('updated_at', startOfMonth.toISOString())
       }
 
-      q = q.order(sortBy, { ascending: sortDir === 'asc' })
-        .range(page * pageSize, (page + 1) * pageSize - 1)
+      const from = page * pageSize
+      const to = pageSize >= 10000 ? 99999 : (page + 1) * pageSize - 1
+
+      q = q.order(sortBy, { ascending: sortDir === 'asc' }).range(from, to)
 
       const { data } = await q
       return (data ?? []) as unknown as VideoWithSchedules[]
