@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import { ChevronUp, ChevronDown, Video, Trash2, GripVertical, Pencil, Plus, Filter, Copy, Check } from 'lucide-react'
+import { ChevronUp, ChevronDown, Video, Trash2, GripVertical, Pencil, Plus, Filter, Copy, Check, Loader2 } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuSeparator,
@@ -365,11 +365,13 @@ function CaptionCopyCell({ caption }: { caption: string | null | undefined }) {
   )
 }
 
-function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, onFieldSave, temaOptions, activePlatformFilter }: {
+function SortableRow({ video, index, page, pageSize, isSelected, onToggleSelect, onRowClick, onDelete, onFieldSave, temaOptions, activePlatformFilter }: {
   video: VideoWithSchedules
   index: number
   page: number
   pageSize: number
+  isSelected: boolean
+  onToggleSelect: (id: string) => void
   onRowClick: (v: VideoWithSchedules) => void
   onDelete: (v: VideoWithSchedules) => void
   onFieldSave: SaveFn
@@ -385,17 +387,25 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, onFie
     <tr
       ref={setNodeRef}
       style={style}
-      className={cn('hover:bg-subtle/80 cursor-pointer transition-colors border-b border-border/60', isDragging && 'opacity-50 bg-subtle')}
+      className={cn('hover:bg-subtle/80 cursor-pointer transition-colors border-b border-border/60', isDragging && 'opacity-50 bg-subtle', isSelected && 'bg-accent-light/20')}
       onClick={() => onRowClick(video)}
     >
       <td className="px-2 py-3.5 w-6" onClick={(e) => e.stopPropagation()}>
-        <button
-          {...attributes}
-          {...listeners}
-          className="text-text-muted hover:text-text-primary cursor-grab active:cursor-grabbing touch-none p-0.5"
-        >
-          <GripVertical className="w-3.5 h-3.5" />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect(video.id)}
+            className="w-3.5 h-3.5 rounded border-border text-accent focus:ring-accent accent-[#4C9998] cursor-pointer"
+          />
+          <button
+            {...attributes}
+            {...listeners}
+            className="text-text-muted hover:text-text-primary cursor-grab active:cursor-grabbing touch-none p-0.5"
+          >
+            <GripVertical className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </td>
       <td className="px-3.5 py-3.5 text-xs">
         <NoVideoCell video={video} index={index} page={page} pageSize={pageSize} save={onFieldSave} />
@@ -491,6 +501,8 @@ function SortableRow({ video, index, page, pageSize, onRowClick, onDelete, onFie
 export function TableView({ videos: initialVideos, loading, sortBy, sortDir, page, onSort, onPageChange, onRowClick, total, pageSize, onPageSizeChange, activePlatformFilter, columnFilters }: Props) {
   const totalPages = Math.ceil(total / pageSize)
   const [localVideos, setLocalVideos] = useState<VideoWithSchedules[] | null>(null)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [deletingSelected, setDeletingSelected] = useState(false)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const queryClient = useQueryClient()
   const { workspaceId } = useWorkspace()
@@ -535,6 +547,36 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
 
   const videos = localVideos ?? initialVideos
 
+  const allRowIds = videos.map((v) => v.id)
+  const isAllSelected = allRowIds.length > 0 && allRowIds.every((id) => selectedIds.includes(id))
+
+  function toggleSelectAll() {
+    if (isAllSelected) setSelectedIds([])
+    else setSelectedIds(allRowIds)
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id])
+  }
+
+  async function handleDeleteSelected() {
+    if (!selectedIds.length) return
+    if (!confirm(`Hapus ${selectedIds.length} konten terpilih? Data jadwal dan performa terkait juga akan dihapus.`)) return
+    setDeletingSelected(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('videos').delete().in('id', selectedIds)
+      if (error) throw error
+      toast.success(`${selectedIds.length} konten terpilih berhasil dihapus!`)
+      setSelectedIds([])
+      queryClient.invalidateQueries({ queryKey: ['videos'] })
+    } catch (err: any) {
+      toast.error('Gagal menghapus: ' + err.message)
+    } finally {
+      setDeletingSelected(false)
+    }
+  }
+
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     if (!over || active.id === over.id) return
@@ -559,7 +601,15 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
         <table className="w-full border-collapse min-w-[840px]">
           <thead className="sticky top-0 bg-white border-b border-border z-10">
             <tr>
-              <th className="w-6 px-2" />
+              <th className="w-10 px-2 text-center" onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  checked={isAllSelected}
+                  onChange={toggleSelectAll}
+                  className="w-3.5 h-3.5 rounded border-border text-accent focus:ring-accent accent-[#4C9998] cursor-pointer"
+                  title="Pilih semua di halaman ini"
+                />
+              </th>
               <Th col="no_video" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-28">No. Video</Th>
               <Th col="judul" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Judul</Th>
               <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-40">Tema <HeaderFilter label="Tema" spec={columnFilters?.tema} /></Th>
@@ -590,6 +640,8 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
                         index={index}
                         page={page}
                         pageSize={pageSize}
+                        isSelected={selectedIds.includes(v.id)}
+                        onToggleSelect={toggleSelect}
                         onRowClick={onRowClick}
                         onDelete={handleDelete}
                         onFieldSave={handleFieldSave}
@@ -629,6 +681,28 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
               <option value={10000}>Tampilkan Semua ({total > 0 ? `${total}+` : 'Semua'})</option>
             </select>
           </div>
+        </div>
+      )}
+
+      {/* Floating Action Bar for Selected Rows */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white rounded-full px-5 py-2.5 shadow-2xl flex items-center gap-4 border border-slate-700 animate-in fade-in slide-in-from-bottom-3">
+          <span className="text-xs font-semibold text-slate-200">{selectedIds.length} konten dipilih</span>
+          <div className="h-4 w-px bg-slate-700" />
+          <button
+            onClick={handleDeleteSelected}
+            disabled={deletingSelected}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1 bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-semibold rounded-full transition-all shadow-sm cursor-pointer"
+          >
+            {deletingSelected ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+            <span>Hapus {selectedIds.length} Terpilih</span>
+          </button>
+          <button
+            onClick={() => setSelectedIds([])}
+            className="text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+          >
+            Batal
+          </button>
         </div>
       )}
     </div>
