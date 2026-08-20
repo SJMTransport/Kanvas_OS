@@ -556,16 +556,19 @@ function DistributionTab({
               <div className="flex items-center gap-2">
                 <div className={cn('w-2.5 h-2.5 rounded-full', getPlatformDot(platform))} />
                 <span className="text-xs font-semibold text-text-primary">{PLATFORM_LABELS[platform]}</span>
+                {platformSchedules.length > 0 && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-accent-light/40 text-accent border border-accent/20">
+                    {platformSchedules.length}x Tayang
+                  </span>
+                )}
               </div>
-              {platformSchedules.length === 0 && (
-                <Button size="sm" variant="secondary" className="h-6 text-[10px] gap-1" onClick={(e) => {
-                  e.stopPropagation()
-                  if (platform === adding) { setAdding(null); setEditingId(null) }
-                  else { setAdding(platform); setEditingId(null); setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false, cross_platforms: [] }) }
-                }}>
-                  <Plus className="w-2.5 h-2.5" /> Jadwal
-                </Button>
-              )}
+              <Button size="sm" variant="secondary" className="h-6 text-[10px] gap-1" onClick={(e) => {
+                e.stopPropagation()
+                if (platform === adding && !editingId) { setAdding(null); setEditingId(null) }
+                else { setAdding(platform); setEditingId(null); setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false, cross_platforms: [] }) }
+              }}>
+                <Plus className="w-2.5 h-2.5" /> {platformSchedules.length > 0 ? '+ Tanggal Baru' : '+ Jadwal'}
+              </Button>
             </div>
 
             {adding === platform && (
@@ -921,6 +924,23 @@ function DistributionTab({
                   )}
                 </div>
               ))}
+              {platformSchedules.length > 0 && adding !== platform && (
+                <div className="px-3 py-2 bg-surface/50 border-t border-border flex justify-end">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs gap-1 border-border bg-white hover:bg-subtle text-accent font-medium"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setAdding(platform)
+                      setEditingId(null)
+                      setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false, cross_platforms: [] })
+                    }}
+                  >
+                    <Plus className="w-3 h-3 text-accent" /> + Tambah Tanggal Tayang
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         )
