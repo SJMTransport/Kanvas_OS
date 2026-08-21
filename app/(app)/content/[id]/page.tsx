@@ -2035,10 +2035,28 @@ export default function ContentDetailPage() {
     setSavingLifecycleStage(true)
     try {
       const supabase = createClient()
-      const { error } = await supabase.from('videos').update({ production_status: productionStatus }).eq('id', videoId)
+      // .select('id') is required here — the videos_update RLS policy
+      // (get_member_role IN ('owner','manager') OR assigned_to = auth.uid())
+      // makes an update that matches zero rows a SILENT no-op: Supabase
+      // returns no error at all, it just updates 0 rows. Without checking
+      // the returned rows, this looked like a successful mutation (toast +
+      // no thrown error) while the database was untouched — exactly the
+      // "click reacts, status doesn't actually change" bug. Checking the
+      // returned row count turns that silent denial into an honest,
+      // reported failure instead of a false success.
+      const { data, error } = await supabase
+        .from('videos')
+        .update({ production_status: productionStatus })
+        .eq('id', videoId)
+        .select('id')
       if (error) {
         console.error('Failed to update production_status:', error)
         throw error
+      }
+      if (!data || data.length === 0) {
+        console.error('production_status update matched 0 rows — likely blocked by RLS (videos_update requires owner/manager role or assignment to this content) for video', videoId)
+        toast.error('Gagal mengubah status: kamu tidak memiliki izin untuk mengubah konten ini.')
+        return
       }
       toast.success('Status konten diperbarui')
       queryClient.invalidateQueries({ queryKey: ['video-detail', videoId] })
