@@ -13,7 +13,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
             gcTime: 1000 * 60 * 10,         // cache 10 menit
             retry: 1,
             refetchOnWindowFocus: false,
-            refetchOnMount: false,
+            // Phase 03D — this override was the confirmed root cause of
+            // Calendar/Dashboard staying stale after a schedule mutation:
+            // invalidateQueries() only forces an immediate refetch for
+            // currently-mounted queries; a route visited AFTER invalidation
+            // relies on refetch-on-mount to pick up the now-stale cache,
+            // which this override disabled app-wide. Reverted to the
+            // library default (refetch only when data is actually stale or
+            // invalidated — not on every mount).
           },
         },
       })
