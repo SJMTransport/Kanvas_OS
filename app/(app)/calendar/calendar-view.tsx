@@ -198,6 +198,11 @@ export function CalendarView({ scope = 'all' }: CalendarViewProps = {}) {
     } else {
       toast.success('Jadwal diperbarui')
       queryClient.invalidateQueries({ queryKey })
+      // Drag-reschedule changes a schedule's date, which Dashboard's
+      // "Jadwal Hari Ini" and Action Center also depend on — invalidate
+      // those too, forcing an immediate refetch regardless of mount state.
+      queryClient.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['action-center'], refetchType: 'all' })
     }
   }
 

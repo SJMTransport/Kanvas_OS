@@ -21,10 +21,11 @@ interface KanbanCardProps {
   video: VideoWithSchedules
   onClick: (v: VideoWithSchedules) => void
   overlay?: boolean
+  dragDisabled?: boolean
 }
 
-function KanbanCard({ video, onClick, overlay }: KanbanCardProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: video.id })
+function KanbanCard({ video, onClick, overlay, dragDisabled }: KanbanCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: video.id, disabled: dragDisabled })
   const style = { transform: CSS.Transform.toString(transform), transition }
   const platforms = [...new Set(video.video_platform_schedules?.map((s) => s.platform as Platform) ?? [])]
   const nextSchedule = video.video_platform_schedules?.[0]
@@ -34,12 +35,13 @@ function KanbanCard({ video, onClick, overlay }: KanbanCardProps) {
       ref={setNodeRef}
       style={style}
       className={cn(
-        'bg-white border border-border/70 rounded-xl p-3 cursor-grab active:cursor-grabbing select-none shadow-card hover:shadow-subtle transition-all',
+        'bg-white border border-border/70 rounded-xl p-3 select-none shadow-card hover:shadow-subtle transition-all',
+        dragDisabled ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing',
         isDragging && 'opacity-40',
         overlay && 'shadow-modal rotate-1'
       )}
-      {...attributes}
-      {...listeners}
+      {...(dragDisabled ? {} : attributes)}
+      {...(dragDisabled ? {} : listeners)}
       onClick={(e) => { if (!isDragging) onClick(video) }}
     >
       {video.thumbnail_url && (
@@ -87,16 +89,32 @@ interface Props {
   onCardClick: (v: VideoWithSchedules) => void
 }
 
+// Phase 04 — Kanban ordering. `sort_order` (the existing drag-and-drop
+// field) stays the DEFAULT — nothing about existing manual ordering
+// changes. This adds an explicit, additive "No. Konten" view mode that
+// re-sorts each column by no_video ascending, purely client-side over
+// already-fetched data — no change to the fetch, no change to sort_order,
+// no change to what "manual" mode does. Numeric-aware (VID-2 < VID-10),
+// not lexical string sort.
+function parseVideoNo(no_video?: string | null): number {
+  if (!no_video) return Number.POSITIVE_INFINITY
+  const digits = no_video.replace(/\D/g, '')
+  return digits ? parseInt(digits, 10) : Number.POSITIVE_INFINITY
+}
+
 export function KanbanView({ videos, onCardClick }: Props) {
   const [dragging, setDragging] = useState<VideoWithSchedules | null>(null)
+  const [sortMode, setSortMode] = useState<'manual' | 'no_video'>('manual')
   const updateStatus = useUpdateVideoStatus()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
-  const columns = STATUS_ORDER.map((status) => ({
-    status,
-    label: STATUS_CONFIG[status].label,
-    videos: videos.filter((v) => v.status === status),
-  }))
+  const columns = STATUS_ORDER.map((status) => {
+    const colVideos = videos.filter((v) => v.status === status)
+    if (sortMode === 'no_video') {
+      colVideos.sort((a, b) => parseVideoNo(a.no_video) - parseVideoNo(b.no_video))
+    }
+    return { status, label: STATUS_CONFIG[status].label, videos: colVideos }
+  })
 
   function handleDragStart(e: DragStartEvent) {
     const video = videos.find((v) => v.id === e.active.id)
@@ -120,7 +138,30 @@ export function KanbanView({ videos, onCardClick }: Props) {
   }
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex items-center justify-end gap-1.5 px-1 pb-2 shrink-0">
+        <span className="text-[11px] text-text-muted mr-1">Urutan:</span>
+        <button
+          onClick={() => setSortMode('manual')}
+          className={cn('text-[11px] font-medium px-2 py-1 rounded-md border transition-colors',
+            sortMode === 'manual' ? 'bg-accent text-white border-accent' : 'bg-white text-text-secondary border-border hover:bg-subtle')}
+        >
+          Manual (Drag)
+        </button>
+        <button
+          onClick={() => setSortMode('no_video')}
+          className={cn('text-[11px] font-medium px-2 py-1 rounded-md border transition-colors',
+            sortMode === 'no_video' ? 'bg-accent text-white border-accent' : 'bg-white text-text-secondary border-border hover:bg-subtle')}
+        >
+          No. Konten
+        </button>
+      </div>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={sortMode === 'manual' ? handleDragStart : undefined}
+        onDragEnd={sortMode === 'manual' ? handleDragEnd : undefined}
+      >
       <div className="flex flex-1 min-h-0 w-full overflow-x-auto overflow-y-hidden gap-3 p-4 bg-[#F7FAF9]/60 rounded-[16px] border border-[#E8EEEC]">
         {columns.map((col) => (
           <div
@@ -137,7 +178,7 @@ export function KanbanView({ videos, onCardClick }: Props) {
             <SortableContext items={col.videos.map((v) => v.id)} strategy={verticalListSortingStrategy} id={col.status}>
               <div className="flex-1 overflow-y-auto p-1.5 space-y-2 min-h-0">
                 {col.videos.map((v) => (
-                  <KanbanCard key={v.id} video={v} onClick={onCardClick} />
+                  <KanbanCard key={v.id} video={v} onClick={onCardClick} dragDisabled={sortMode !== 'manual'} />
                 ))}
                 {col.videos.length === 0 && (
                   <div className="py-8 text-center">
@@ -152,6 +193,7 @@ export function KanbanView({ videos, onCardClick }: Props) {
       <DragOverlay>
         {dragging && <KanbanCard video={dragging} onClick={() => {}} overlay />}
       </DragOverlay>
-    </DndContext>
+      </DndContext>
+    </div>
   )
 }

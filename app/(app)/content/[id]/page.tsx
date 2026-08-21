@@ -353,15 +353,25 @@ function DistributionTab({
 }) {
   const queryClient = useQueryClient()
 
-  // Phase 03B-2 fix — Dashboard's "Jadwal Hari Ini" and Calendar both read
-  // schedule data under their own query keys (['dashboard', workspaceId] and
-  // ['calendar-events', ...]), which this tab's schedule mutations never
-  // invalidated (only ['schedules']/['schedules-video', ...] were, which
-  // don't match either). That's the confirmed reason those screens required
-  // a hard refresh to show a newly-saved schedule.
+  // Phase 03B-2/03D/04 fix — Dashboard's "Jadwal Hari Ini", the Action
+  // Center widget, and Calendar each read schedule-derived data under
+  // their own query keys (['dashboard', workspaceId], ['action-center',
+  // workspaceId], ['calendar-events', ...]). None of these were ever
+  // invalidated by this tab's schedule mutations before 03B-2/03D, and
+  // ['action-center'] was still missed by both those phases — a real,
+  // separate gap, now closed here.
+  //
+  // refetchType: 'all' (not the invalidateQueries default of 'active')
+  // is used deliberately: it forces these queries to refetch immediately,
+  // right now, even though Dashboard/Calendar/Action Center are not
+  // mounted while the user is on Content Detail. This removes any
+  // dependency on "does mounting later actually trigger a refetch" —
+  // fresh data is already sitting in the cache by the time the user
+  // navigates there, regardless of refetchOnMount/staleTime behavior.
   function invalidateScheduleDependents() {
-    queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-    queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
+    queryClient.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' })
+    queryClient.invalidateQueries({ queryKey: ['calendar-events'], refetchType: 'all' })
+    queryClient.invalidateQueries({ queryKey: ['action-center'], refetchType: 'all' })
   }
   const { workspaceId } = useWorkspace()
   const [adding, setAdding] = useState<Platform | null>(null)

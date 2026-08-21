@@ -52,6 +52,18 @@ export function ContentLifecycleControl({ videoId, productionStatus, onGoToBrand
     setSaving(true)
     try {
       const supabase = createClient()
+      // Phase 04 — deliberately does NOT also write legacy videos.status
+      // here. Investigation found the auto_assign_no_upload trigger fires
+      // on EVERY update to a videos row and, whenever NEW.status is not
+      // 'scheduled'/'live', unconditionally resets no_video to 'VID-000' —
+      // including for a video that is currently 'scheduled'/'live' with a
+      // real number. A legitimate "Live → Editing" revision (explicitly
+      // called out as a valid backward transition in Phase 03E) would
+      // therefore silently destroy that content's real VID-XXX number the
+      // moment this control wrote a mapped legacy status. That is a real
+      // regression, not a safe compatibility projection — so Kanban's
+      // dependency on legacy status is left as a confirmed, documented
+      // BLOCKER (see final report) rather than papered over here.
       const { error } = await supabase.from('videos').update({ production_status: next }).eq('id', videoId)
       if (error) {
         console.error('Failed to update production_status:', error)
@@ -59,7 +71,7 @@ export function ContentLifecycleControl({ videoId, productionStatus, onGoToBrand
       }
       toast.success('Status produksi diperbarui')
       queryClient.invalidateQueries({ queryKey: ['video-detail', videoId] })
-      queryClient.invalidateQueries({ queryKey: ['videos'] })
+      queryClient.invalidateQueries({ queryKey: ['videos'], refetchType: 'all' })
     } catch (err) {
       toast.error('Gagal mengubah status produksi')
       setValue(previous)
