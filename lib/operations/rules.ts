@@ -357,6 +357,27 @@ function normalizedProductionStage(v: LifecycleInput): 'idea' | 'scripting' | 'p
  * derived from videos.status, since migration 030 promotes it to 'live' on
  * a single platform posting. hasActiveSchedule is true once at least one
  * platform schedule exists (regardless of whether it's posted yet).
+ *
+ * Priority, root-caused: this used to check isFullyPublished/hasActiveSchedule
+ * BEFORE production_status, which meant that for any content that already
+ * had real schedules (the normal case for most published content),
+ * production_status could never move the displayed stage at all — a user
+ * clicking "Editing" on a Live video would write production_status
+ * successfully, but the computed stage would still return 'live'
+ * unconditionally, making the click look like it had no effect. An
+ * explicit, active production_status (anything short of 'ready' — the
+ * user deliberately said "this needs work") now takes priority: it's a
+ * real, intentional workflow signal (e.g. revising a live video after
+ * spotting an error, explicitly called out as a legitimate transition)
+ * and must be reflected immediately. Only once production reaches
+ * 'ready' does real publishing evidence (schedule existence/completion)
+ * decide the stage — which preserves the exact existing behavior for the
+ * large majority of content that sits at production_status='ready' once
+ * published, and is unaffected by this change. This function is consumed
+ * only by Content Detail's and Calendar's display surfaces (not by
+ * Action Center/deadline-hiding, which call isPublishingFullyDone
+ * directly) — reordering it here does not change any overdue/deadline
+ * business rule.
  */
 export function computeContentLifecycleStage(
   v: LifecycleInput,
@@ -364,12 +385,13 @@ export function computeContentLifecycleStage(
   hasActiveSchedule: boolean
 ): ContentLifecycleStage {
   if (v.status === 'archived') return 'archived'
+
+  const stage = normalizedProductionStage(v)
+  if (stage !== 'ready') return stage
+
   if (isFullyPublished) return 'live'
   if (hasActiveSchedule) return 'scheduled'
 
-  const stage = normalizedProductionStage(v)
   const approvalOk = !v.approval_status || v.approval_status === 'approved' || v.approval_status === 'not_required'
-  if (stage === 'ready' && approvalOk) return 'ready_to_publish'
-  if (stage === 'ready') return 'editing' // production done but still waiting on approval
-  return stage
+  return approvalOk ? 'ready_to_publish' : 'editing'
 }
