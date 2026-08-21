@@ -17,6 +17,7 @@ import type { Platform } from '@/lib/types'
 import type { RecentVideo } from './page'
 import { PageContainer, PageHeader } from '@/components/layout/page-header'
 import { ActionCenter } from '@/components/dashboard/action-center'
+import { ContentIdentity } from '@/components/content/ContentIdentity'
 import type { ActionItem } from '@/lib/operations/rules'
 import { cn } from '@/lib/utils'
 
@@ -35,7 +36,7 @@ interface Schedule {
   platform: Platform
   jam_post: string | null
   tanggal_tayang: string
-  videos: { id: string; judul: string; thumbnail_url: string | null; status: string } | null
+  videos: { id: string; judul: string; no_video?: string | null; thumbnail_url: string | null; status: string } | null
 }
 
 interface Followup {
@@ -193,7 +194,7 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
                     )}
                   </div>
                   <p className="text-xs font-medium text-text-primary line-clamp-2 leading-tight">
-                    {s.videos?.judul ?? 'Video'}
+                    <ContentIdentity videoNo={s.videos?.no_video} judul={s.videos?.judul} emptyPlaceholder="Video" />
                   </p>
                 </div>
               </Link>
@@ -389,7 +390,7 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
                       <p className="text-sm text-text-primary">
                         <span className="font-medium">{firstOf(v.users)?.full_name ?? 'Seseorang'}</span>
                         {' '}mengupdate{' '}
-                        <span className="font-medium">"{v.judul}"</span>
+                        <span className="font-medium">"<ContentIdentity videoNo={v.no_video} judul={v.judul} />"</span>
                       </p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <Badge variant="secondary" className="text-[10px] py-0 px-1.5">

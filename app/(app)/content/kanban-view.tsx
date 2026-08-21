@@ -9,6 +9,7 @@ import { format, parseISO } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
 import { Video, CalendarDays, ClipboardList } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { ContentIdentity } from '@/components/content/ContentIdentity'
 import { getStatusBadgeClass, STATUS_CONFIG, STATUS_ORDER } from '@/lib/utils/status'
 import { getPlatformDot } from '@/lib/utils/platform'
 import { useUpdateVideoStatus } from '@/lib/hooks/useVideos'
@@ -46,7 +47,9 @@ function KanbanCard({ video, onClick, overlay }: KanbanCardProps) {
           <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover" />
         </div>
       )}
-      <p className="text-xs font-semibold text-text-primary line-clamp-2 leading-snug mb-2.5">{video.judul}</p>
+      <p className="text-xs font-semibold text-text-primary line-clamp-2 leading-snug mb-2.5">
+        <ContentIdentity videoNo={video.no_video} judul={video.judul} numberClassName="font-mono text-text-muted" />
+      </p>
       <div className="flex items-center justify-between pt-1 border-t border-border/40">
         <div className="flex items-center gap-1">
           {platforms.slice(0, 3).map((p) => (

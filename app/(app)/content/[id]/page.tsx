@@ -20,7 +20,6 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { getStatusBadgeClass, STATUS_CONFIG } from '@/lib/utils/status'
 import { getPlatformDot, getPlatformBadge } from '@/lib/utils/platform'
 import { formatNumber, formatDate } from '@/lib/utils/formatters'
 import {
@@ -39,68 +38,18 @@ import {
 import { computeFinancialStatus, isInvoiceOverdue, FINANCIAL_STATUS_CONFIG } from '@/lib/utils/financial'
 import { formatRupiah } from '@/lib/utils/formatters'
 import { ScriptBlocks, type ScriptBlock } from '@/components/content/ScriptBlocks'
+import { ContentIdentity } from '@/components/content/ContentIdentity'
+import { LifecycleIndicator } from '@/components/content/LifecycleIndicator'
 import { VideoWorkBadges } from '@/components/content/VideoWorkBadges'
 import { PlatformEmbed } from '@/components/content/PlatformEmbed'
-import type { VideoStatus, Platform } from '@/lib/types'
+import type { Platform } from '@/lib/types'
 import type { VideoWithSchedules } from '@/lib/hooks/useVideos'
 
 const PLATFORMS: Platform[] = ['tiktok', 'instagram', 'youtube', 'facebook']
 const PLATFORM_LABELS: Record<Platform, string> = {
   tiktok: 'TikTok', instagram: 'Instagram', youtube: 'YouTube', facebook: 'Facebook',
 }
-const ALL_STATUSES: VideoStatus[] = ['ide', 'scripting', 'produksi', 'editing', 'scheduled', 'live', 'archived']
 
-// ─── Status Stepper ─────────────────────────────────────────────────────────
-
-function StatusStepper({ currentStatus, onStatusChange }: { currentStatus: VideoStatus; onStatusChange: (s: VideoStatus) => void }) {
-  const currentIndex = ALL_STATUSES.indexOf(currentStatus)
-  return (
-    <div className="w-full bg-white border border-border rounded-xl p-3 shadow-sm">
-      <div className="relative flex items-center justify-between px-2">
-        {/* Progress Line */}
-        <div className="absolute left-6 right-6 top-3 h-0.5 bg-border -z-10" />
-        <div 
-          className="absolute left-6 top-3 h-0.5 bg-accent transition-all duration-300 -z-10" 
-          style={{ width: `${(currentIndex / (ALL_STATUSES.length - 1)) * 100}%` }}
-        />
-        
-        {ALL_STATUSES.map((status, index) => {
-          const isCompleted = index <= currentIndex
-          const isActive = status === currentStatus
-          const config = STATUS_CONFIG[status]
-          return (
-            <button
-              key={status}
-              onClick={() => onStatusChange(status)}
-              className="flex flex-col items-center group cursor-pointer focus:outline-none"
-            >
-              <div 
-                className={cn(
-                  "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all duration-300",
-                  isActive 
-                    ? "bg-accent border-accent text-white scale-110 shadow-sm"
-                    : isCompleted
-                      ? "bg-accent/10 border-accent text-accent"
-                      : "bg-white border-border text-text-muted hover:border-text-secondary"
-                )}
-              >
-                {isCompleted && !isActive ? "✓" : index + 1}
-              </div>
-              <span 
-                className={cn(
-                  "text-[10px] mt-1.5 font-medium transition-colors duration-300 hidden md:block",
-                  isActive ? "text-accent font-bold" : "text-text-muted group-hover:text-text-primary"
-                )}
-              >
-                {config?.label ?? status}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
 
 // ─── Suggestion Tema Select ──────────────────────────────────────────────────
 
@@ -1234,10 +1183,12 @@ function ContentLifecycleHeader({
   return (
     <div className="bg-white border border-border rounded-xl p-5 shadow-sm space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          {videoNo && <p className="text-xs font-mono text-text-muted">{videoNo}</p>}
-          <h2 className="font-heading font-bold text-lg text-text-primary">{judul}</h2>
-        </div>
+        <ContentIdentity
+          videoNo={videoNo}
+          judul={judul}
+          className="font-heading font-bold text-lg text-text-primary"
+          numberClassName="font-mono text-text-muted text-sm"
+        />
         <Badge variant="outline" className={cn('text-xs font-bold px-3 py-1', LIFECYCLE_CONFIG[stage].badgeClass)}>
           {LIFECYCLE_CONFIG[stage].label}
         </Badge>
@@ -1273,24 +1224,8 @@ function ContentLifecycleHeader({
         </div>
       )}
 
-      <div className="flex items-center gap-1 pt-1 overflow-x-auto">
-        {LIFECYCLE_ORDER.map((s, i) => {
-          const currentIdx = LIFECYCLE_ORDER.indexOf(stage)
-          const isDone = i < currentIdx
-          const isCurrent = s === stage
-          return (
-            <div key={s} className="flex items-center shrink-0">
-              <span className={cn(
-                'text-[10px] font-semibold px-2 py-1 rounded-full whitespace-nowrap',
-                isCurrent ? cn('ring-1 ring-offset-1', LIFECYCLE_CONFIG[s].badgeClass) :
-                isDone ? 'text-text-muted bg-subtle' : 'text-text-muted/50 bg-subtle/50'
-              )}>
-                {LIFECYCLE_CONFIG[s].label}
-              </span>
-              {i < LIFECYCLE_ORDER.length - 1 && <span className="w-3 h-px bg-border mx-0.5" />}
-            </div>
-          )
-        })}
+      <div className="pt-1">
+        <LifecycleIndicator stage={stage} showBadge={false} showSteps />
       </div>
     </div>
   )
@@ -1721,7 +1656,6 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
             <Badge variant="outline" className={cn('text-xs font-bold capitalize', PRODUCTION_STATUS_CONFIG[prodStatus]?.badgeClass)}>
               {PRODUCTION_STATUS_CONFIG[prodStatus]?.label || prodStatus}
             </Badge>
-            <span className="text-[10px] text-text-muted capitalize">Workflow: {video.status}</span>
           </div>
           <Select value={newProductionStatus} onValueChange={handleUpdateProductionStatus} disabled={updatingProduction}>
             <SelectTrigger className="h-8 text-xs bg-white"><SelectValue /></SelectTrigger>
@@ -2034,26 +1968,20 @@ export default function ContentDetailPage() {
     return map
   }, [perfRecords])
 
-  async function handleStatusChange(newStatus: VideoStatus) {
-    if (!video) return
-    const supabase = createClient()
-    const payload: Record<string, any> = {
-      status: newStatus,
-      updated_at: new Date().toISOString(),
-    }
-    const { error } = await supabase
-      .from('videos')
-      .update(payload)
-      .eq('id', video.id)
-    
-    if (error) {
-      toast.error(error.message)
-    } else {
-      toast.success(`Status diubah ke ${STATUS_CONFIG[newStatus]?.label ?? newStatus}`)
-      queryClient.invalidateQueries({ queryKey: ['videos'] })
-      queryClient.invalidateQueries({ queryKey: ['video-detail', video.id] })
-    }
-  }
+  // Same shared schedule-completion signal used across Calendar/Action
+  // Center/Content Detail (isPublishingFullyDone) — never derived from
+  // legacy videos.status. Shares its query key with ContentBrandTab's own
+  // fetch, so react-query dedupes the network call.
+  const { data: headerScheduleRows = [] } = useQuery({
+    queryKey: ['content-schedule-statuses', id],
+    enabled: !!id,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data, error } = await supabase.from('video_platform_schedules').select('status').eq('video_id', id)
+      if (error) { console.error('Failed to load schedule statuses:', error); return [] }
+      return data ?? []
+    },
+  })
 
   async function handleExportAll() {
     setExporting(true)
@@ -2096,6 +2024,12 @@ export default function ContentDetailPage() {
     </div>
   )
 
+  const lifecycleStage = computeContentLifecycleStage(
+    { status: video.status, production_status: video.production_status, approval_status: video.approval_status },
+    isPublishingFullyDone(headerScheduleRows.map((s: any) => s.status)),
+    headerScheduleRows.length > 0
+  )
+
   const totalViews = Object.values(platformData).reduce((sum, d: any) => sum + (Number(d?.views) || 0), 0)
   const totalLikes = Object.values(platformData).reduce((sum, d: any) => sum + (Number(d?.likes) || 0), 0)
   const totalComments = Object.values(platformData).reduce((sum, d: any) => sum + (Number(d?.comments) || 0), 0)
@@ -2114,18 +2048,10 @@ export default function ContentDetailPage() {
           </button>
           <div className="flex items-center gap-3">
             <h1 className="font-heading font-bold text-2xl text-text-primary leading-tight">
-              {video.judul || <span className="text-text-muted italic">Ketik judul...</span>}
+              <ContentIdentity videoNo={video.no_video} judul={video.judul} emptyPlaceholder="Ketik judul..." />
             </h1>
-            {video.no_video && (
-              <span className="text-xs text-text-muted font-mono bg-subtle px-2 py-1 rounded-md border border-border">
-                {video.no_video}
-              </span>
-            )}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={cn('inline-flex text-[10px] px-2 py-0.5 rounded-full border font-medium uppercase tracking-wider', getStatusBadgeClass(video.status as VideoStatus))}>
-              {STATUS_CONFIG[video.status as VideoStatus]?.label ?? video.status}
-            </span>
             {video.format && (
               <span className="text-[10px] text-text-muted bg-surface px-2 py-0.5 rounded-full border border-border font-medium">
                 {video.format}
@@ -2134,7 +2060,7 @@ export default function ContentDetailPage() {
             <VideoWorkBadges videoId={video.id} />
           </div>
           <div className="pt-2 max-w-2xl">
-            <StatusStepper currentStatus={video.status as VideoStatus} onStatusChange={handleStatusChange} />
+            <LifecycleIndicator stage={lifecycleStage} />
           </div>
         </div>
 

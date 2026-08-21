@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ContentIdentity } from '@/components/content/ContentIdentity'
 import {
   ArrowLeft, Plus, Video as VideoIcon, Lightbulb, MapPin, Bookmark,
   Trash2, AlertTriangle, Search, Check, ChevronRight, Film, Layers, X,
@@ -96,16 +97,19 @@ export default function WorkDetailPage() {
       }
 
       const labelMap = new Map<string, string>() // `${type}:${id}` -> label
+      const noVideoMap = new Map<string, string | null>() // `video:${id}` -> no_video, video items only
       await Promise.all(
         Array.from(byType.entries()).map(async ([type, ids]) => {
           const config = ITEM_TYPES[type]
           if (!config) return
+          const extraCols = type === 'video' ? ', no_video' : ''
           const { data: metas } = await supabase
             .from(config.table)
-            .select(`id, ${config.labelField}`)
+            .select(`id, ${config.labelField}${extraCols}`)
             .in('id', ids)
-          for (const m of (metas ?? []) as Record<string, string>[]) {
+          for (const m of (metas ?? []) as Record<string, any>[]) {
             labelMap.set(`${type}:${m.id}`, m[config.labelField] ?? 'Tanpa judul')
+            if (type === 'video') noVideoMap.set(`video:${m.id}`, m.no_video ?? null)
           }
         })
       )
@@ -113,6 +117,7 @@ export default function WorkDetailPage() {
       return rows.map((item) => ({
         ...item,
         label: labelMap.get(`${item.item_type}:${item.item_id}`) ?? 'Tanpa judul',
+        noVideo: item.item_type === 'video' ? noVideoMap.get(`video:${item.item_id}`) ?? null : null,
       }))
     },
     enabled: !!id,
@@ -311,10 +316,13 @@ export default function WorkDetailPage() {
                         <div className="flex-1 min-w-0">
                           {href ? (
                             <Link href={href} className="text-sm font-medium text-text-primary truncate hover:text-accent flex items-center gap-1">
-                              {item.label} <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100" />
+                              {item.item_type === 'video' ? <ContentIdentity videoNo={(item as any).noVideo} judul={item.label} /> : item.label}
+                              <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100" />
                             </Link>
                           ) : (
-                            <p className="text-sm font-medium text-text-primary truncate">{item.label}</p>
+                            <p className="text-sm font-medium text-text-primary truncate">
+                              {item.item_type === 'video' ? <ContentIdentity videoNo={(item as any).noVideo} judul={item.label} /> : item.label}
+                            </p>
                           )}
                         </div>
                         <Badge variant="secondary" className={`text-[10px] ${g.config.color}`}>{g.config.label}</Badge>

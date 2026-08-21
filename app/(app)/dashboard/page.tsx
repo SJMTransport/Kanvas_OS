@@ -29,14 +29,14 @@ export default function DashboardPage() {
       // All queries run in parallel — much faster than sequential.
       // Each is settled independently so one flaky request can't sink the whole dashboard.
       const results = await Promise.allSettled([
-        supabase.from('video_platform_schedules').select('*, videos!inner(id, judul, thumbnail_url, status, workspace_id)').eq('videos.workspace_id', workspaceId).eq('tanggal_tayang', today).order('jam_post', { ascending: true }),
+        supabase.from('video_platform_schedules').select('*, videos!inner(id, judul, no_video, thumbnail_url, status, workspace_id)').eq('videos.workspace_id', workspaceId).eq('tanggal_tayang', today).order('jam_post', { ascending: true }),
         supabase.from('videos').select('*', { count: 'exact', head: true }).eq('workspace_id', workspaceId),
         supabase.from('videos').select('*', { count: 'exact', head: true }).eq('workspace_id', workspaceId).eq('status', 'scheduled'),
         supabase.from('video_platform_schedules').select('video_id, videos!inner(workspace_id)').eq('videos.workspace_id', workspaceId).gte('tanggal_tayang', monthStart).lte('tanggal_tayang', monthEnd),
         supabase.from('videos').select('*', { count: 'exact', head: true }).eq('workspace_id', workspaceId).in('status', ['ide', 'scripting', 'produksi', 'editing']),
         supabase.from('brands').select('id, nama_brand, status, next_followup_date, industri').eq('workspace_id', workspaceId).not('status', 'in', '("selesai","cold")').lte('next_followup_date', today).order('next_followup_date', { ascending: true }).limit(5),
         supabase.from('invoices').select('id, invoice_number, total, due_date, brands(nama_brand)').eq('workspace_id', workspaceId).eq('status', 'overdue').order('due_date', { ascending: true }).limit(5),
-        supabase.from('videos').select('id, judul, status, updated_at, created_by, users(full_name)').eq('workspace_id', workspaceId).order('updated_at', { ascending: false }).limit(5),
+        supabase.from('videos').select('id, judul, no_video, status, updated_at, created_by, users(full_name)').eq('workspace_id', workspaceId).order('updated_at', { ascending: false }).limit(5),
         supabase.rpc('pilar_konten_counts', { ws_id: workspaceId }),
       ])
 
@@ -120,6 +120,7 @@ export default function DashboardPage() {
 export interface RecentVideo {
   id: string
   judul: string
+  no_video?: string | null
   status: string
   updated_at: string | null
   created_by: string | null
