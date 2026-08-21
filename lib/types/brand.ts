@@ -153,15 +153,24 @@ export interface ContentDeliverable {
 export interface DealPayment {
   id: string
   deal_id: string
+  invoice_id?: string | null
   amount: number
   payment_type: PaymentType
   due_date?: string | null
   paid_date?: string | null
   status: PaymentStatus
+  payment_method?: string | null
+  proof_url?: string | null
+  paid_by?: string | null
   notes?: string | null
   created_at: string
   updated_at: string
 }
+
+// Quotation and Invoice already have canonical definitions in
+// lib/types/index.ts (extended there for Phase 3.5 with deal_id/
+// quotation_id) — intentionally not redefined here to avoid two competing
+// financial-entity type models.
 
 export interface DealSchedule {
   id: string

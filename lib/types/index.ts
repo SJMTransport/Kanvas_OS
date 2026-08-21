@@ -231,6 +231,9 @@ export interface Quotation {
   id: string
   workspace_id: string
   brand_id: string
+  // Added by migration 035 (Phase 3.5) — nullable, a quotation can predate
+  // a formally created Deal.
+  deal_id?: string | null
   quotation_number: string
   tanggal: string
   expired_date: string | null
@@ -272,6 +275,9 @@ export interface Invoice {
   workspace_id: string
   brand_id: string
   deal_id: string | null
+  // Added by migration 035 (Phase 3.5) — nullable, plenty of legitimate
+  // invoices are created directly against a Deal with no quotation at all.
+  quotation_id?: string | null
   invoice_number: string
   type: InvoiceType
   tanggal: string

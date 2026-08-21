@@ -35,8 +35,25 @@ export default function QuotationNewPage() {
   const queryClient = useQueryClient()
 
   const brandIdParam = searchParams.get('brandId') ?? ''
+  const dealIdParam = searchParams.get('dealId') ?? ''
 
   const [brandId, setBrandId] = useState(brandIdParam)
+
+  // If created from a Deal, lock the Brand to that Deal's brand — the
+  // context is already known, no need to ask the user to re-select it.
+  const { data: linkedDeal } = useQuery({
+    queryKey: ['quotation-source-deal', dealIdParam],
+    enabled: !!dealIdParam,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase.from('deals').select('id, brand_id, title, nama_campaign').eq('id', dealIdParam).single()
+      return data
+    },
+  })
+
+  useEffect(() => {
+    if (linkedDeal?.brand_id) setBrandId(linkedDeal.brand_id)
+  }, [linkedDeal])
   const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0])
   const [berlakuHingga, setBerlakuHingga] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() + 14); return d.toISOString().split('T')[0]
@@ -73,30 +90,42 @@ export default function QuotationNewPage() {
     setSaving(true)
     try {
       const supabase = createClient()
-      const { data: numData } = await supabase.rpc('generate_doc_number', { p_workspace_id: workspaceId, p_type: 'QUO' })
-      const nomor = numData ?? `QUO-${Date.now()}`
+      // generate_doc_number(ws_id, doc_type) — see 007_functions.sql.
+      // Column names below match quotations' actual schema (005_brand.sql):
+      // quotation_number/expired_date/tax_pct/notes, not nomor/berlaku_hingga/
+      // pajak/catatan — those never existed, which silently broke every save
+      // this page ever attempted (confirmed during the Phase 3.5 audit).
+      const { data: numData, error: numErr } = await supabase.rpc('generate_doc_number', { ws_id: workspaceId, doc_type: 'QUO' })
+      if (numErr) console.error('Failed to generate quotation number:', numErr)
+      const quotationNumber = numData ?? `QUO-${Date.now()}`
 
       const payload = {
         workspace_id: workspaceId,
         brand_id: brandId,
-        nomor,
+        deal_id: dealIdParam || null,
+        quotation_number: quotationNumber,
         tanggal,
-        berlaku_hingga: berlakuHingga,
+        expired_date: berlakuHingga,
         items: items.map(({ id: _id, ...rest }) => rest),
         subtotal,
         diskon,
-        pajak,
+        tax_pct: pajak,
         total,
         payment_terms: paymentTerms || null,
-        catatan: catatan || null,
+        notes: catatan || null,
         status,
       }
       const { error } = await supabase.from('quotations').insert(payload)
-      if (error) throw error
+      if (error) {
+        console.error('Failed to save quotation:', error)
+        throw error
+      }
       toast.success(status === 'draft' ? 'Draft tersimpan!' : 'Quotation terkirim!')
       queryClient.invalidateQueries({ queryKey: ['brand-quotations', brandId] })
-      router.push(brandId ? `/brand/${brandId}` : '/brand')
+      queryClient.invalidateQueries({ queryKey: ['deal-quotations', dealIdParam] })
+      router.push(dealIdParam ? `/brand/deals/${dealIdParam}` : brandId ? `/brand/${brandId}` : '/brand')
     } catch (err) {
+      console.error('Quotation save failed:', err)
       toast.error(err instanceof Error ? err.message : 'Terjadi kesalahan')
     } finally {
       setSaving(false)
@@ -135,7 +164,14 @@ export default function QuotationNewPage() {
         <button onClick={() => router.back()} className="text-text-muted hover:text-accent transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <h1 className="font-heading text-xl font-bold text-text-primary">Buat Quotation</h1>
+        <div>
+          <h1 className="font-heading text-xl font-bold text-text-primary">Buat Quotation</h1>
+          {linkedDeal && (
+            <p className="text-xs text-text-muted mt-0.5">
+              Untuk Deal: <strong className="text-accent">{linkedDeal.title || linkedDeal.nama_campaign}</strong>
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="space-y-6">
@@ -143,7 +179,7 @@ export default function QuotationNewPage() {
         <div className="bg-white border border-border rounded-xl p-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-1.5">
             <Label>Brand <span className="text-error">*</span></Label>
-            <Select value={brandId} onValueChange={setBrandId}>
+            <Select value={brandId} onValueChange={setBrandId} disabled={!!dealIdParam}>
               <SelectTrigger><SelectValue placeholder="Pilih brand" /></SelectTrigger>
               <SelectContent>
                 {(brands ?? []).map((b) => <SelectItem key={b.id} value={b.id}>{b.nama_brand}</SelectItem>)}

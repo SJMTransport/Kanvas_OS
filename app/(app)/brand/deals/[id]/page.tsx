@@ -17,8 +17,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { toast } from 'sonner'
 import {
   ArrowLeft, Plus, Loader2, FileText, Video, DollarSign, Calendar,
-  CheckCircle2, Link as LinkIcon, Trash2, ExternalLink, Layers, Pencil, AlertTriangle
+  CheckCircle2, Link as LinkIcon, Trash2, ExternalLink, Layers, Pencil, AlertTriangle, Upload, Paperclip
 } from 'lucide-react'
+import Link from 'next/link'
 import { formatDate, formatRupiah } from '@/lib/utils/formatters'
 import {
   getApprovalAgingText,
@@ -28,6 +29,8 @@ import {
 } from '@/lib/utils/workflow'
 import { cn } from '@/lib/utils'
 import type { DealDeliverable, DealPayment, DealSchedule, DealBrief, DealSow } from '@/lib/types/brand'
+import type { Quotation, Invoice } from '@/lib/types'
+import { computeFinancialStatus, isInvoiceOverdue, FINANCIAL_STATUS_CONFIG } from '@/lib/utils/financial'
 import { AddVideoSheet } from '@/app/(app)/content/add-video-sheet'
 
 export default function DealDetailPage() {
@@ -60,9 +63,27 @@ export default function DealDetailPage() {
   const [payAmount, setPayAmount] = useState('')
   const [payType, setPayType] = useState('dp')
   const [payDueDate, setPayDueDate] = useState('')
+  const [payPaidDate, setPayPaidDate] = useState('')
   const [payStatus, setPayStatus] = useState('pending')
   const [payNotes, setPayNotes] = useState('')
+  const [payInvoiceId, setPayInvoiceId] = useState('')
+  const [payBy, setPayBy] = useState('')
+  const [payMethod, setPayMethod] = useState('transfer')
+  const [payProofUrl, setPayProofUrl] = useState('')
+  const [uploadingProof, setUploadingProof] = useState(false)
   const [deletePaymentTarget, setDeletePaymentTarget] = useState<DealPayment | null>(null)
+
+  // Invoice Form (shared by create + edit)
+  const [addInvoiceOpen, setAddInvoiceOpen] = useState(false)
+  const [invEditingId, setInvEditingId] = useState<string | null>(null)
+  const [invType, setInvType] = useState<'dp' | 'pelunasan' | 'full'>('dp')
+  const [invTotal, setInvTotal] = useState('')
+  const [invTanggal, setInvTanggal] = useState(new Date().toISOString().split('T')[0])
+  const [invDueDate, setInvDueDate] = useState('')
+  const [invStatus, setInvStatus] = useState<'draft' | 'sent' | 'overdue' | 'paid' | 'cancelled'>('draft')
+  const [invQuotationId, setInvQuotationId] = useState('')
+  const [invNotes, setInvNotes] = useState('')
+  const [deleteInvoiceTarget, setDeleteInvoiceTarget] = useState<Invoice | null>(null)
 
   // Schedule Form
   const [schedTitle, setSchedTitle] = useState('')
@@ -157,6 +178,26 @@ export default function DealDetailPage() {
       const supabase = createClient()
       const { data } = await supabase.from('deal_payments').select('*').eq('deal_id', id).order('due_date', { ascending: true })
       return (data ?? []) as DealPayment[]
+    },
+    enabled: !!id,
+  })
+
+  const { data: quotations = [] } = useQuery<Quotation[]>({
+    queryKey: ['deal-quotations', id],
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase.from('quotations').select('*').eq('deal_id', id).order('created_at', { ascending: false })
+      return (data ?? []) as Quotation[]
+    },
+    enabled: !!id,
+  })
+
+  const { data: invoices = [] } = useQuery<Invoice[]>({
+    queryKey: ['deal-invoices', id],
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase.from('invoices').select('*').eq('deal_id', id).order('tanggal', { ascending: false })
+      return (data ?? []) as Invoice[]
     },
     enabled: !!id,
   })
@@ -411,8 +452,13 @@ export default function DealDetailPage() {
     setPayAmount('')
     setPayType('dp')
     setPayDueDate('')
+    setPayPaidDate('')
     setPayStatus('pending')
     setPayNotes('')
+    setPayInvoiceId('')
+    setPayBy('')
+    setPayMethod('transfer')
+    setPayProofUrl('')
   }
 
   function openEditPayment(p: DealPayment) {
@@ -420,9 +466,33 @@ export default function DealDetailPage() {
     setPayAmount(String(p.amount ?? ''))
     setPayType(p.payment_type || 'dp')
     setPayDueDate(p.due_date || '')
+    setPayPaidDate(p.paid_date || '')
     setPayStatus(p.status || 'pending')
     setPayNotes(p.notes || '')
+    setPayInvoiceId(p.invoice_id || '')
+    setPayBy(p.paid_by || '')
+    setPayMethod(p.payment_method || 'transfer')
+    setPayProofUrl(p.proof_url || '')
     setAddPaymentOpen(true)
+  }
+
+  async function handleUploadProof(file: File) {
+    setUploadingProof(true)
+    try {
+      const supabase = createClient()
+      const ext = file.name.split('.').pop()
+      const path = `payments/${id}/${crypto.randomUUID()}.${ext}`
+      const { error } = await supabase.storage.from('content-images').upload(path, file)
+      if (error) throw error
+      const { data: { publicUrl } } = supabase.storage.from('content-images').getPublicUrl(path)
+      setPayProofUrl(publicUrl)
+      toast.success('Bukti pembayaran berhasil diunggah!')
+    } catch (err) {
+      console.error('Failed to upload payment proof:', err)
+      toast.error(err instanceof Error ? err.message : 'Gagal mengunggah bukti pembayaran')
+    } finally {
+      setUploadingProof(false)
+    }
   }
 
   async function handleSavePayment(e: React.FormEvent) {
@@ -431,12 +501,17 @@ export default function DealDetailPage() {
     setSaving(true)
     try {
       const supabase = createClient()
+      const isPaid = payStatus === 'paid'
       const payload = {
         amount: Number(payAmount) || 0,
         payment_type: payType as any,
         due_date: payDueDate || null,
         status: payStatus as any,
-        paid_date: payStatus === 'paid' ? new Date().toISOString().split('T')[0] : null,
+        paid_date: isPaid ? (payPaidDate || new Date().toISOString().split('T')[0]) : null,
+        invoice_id: payInvoiceId || null,
+        paid_by: payBy || null,
+        payment_method: payMethod || null,
+        proof_url: payProofUrl || null,
         notes: payNotes || null,
       }
 
@@ -491,6 +566,125 @@ export default function DealDetailPage() {
     } catch (err) {
       console.error('Failed to delete payment:', err)
       toast.error(err instanceof Error ? err.message : 'Gagal menghapus pembayaran')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ── Quotation ────────────────────────────────────────────────────────────
+  // Creation/editing of line items reuses the existing dedicated page
+  // (/brand/quotations/new) rather than rebuilding that form here — only
+  // status transitions happen inline, since that's the part of the
+  // quotation lifecycle that belongs to the Deal workspace.
+
+  async function handleUpdateQuotationStatus(quotationId: string, newStatus: string) {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('quotations').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', quotationId)
+      if (error) throw error
+      toast.success(`Quotation ditandai ${newStatus}`)
+      queryClient.invalidateQueries({ queryKey: ['deal-quotations', id] })
+    } catch (err) {
+      console.error('Failed to update quotation status:', err)
+      toast.error('Gagal mengupdate status quotation')
+    }
+  }
+
+  // ── Invoice ──────────────────────────────────────────────────────────────
+
+  function resetInvoiceForm() {
+    setInvEditingId(null)
+    setInvType('dp')
+    setInvTotal('')
+    setInvTanggal(new Date().toISOString().split('T')[0])
+    setInvDueDate('')
+    setInvStatus('draft')
+    setInvQuotationId('')
+    setInvNotes('')
+  }
+
+  function openEditInvoice(inv: Invoice) {
+    setInvEditingId(inv.id)
+    setInvType(inv.type)
+    setInvTotal(String(inv.total ?? ''))
+    setInvTanggal(inv.tanggal || new Date().toISOString().split('T')[0])
+    setInvDueDate(inv.due_date || '')
+    setInvStatus(inv.status)
+    setInvQuotationId(inv.quotation_id || '')
+    setInvNotes(inv.notes || '')
+    setAddInvoiceOpen(true)
+  }
+
+  async function handleSaveInvoice(e: React.FormEvent) {
+    e.preventDefault()
+    if (!invTotal || !deal) return
+    setSaving(true)
+    try {
+      const supabase = createClient()
+      const total = Number(invTotal) || 0
+
+      if (invEditingId) {
+        const { error } = await supabase.from('invoices').update({
+          type: invType,
+          tanggal: invTanggal,
+          due_date: invDueDate || null,
+          subtotal: total,
+          total,
+          status: invStatus,
+          quotation_id: invQuotationId || null,
+          notes: invNotes || null,
+          updated_at: new Date().toISOString(),
+        }).eq('id', invEditingId)
+        if (error) throw error
+        toast.success('Invoice berhasil diperbarui!')
+      } else {
+        const { data: numData, error: numErr } = await supabase.rpc('generate_doc_number', { ws_id: deal.workspace_id, doc_type: 'INV' })
+        if (numErr) console.error('Failed to generate invoice number:', numErr)
+        const invoiceNumber = numData ?? `INV-${Date.now()}`
+
+        const { error } = await supabase.from('invoices').insert({
+          workspace_id: deal.workspace_id,
+          brand_id: deal.brand_id,
+          deal_id: id,
+          quotation_id: invQuotationId || null,
+          invoice_number: invoiceNumber,
+          type: invType,
+          tanggal: invTanggal,
+          due_date: invDueDate || null,
+          items: [],
+          subtotal: total,
+          total,
+          status: invStatus,
+          notes: invNotes || null,
+        })
+        if (error) throw error
+        toast.success('Invoice berhasil dibuat!')
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['deal-invoices', id] })
+      setAddInvoiceOpen(false)
+      resetInvoiceForm()
+    } catch (err) {
+      console.error('Failed to save invoice:', err)
+      toast.error(err instanceof Error ? err.message : 'Gagal menyimpan invoice')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDeleteInvoice() {
+    if (!deleteInvoiceTarget) return
+    setSaving(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('invoices').delete().eq('id', deleteInvoiceTarget.id)
+      if (error) throw error
+      toast.success('Invoice dihapus.')
+      queryClient.invalidateQueries({ queryKey: ['deal-invoices', id] })
+      setDeleteInvoiceTarget(null)
+    } catch (err) {
+      console.error('Failed to delete invoice:', err)
+      toast.error(err instanceof Error ? err.message : 'Gagal menghapus invoice')
     } finally {
       setSaving(false)
     }
@@ -649,12 +843,23 @@ export default function DealDetailPage() {
     }
   }
 
-  // Calculate Financials
+  // Calculate Financials — every figure below is derived from actual
+  // invoice/payment records, never a separately-tracked/duplicated total.
   const totalValueNum = Number(deal?.total_value || deal?.nilai_total || 0)
+  const invoicedTotal = invoices.reduce((sum, inv) => sum + Number(inv.total || 0), 0)
   const paidNum = payments.filter((p) => p.status === 'paid').reduce((sum, p) => sum + Number(p.amount || 0), 0)
-  const outstandingNum = Math.max(0, totalValueNum - paidNum)
-  // Derived purely from deal_payments records — never a separately-tracked value.
-  const paymentStatusLabel = totalValueNum <= 0 ? 'Belum Ada Nilai' : paidNum <= 0 ? 'Belum Dibayar' : outstandingNum <= 0 ? 'Lunas' : 'Sebagian'
+  const outstandingNum = Math.max(0, invoicedTotal - paidNum)
+
+  // Paid-per-invoice, for the overdue check (an invoice already fully paid
+  // is never overdue even if its due_date has passed).
+  const paidByInvoice = new Map<string, number>()
+  payments.filter((p) => p.status === 'paid' && p.invoice_id).forEach((p) => {
+    paidByInvoice.set(p.invoice_id!, (paidByInvoice.get(p.invoice_id!) || 0) + Number(p.amount || 0))
+  })
+  const hasOverdueInvoice = invoices.some((inv) => isInvoiceOverdue(inv, paidByInvoice.get(inv.id) || 0))
+
+  const financialStatus = computeFinancialStatus({ dealValue: totalValueNum, invoicedTotal, paidTotal: paidNum, hasOverdueInvoice })
+  const paymentStatusLabel = FINANCIAL_STATUS_CONFIG[financialStatus].label
 
   // Map deliverables with linked content counts
   const deliverablesWithContent = deliverables.map((del) => {
@@ -748,7 +953,7 @@ export default function DealDetailPage() {
             </div>
             <div>
               <p className="text-[10px] uppercase font-semibold text-text-muted">Status Bayar</p>
-              <Badge variant="outline" className={cn('text-[10px] font-bold uppercase mt-0.5', paymentStatusLabel === 'Lunas' ? 'text-emerald-700 border-emerald-300 bg-emerald-50' : paymentStatusLabel === 'Sebagian' ? 'text-amber-700 border-amber-300 bg-amber-50' : 'text-text-muted')}>
+              <Badge variant="outline" className={cn('text-[10px] font-bold uppercase mt-0.5', FINANCIAL_STATUS_CONFIG[financialStatus].badgeClass)}>
                 {paymentStatusLabel}
               </Badge>
             </div>
@@ -772,7 +977,7 @@ export default function DealDetailPage() {
           <TabsTrigger value="sow" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent rounded-none px-1 py-2.5 font-semibold text-xs text-text-muted data-[state=active]:text-accent">SOW & Deliverables ({deliverables.length})</TabsTrigger>
           <TabsTrigger value="content" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent rounded-none px-1 py-2.5 font-semibold text-xs text-text-muted data-[state=active]:text-accent">Konten Terkait ({allUniqueContent.length})</TabsTrigger>
           <TabsTrigger value="schedule" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent rounded-none px-1 py-2.5 font-semibold text-xs text-text-muted data-[state=active]:text-accent">Schedule ({schedules.length})</TabsTrigger>
-          <TabsTrigger value="payment" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent rounded-none px-1 py-2.5 font-semibold text-xs text-text-muted data-[state=active]:text-accent">Payment ({payments.length})</TabsTrigger>
+          <TabsTrigger value="payment" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent rounded-none px-1 py-2.5 font-semibold text-xs text-text-muted data-[state=active]:text-accent">Financial ({quotations.length + invoices.length + payments.length})</TabsTrigger>
         </TabsList>
 
         {/* TAB 1: OVERVIEW */}
@@ -1168,63 +1373,201 @@ export default function DealDetailPage() {
         </TabsContent>
 
         {/* TAB 6: PAYMENT */}
-        <TabsContent value="payment" className="space-y-4 outline-none">
+        <TabsContent value="payment" className="space-y-6 outline-none">
+          {/* A. FINANCIAL SUMMARY */}
+          <div className="bg-white border border-border rounded-xl p-5 space-y-3 shadow-xs">
+            <h3 className="font-semibold text-sm text-text-primary uppercase tracking-wider border-b border-border pb-2">Financial Summary</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+              <div className="p-3 bg-subtle/50 rounded-lg border border-border/60">
+                <p className="text-[10px] uppercase font-bold text-text-muted">Deal Value</p>
+                <p className="text-sm font-bold font-mono text-text-primary mt-1">{formatRupiah(totalValueNum)}</p>
+              </div>
+              <div className="p-3 bg-blue-50/50 rounded-lg border border-blue-200/60">
+                <p className="text-[10px] uppercase font-bold text-blue-800">Invoiced</p>
+                <p className="text-sm font-bold font-mono text-blue-700 mt-1">{formatRupiah(invoicedTotal)}</p>
+              </div>
+              <div className="p-3 bg-emerald-50/50 rounded-lg border border-emerald-200/60">
+                <p className="text-[10px] uppercase font-bold text-emerald-800">Paid</p>
+                <p className="text-sm font-bold font-mono text-emerald-700 mt-1">{formatRupiah(paidNum)}</p>
+              </div>
+              <div className="p-3 bg-amber-50/50 rounded-lg border border-amber-200/60">
+                <p className="text-[10px] uppercase font-bold text-amber-800">Outstanding</p>
+                <p className="text-sm font-bold font-mono text-amber-700 mt-1">{formatRupiah(outstandingNum)}</p>
+              </div>
+              <div className="p-3 bg-subtle/50 rounded-lg border border-border/60 flex flex-col items-center justify-center">
+                <p className="text-[10px] uppercase font-bold text-text-muted mb-1">Payment Status</p>
+                <Badge variant="outline" className={cn('text-[10px] font-bold uppercase', FINANCIAL_STATUS_CONFIG[financialStatus].badgeClass)}>
+                  {paymentStatusLabel}
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          {/* B. QUOTATIONS */}
+          <div className="bg-white border border-border rounded-xl p-5 space-y-3 shadow-xs">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <h3 className="font-semibold text-sm text-text-primary uppercase tracking-wider">Quotations</h3>
+              <Link href={`/brand/quotations/new?dealId=${id}`}>
+                <Button size="sm" className="bg-accent hover:bg-accent/90 h-8 text-xs font-semibold gap-1">
+                  <Plus className="w-3.5 h-3.5" /> Buat Quotation
+                </Button>
+              </Link>
+            </div>
+            {quotations.length === 0 ? (
+              <p className="py-6 text-center text-text-muted text-xs">Belum ada quotation untuk deal ini.</p>
+            ) : (
+              <div className="space-y-2">
+                {quotations.map((q) => (
+                  <div key={q.id} className="flex items-center justify-between p-3 bg-subtle/30 border border-border/60 rounded-lg text-xs">
+                    <div className="flex items-center gap-3">
+                      <FileText className="w-4 h-4 text-accent" />
+                      <div>
+                        <p className="font-mono font-bold text-text-primary">{q.quotation_number}</p>
+                        <p className="text-[11px] text-text-muted">{formatDate(q.tanggal)} {q.expired_date && `• Berlaku s/d ${formatDate(q.expired_date)}`}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-text-primary">{formatRupiah(Number(q.total))}</span>
+                      <Badge variant="outline" className={cn('text-[9px] uppercase font-bold', q.status === 'accepted' ? 'text-emerald-700 border-emerald-300 bg-emerald-50' : q.status === 'rejected' ? 'text-rose-700 border-rose-300 bg-rose-50' : 'text-slate-700 border-slate-300 bg-slate-50')}>
+                        {q.status}
+                      </Badge>
+                      {(q.status === 'sent' || q.status === 'negotiating' || q.status === 'draft') && (
+                        <>
+                          <Button size="sm" variant="ghost" className="h-6 text-[10px] px-1.5 text-emerald-700" onClick={() => handleUpdateQuotationStatus(q.id, 'accepted')}>Accept</Button>
+                          <Button size="sm" variant="ghost" className="h-6 text-[10px] px-1.5 text-rose-700" onClick={() => handleUpdateQuotationStatus(q.id, 'rejected')}>Reject</Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* C. INVOICES */}
+          <div className="bg-white border border-border rounded-xl p-5 space-y-3 shadow-xs">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <h3 className="font-semibold text-sm text-text-primary uppercase tracking-wider">Invoices</h3>
+              <Button size="sm" onClick={() => { resetInvoiceForm(); setAddInvoiceOpen(true) }} className="bg-accent hover:bg-accent/90 h-8 text-xs font-semibold gap-1">
+                <Plus className="w-3.5 h-3.5" /> Buat Invoice
+              </Button>
+            </div>
+            {invoices.length === 0 ? (
+              <p className="py-6 text-center text-text-muted text-xs">Belum ada invoice untuk deal ini.</p>
+            ) : (
+              <div className="space-y-2">
+                {invoices.map((inv) => {
+                  const paidForInv = paidByInvoice.get(inv.id) || 0
+                  const overdue = isInvoiceOverdue(inv, paidForInv)
+                  const linkedQuotation = quotations.find((q) => q.id === inv.quotation_id)
+                  return (
+                    <div key={inv.id} className="p-3 bg-subtle/30 border border-border/60 rounded-lg text-xs space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <DollarSign className="w-4 h-4 text-accent" />
+                          <div>
+                            <p className="font-mono font-bold text-text-primary">{inv.invoice_number} <span className="uppercase text-[10px] text-text-muted">{inv.type}</span></p>
+                            <p className="text-[11px] text-text-muted">{formatDate(inv.tanggal)} {inv.due_date && `• Jatuh tempo ${formatDate(inv.due_date)}`}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-text-primary">{formatRupiah(Number(inv.total))}</span>
+                          <Badge variant="outline" className={cn('text-[9px] uppercase font-bold', overdue ? 'text-rose-700 border-rose-300 bg-rose-50' : inv.status === 'paid' ? 'text-emerald-700 border-emerald-300 bg-emerald-50' : 'text-slate-700 border-slate-300 bg-slate-50')}>
+                            {overdue ? 'overdue' : inv.status}
+                          </Badge>
+                          <button onClick={() => openEditInvoice(inv)} className="p-1 rounded hover:bg-subtle text-text-muted hover:text-accent transition-colors" title="Edit invoice">
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => setDeleteInvoiceTarget(inv)} className="p-1 rounded hover:bg-error/10 text-text-muted hover:text-error transition-colors" title="Hapus invoice">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      {linkedQuotation && (
+                        <p className="text-[11px] text-text-muted pl-7">Based on <span className="font-mono font-semibold text-accent">{linkedQuotation.quotation_number}</span></p>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* D. PAYMENTS */}
           <div className="bg-white border border-border rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between border-b border-border pb-3">
-              <div>
-                <h3 className="font-semibold text-sm text-text-primary">Jadwal & Status Pembayaran Deal</h3>
-                <p className="text-xs text-text-muted mt-0.5">Total Value: {formatRupiah(totalValueNum)} • Terbayar: <strong className="text-emerald-700">{formatRupiah(paidNum)}</strong> • Outstanding: <strong className="text-amber-600">{formatRupiah(outstandingNum)}</strong></p>
-              </div>
-              <Button size="sm" onClick={() => setAddPaymentOpen(true)} className="bg-accent hover:bg-accent/90 h-8 text-xs font-semibold">
-                <Plus className="w-3.5 h-3.5 mr-1" /> Tambah Term Pembayaran
+              <h3 className="font-semibold text-sm text-text-primary uppercase tracking-wider">Payments</h3>
+              <Button size="sm" onClick={() => { resetPaymentForm(); setAddPaymentOpen(true) }} className="bg-accent hover:bg-accent/90 h-8 text-xs font-semibold">
+                <Plus className="w-3.5 h-3.5 mr-1" /> Tambah Pembayaran
               </Button>
             </div>
 
-            <table className="w-full text-left border-collapse text-xs min-w-[540px]">
-              <thead className="bg-subtle/50 text-text-muted border-b border-border uppercase font-semibold">
-                <tr>
-                  <th className="px-3 py-2.5">Term / Tipe</th>
-                  <th className="px-3 py-2.5 text-right">Nominal</th>
-                  <th className="px-3 py-2.5 text-center">Jatuh Tempo</th>
-                  <th className="px-3 py-2.5 text-center">Status</th>
-                  <th className="px-3 py-2.5 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
-                {payments.length === 0 ? (
-                  <tr><td colSpan={5} className="py-8 text-center text-text-muted">Belum ada record termin pembayaran. Klik "+ Tambah Term Pembayaran" di atas.</td></tr>
-                ) : (
-                  payments.map((p) => (
-                    <tr key={p.id}>
-                      <td className="px-3 py-3 uppercase font-bold text-text-primary">{p.payment_type}</td>
-                      <td className="px-3 py-3 text-right font-mono font-bold text-emerald-700">{formatRupiah(Number(p.amount))}</td>
-                      <td className="px-3 py-3 text-center text-text-muted font-mono">{p.due_date ? formatDate(p.due_date) : '—'}</td>
-                      <td className="px-3 py-3 text-center">
-                        <Badge variant={p.status === 'paid' ? 'default' : 'outline'} className={cn('text-[9px] uppercase font-bold', p.status === 'paid' ? 'bg-emerald-600 text-white' : 'text-amber-600 border-amber-300')}>
-                          {p.status}
-                        </Badge>
-                      </td>
-                      <td className="px-3 py-3 text-right space-x-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 text-[11px] px-2 text-accent"
-                          onClick={() => handleTogglePaymentStatus(p.id, p.status)}
-                        >
-                          {p.status === 'paid' ? 'Tandai Pending' : 'Tandai Lunas'}
-                        </Button>
-                        <button onClick={() => openEditPayment(p)} className="p-1 rounded hover:bg-subtle text-text-muted hover:text-accent transition-colors" title="Edit pembayaran">
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={() => setDeletePaymentTarget(p)} className="p-1 rounded hover:bg-error/10 text-text-muted hover:text-error transition-colors" title="Hapus pembayaran">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs min-w-[760px]">
+                <thead className="bg-subtle/50 text-text-muted border-b border-border uppercase font-semibold">
+                  <tr>
+                    <th className="px-3 py-2.5">Invoice</th>
+                    <th className="px-3 py-2.5">Tipe</th>
+                    <th className="px-3 py-2.5 text-right">Nominal</th>
+                    <th className="px-3 py-2.5 text-center">Tgl Bayar</th>
+                    <th className="px-3 py-2.5">Dibayar Oleh</th>
+                    <th className="px-3 py-2.5">Metode</th>
+                    <th className="px-3 py-2.5 text-center">Status</th>
+                    <th className="px-3 py-2.5 text-center">Bukti</th>
+                    <th className="px-3 py-2.5 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {payments.length === 0 ? (
+                    <tr><td colSpan={9} className="py-8 text-center text-text-muted">Belum ada record pembayaran. Klik "+ Tambah Pembayaran" di atas.</td></tr>
+                  ) : (
+                    payments.map((p) => {
+                      const linkedInvoice = invoices.find((inv) => inv.id === p.invoice_id)
+                      return (
+                        <tr key={p.id}>
+                          <td className="px-3 py-3 font-mono text-text-muted">
+                            {linkedInvoice ? <span className="font-semibold text-accent">{linkedInvoice.invoice_number}</span> : <span className="italic">Legacy / Belum terhubung ke Invoice</span>}
+                          </td>
+                          <td className="px-3 py-3 uppercase font-bold text-text-primary">{p.payment_type}</td>
+                          <td className="px-3 py-3 text-right font-mono font-bold text-emerald-700">{formatRupiah(Number(p.amount))}</td>
+                          <td className="px-3 py-3 text-center text-text-muted font-mono">{p.paid_date ? formatDate(p.paid_date) : (p.due_date ? formatDate(p.due_date) : '—')}</td>
+                          <td className="px-3 py-3 text-text-secondary">{p.paid_by || '—'}</td>
+                          <td className="px-3 py-3 text-text-secondary capitalize">{p.payment_method || '—'}</td>
+                          <td className="px-3 py-3 text-center">
+                            <Badge variant={p.status === 'paid' ? 'default' : 'outline'} className={cn('text-[9px] uppercase font-bold', p.status === 'paid' ? 'bg-emerald-600 text-white' : 'text-amber-600 border-amber-300')}>
+                              {p.status}
+                            </Badge>
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            {p.proof_url ? (
+                              <a href={p.proof_url} target="_blank" rel="noreferrer" className="text-accent hover:underline inline-flex items-center gap-1">
+                                <Paperclip className="w-3 h-3" /> Lihat
+                              </a>
+                            ) : '—'}
+                          </td>
+                          <td className="px-3 py-3 text-right space-x-1 whitespace-nowrap">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 text-[11px] px-2 text-accent"
+                              onClick={() => handleTogglePaymentStatus(p.id, p.status)}
+                            >
+                              {p.status === 'paid' ? 'Tandai Pending' : 'Tandai Lunas'}
+                            </Button>
+                            <button onClick={() => openEditPayment(p)} className="p-1 rounded hover:bg-subtle text-text-muted hover:text-accent transition-colors" title="Edit pembayaran">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => setDeletePaymentTarget(p)} className="p-1 rounded hover:bg-error/10 text-text-muted hover:text-error transition-colors" title="Hapus pembayaran">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </TabsContent>
       </Tabs>
@@ -1391,8 +1734,61 @@ export default function DealDetailPage() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Jatuh Tempo</Label>
-              <Input type="date" value={payDueDate} onChange={(e) => setPayDueDate(e.target.value)} className="h-9 text-xs" />
+              <Label className="text-xs font-semibold">Invoice Terkait (Opsional)</Label>
+              <Select value={payInvoiceId || '__none__'} onValueChange={(v) => setPayInvoiceId(v === '__none__' ? '' : v)}>
+                <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Tidak terhubung ke invoice" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__" className="text-xs">Tidak terhubung ke invoice</SelectItem>
+                  {invoices.map((inv) => (
+                    <SelectItem key={inv.id} value={inv.id} className="text-xs">{inv.invoice_number} — {formatRupiah(Number(inv.total))}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Jatuh Tempo</Label>
+                <Input type="date" value={payDueDate} onChange={(e) => setPayDueDate(e.target.value)} className="h-9 text-xs" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Tanggal Bayar</Label>
+                <Input type="date" value={payPaidDate} onChange={(e) => setPayPaidDate(e.target.value)} className="h-9 text-xs" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Dibayar Oleh</Label>
+                <Input value={payBy} onChange={(e) => setPayBy(e.target.value)} placeholder="misal nama brand / PIC" className="h-9 text-xs" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Metode Pembayaran</Label>
+                <Select value={payMethod} onValueChange={setPayMethod}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="transfer" className="text-xs">Transfer Bank</SelectItem>
+                    <SelectItem value="cash" className="text-xs">Cash</SelectItem>
+                    <SelectItem value="qris" className="text-xs">QRIS</SelectItem>
+                    <SelectItem value="other" className="text-xs">Lainnya</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Bukti Pembayaran</Label>
+              {payProofUrl ? (
+                <div className="flex items-center justify-between bg-subtle/50 border border-border rounded-lg px-3 py-2 text-xs">
+                  <a href={payProofUrl} target="_blank" rel="noreferrer" className="text-accent hover:underline inline-flex items-center gap-1.5">
+                    <Paperclip className="w-3.5 h-3.5" /> Lihat bukti
+                  </a>
+                  <button type="button" onClick={() => setPayProofUrl('')} className="text-text-muted hover:text-error"><Trash2 className="w-3.5 h-3.5" /></button>
+                </div>
+              ) : (
+                <label className="flex items-center justify-center gap-1.5 h-9 border border-dashed border-border rounded-lg text-xs text-text-muted hover:border-accent hover:text-accent cursor-pointer transition-colors">
+                  {uploadingProof ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                  {uploadingProof ? 'Mengunggah...' : 'Unggah bukti transfer'}
+                  <input type="file" accept="image/*,.pdf" className="hidden" disabled={uploadingProof} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadProof(f) }} />
+                </label>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Catatan</Label>
@@ -1400,7 +1796,7 @@ export default function DealDetailPage() {
             </div>
 
             <div className="pt-3 flex gap-2 border-t border-border">
-              <Button type="submit" className="flex-1 bg-accent hover:bg-accent/90 h-9 text-xs font-semibold" disabled={saving}>
+              <Button type="submit" className="flex-1 bg-accent hover:bg-accent/90 h-9 text-xs font-semibold" disabled={saving || uploadingProof}>
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
                 {payEditingId ? 'Simpan Perubahan' : 'Simpan Pembayaran'}
               </Button>
@@ -1409,6 +1805,100 @@ export default function DealDetailPage() {
           </form>
         </SheetContent>
       </Sheet>
+
+      {/* Sheet: Add/Edit Invoice */}
+      <Sheet open={addInvoiceOpen} onOpenChange={(v) => { setAddInvoiceOpen(v); if (!v) resetInvoiceForm() }}>
+        <SheetContent side="right" className="w-full sm:w-[420px] overflow-y-auto p-0">
+          <SheetHeader className="px-6 py-4 border-b border-border">
+            <SheetTitle className="text-base font-bold">{invEditingId ? 'Edit Invoice' : 'Buat Invoice'}</SheetTitle>
+          </SheetHeader>
+          <form onSubmit={handleSaveInvoice} className="px-6 py-5 space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Nominal Invoice (Rp) <span className="text-error">*</span></Label>
+              <Input type="number" value={invTotal} onChange={(e) => setInvTotal(e.target.value)} placeholder="12500000" className="h-9 text-xs font-mono" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Tipe Invoice</Label>
+                <Select value={invType} onValueChange={(v) => setInvType(v as any)}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="dp" className="text-xs">DP (Down Payment)</SelectItem>
+                    <SelectItem value="pelunasan" className="text-xs">Pelunasan</SelectItem>
+                    <SelectItem value="full" className="text-xs">Full Payment</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Status</Label>
+                <Select value={invStatus} onValueChange={(v) => setInvStatus(v as any)}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft" className="text-xs">Draft</SelectItem>
+                    <SelectItem value="sent" className="text-xs">Sent</SelectItem>
+                    <SelectItem value="paid" className="text-xs">Paid</SelectItem>
+                    <SelectItem value="cancelled" className="text-xs">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Tanggal Invoice</Label>
+                <Input type="date" value={invTanggal} onChange={(e) => setInvTanggal(e.target.value)} className="h-9 text-xs" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Jatuh Tempo</Label>
+                <Input type="date" value={invDueDate} onChange={(e) => setInvDueDate(e.target.value)} className="h-9 text-xs" />
+              </div>
+            </div>
+            {quotations.length > 0 && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Berdasarkan Quotation (Opsional)</Label>
+                <Select value={invQuotationId || '__none__'} onValueChange={(v) => setInvQuotationId(v === '__none__' ? '' : v)}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Tidak berdasarkan quotation" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__" className="text-xs">Tidak berdasarkan quotation</SelectItem>
+                    {quotations.map((q) => (
+                      <SelectItem key={q.id} value={q.id} className="text-xs">{q.quotation_number} ({q.status})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Catatan</Label>
+              <Textarea value={invNotes} onChange={(e) => setInvNotes(e.target.value)} rows={2} className="text-xs" />
+            </div>
+            <div className="pt-3 flex gap-2 border-t border-border">
+              <Button type="submit" className="flex-1 bg-accent hover:bg-accent/90 h-9 text-xs font-semibold" disabled={saving}>
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+                {invEditingId ? 'Simpan Perubahan' : 'Buat Invoice'}
+              </Button>
+              <Button type="button" variant="outline" className="h-9 text-xs" onClick={() => { setAddInvoiceOpen(false); resetInvoiceForm() }}>Batal</Button>
+            </div>
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      {/* Dialog: Delete Invoice confirm */}
+      <Dialog open={!!deleteInvoiceTarget} onOpenChange={(v) => { if (!v) setDeleteInvoiceTarget(null) }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-error" /> Hapus Invoice?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-text-secondary pt-2">
+            Invoice <strong className="text-text-primary">{deleteInvoiceTarget?.invoice_number}</strong> ({deleteInvoiceTarget ? formatRupiah(Number(deleteInvoiceTarget.total)) : ''}) akan dihapus permanen. Payment yang sudah tertaut ke invoice ini akan tetap ada namun kehilangan tautannya (tampil sebagai Legacy).
+          </p>
+          <div className="flex justify-end gap-2 pt-3 border-t border-border">
+            <Button type="button" variant="outline" size="sm" onClick={() => setDeleteInvoiceTarget(null)}>Batal</Button>
+            <Button type="button" variant="destructive" size="sm" onClick={handleDeleteInvoice} disabled={saving}>
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+              Hapus Invoice
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog: Delete Payment confirm */}
       <Dialog open={!!deletePaymentTarget} onOpenChange={(v) => { if (!v) setDeletePaymentTarget(null) }}>
