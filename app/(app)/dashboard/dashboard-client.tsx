@@ -16,6 +16,8 @@ import { id as localeId } from 'date-fns/locale'
 import type { Platform } from '@/lib/types'
 import type { RecentVideo } from './page'
 import { PageContainer, PageHeader } from '@/components/layout/page-header'
+import { ActionCenter } from '@/components/dashboard/action-center'
+import type { ActionItem } from '@/lib/operations/rules'
 import { cn } from '@/lib/utils'
 
 const STATUS_MAP: Record<string, string> = {
@@ -61,6 +63,8 @@ interface Props {
   overdueInvoices: OverdueInvoice[]
   recentVideos: RecentVideo[]
   pilarVideos?: string[]
+  actionItems?: ActionItem[]
+  actionItemsLoading?: boolean
 }
 
 function safeDate(value: string | null | undefined): Date | null {
@@ -111,7 +115,7 @@ function getGreetingEmoji() {
   return '🌙'
 }
 
-export function DashboardClient({ userName, role, todaySchedules, pipeline, followups, overdueInvoices, recentVideos, pilarVideos = [] }: Props) {
+export function DashboardClient({ userName, role, todaySchedules, pipeline, followups, overdueInvoices, recentVideos, pilarVideos = [], actionItems = [], actionItemsLoading }: Props) {
   const router = useRouter()
   const firstName = (userName || 'Kreator').split(' ')[0]
 
@@ -143,6 +147,9 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
         title={`${getGreeting()}, ${firstName} ${getGreetingEmoji()}`}
         subtitle={format(new Date(), 'EEEE, d MMMM yyyy', { locale: localeId })}
       />
+
+      {/* Section 1.5 — Action Center: "what needs my attention right now" */}
+      <ActionCenter items={actionItems} isLoading={actionItemsLoading} />
 
       {/* Section 2 — Today's Schedule */}
       <div>

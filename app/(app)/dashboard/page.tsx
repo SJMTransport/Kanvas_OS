@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
+import { useActionCenter } from '@/lib/hooks/useActionCenter'
 import { DashboardClient } from './dashboard-client'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
@@ -10,6 +11,7 @@ import { AlertTriangle } from 'lucide-react'
 
 export default function DashboardPage() {
   const { workspaceId, role } = useWorkspace()
+  const { data: actionItems = [], isLoading: actionItemsLoading } = useActionCenter(workspaceId)
 
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['dashboard', workspaceId],
@@ -108,6 +110,8 @@ export default function DashboardPage() {
       overdueInvoices={data.overdueInvoices}
       recentVideos={data.recentVideos}
       pilarVideos={data.pilarVideos}
+      actionItems={actionItems}
+      actionItemsLoading={actionItemsLoading}
     />
   )
 }

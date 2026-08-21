@@ -1222,6 +1222,14 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
   const [approvalNote, setApprovalNote] = useState('')
   const [updatingApproval, setUpdatingApproval] = useState(false)
 
+  // Production / Publishing status — Phase 5, Part B: same reasoning as
+  // Approval but with no history table (none exists for these dimensions,
+  // and Part O forbids inventing a second status/history table).
+  const [newProductionStatus, setNewProductionStatus] = useState(video.production_status || 'idea')
+  const [updatingProduction, setUpdatingProduction] = useState(false)
+  const [newPublishingStatus, setNewPublishingStatus] = useState(video.publishing_status || 'not_scheduled')
+  const [updatingPublishing, setUpdatingPublishing] = useState(false)
+
   // Query linked deliverables for this video
   const { data: linkedJunctions = [] } = useQuery({
     queryKey: ['content-brand-junctions', video.id],
@@ -1404,6 +1412,46 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
     }
   }
 
+  async function handleUpdateProductionStatus(next: string) {
+    setNewProductionStatus(next)
+    setUpdatingProduction(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('videos').update({ production_status: next }).eq('id', video.id)
+      if (error) {
+        console.error('Failed to update production_status:', error)
+        throw error
+      }
+      toast.success('Production status diperbarui')
+      queryClient.invalidateQueries({ queryKey: ['video-detail', video.id] })
+    } catch (err) {
+      toast.error('Gagal mengupdate production status')
+      setNewProductionStatus(video.production_status || 'idea')
+    } finally {
+      setUpdatingProduction(false)
+    }
+  }
+
+  async function handleUpdatePublishingStatus(next: string) {
+    setNewPublishingStatus(next)
+    setUpdatingPublishing(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('videos').update({ publishing_status: next }).eq('id', video.id)
+      if (error) {
+        console.error('Failed to update publishing_status:', error)
+        throw error
+      }
+      toast.success('Publishing status diperbarui')
+      queryClient.invalidateQueries({ queryKey: ['video-detail', video.id] })
+    } catch (err) {
+      toast.error('Gagal mengupdate publishing status')
+      setNewPublishingStatus(video.publishing_status || 'not_scheduled')
+    } finally {
+      setUpdatingPublishing(false)
+    }
+  }
+
   const primaryJunction = linkedJunctions[0] as any
   const deliverable = primaryJunction?.deal_deliverables
   // Deal -> Brand is authoritative when a Deal exists directly on the
@@ -1509,7 +1557,16 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
             </Badge>
             <span className="text-[10px] text-text-muted capitalize">Workflow: {video.status}</span>
           </div>
-          <p className="text-[10px] text-text-muted italic">Belum ada update manual — ubah lewat Status Stepper di atas.</p>
+          <Select value={newProductionStatus} onValueChange={handleUpdateProductionStatus} disabled={updatingProduction}>
+            <SelectTrigger className="h-8 text-xs bg-white"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="idea" className="text-xs">Idea</SelectItem>
+              <SelectItem value="scripting" className="text-xs">Scripting</SelectItem>
+              <SelectItem value="production" className="text-xs">Production</SelectItem>
+              <SelectItem value="editing" className="text-xs">Editing</SelectItem>
+              <SelectItem value="ready" className="text-xs">Ready</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Dimension 2: Approval Status */}
@@ -1538,7 +1595,14 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
             </Badge>
             {video.deadline_posting && <span className="text-[10px] font-mono text-text-muted">DL: {formatDate(video.deadline_posting)}</span>}
           </div>
-          <p className="text-[10px] text-text-muted italic">Belum ada update manual — ubah lewat Status Stepper di atas.</p>
+          <Select value={newPublishingStatus} onValueChange={handleUpdatePublishingStatus} disabled={updatingPublishing}>
+            <SelectTrigger className="h-8 text-xs bg-white"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="not_scheduled" className="text-xs">Not Scheduled</SelectItem>
+              <SelectItem value="scheduled" className="text-xs">Scheduled</SelectItem>
+              <SelectItem value="published" className="text-xs">Published</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

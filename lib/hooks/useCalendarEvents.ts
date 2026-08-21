@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { getApprovalAgingText, getApprovalSeverity } from '@/lib/utils/workflow'
 import { isInvoiceOverdue } from '@/lib/utils/financial'
+import { isPublishingFullyDone } from '@/lib/operations/rules'
 import type { CalendarEvent } from '@/app/(app)/calendar/types'
 
 // Phase 4 — Operational Calendar aggregation. Every category reads its date
@@ -131,10 +132,8 @@ export function useCalendarEvents(workspaceId: string | null, startDate: string,
         return map
       }, {} as Record<string, string[]>)
 
-      function isPublishingFullyDone(videoId: string): boolean {
-        const statuses = scheduleStatusesByVideo[videoId]
-        if (!statuses || statuses.length === 0) return false
-        return statuses.every((s) => s === 'posted')
+      function videoPublishingDone(videoId: string): boolean {
+        return isPublishingFullyDone(scheduleStatusesByVideo[videoId])
       }
 
       // Builds the shared Level-1/Level-2 context for a videos row — brand,
@@ -193,7 +192,7 @@ export function useCalendarEvents(workspaceId: string | null, startDate: string,
             ctx,
           })
         }
-        if (v.deadline_posting && v.deadline_posting >= startDate && v.deadline_posting <= endDate && !isPublishingFullyDone(v.id)) {
+        if (v.deadline_posting && v.deadline_posting >= startDate && v.deadline_posting <= endDate && !videoPublishingDone(v.id)) {
           const dateObj = new Date(v.deadline_posting)
           const isDone = ['live', 'archived'].includes(v.status)
           events.push({
