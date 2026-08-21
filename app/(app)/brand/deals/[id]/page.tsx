@@ -15,9 +15,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import { 
-  ArrowLeft, Plus, Loader2, FileText, Video, DollarSign, Calendar, 
-  CheckCircle2, Link as LinkIcon, Trash2, ExternalLink, Layers
+import {
+  ArrowLeft, Plus, Loader2, FileText, Video, DollarSign, Calendar,
+  CheckCircle2, Link as LinkIcon, Trash2, ExternalLink, Layers, Pencil, AlertTriangle
 } from 'lucide-react'
 import { formatDate, formatRupiah } from '@/lib/utils/formatters'
 import {
@@ -44,20 +44,25 @@ export default function DealDetailPage() {
   const [createContentOpen, setCreateContentOpen] = useState(false)
   const [targetDeliverableForCreate, setTargetDeliverableForCreate] = useState<string | null>(null)
 
-  // Deliverable Form
+  // Deliverable Form (shared by create + edit)
+  const [delEditingId, setDelEditingId] = useState<string | null>(null)
   const [delName, setDelName] = useState('')
   const [delPlatform, setDelPlatform] = useState('tiktok')
   const [delQty, setDelQty] = useState('1')
   const [delUnit, setDelUnit] = useState('content')
   const [delDeadline, setDelDeadline] = useState('')
   const [delDesc, setDelDesc] = useState('')
+  const [delStatus, setDelStatus] = useState('planned')
+  const [deleteDeliverableTarget, setDeleteDeliverableTarget] = useState<DealDeliverable & { contentCount: number } | null>(null)
 
-  // Payment Form
+  // Payment Form (shared by create + edit)
+  const [payEditingId, setPayEditingId] = useState<string | null>(null)
   const [payAmount, setPayAmount] = useState('')
   const [payType, setPayType] = useState('dp')
   const [payDueDate, setPayDueDate] = useState('')
   const [payStatus, setPayStatus] = useState('pending')
   const [payNotes, setPayNotes] = useState('')
+  const [deletePaymentTarget, setDeletePaymentTarget] = useState<DealPayment | null>(null)
 
   // Schedule Form
   const [schedTitle, setSchedTitle] = useState('')
@@ -66,6 +71,27 @@ export default function DealDetailPage() {
 
   // Selected video to link
   const [selectedVideoId, setSelectedVideoId] = useState('')
+
+  // Deal edit/delete
+  const [editDealOpen, setEditDealOpen] = useState(false)
+  const [deleteDealOpen, setDeleteDealOpen] = useState(false)
+  const [dealTitleInput, setDealTitleInput] = useState('')
+  const [dealCollabType, setDealCollabType] = useState('Campaign')
+  const [dealTotalValue, setDealTotalValue] = useState('')
+  const [dealStartDate, setDealStartDate] = useState('')
+  const [dealEndDate, setDealEndDate] = useState('')
+  const [dealStatusInput, setDealStatusInput] = useState('dp_pending')
+  const [dealNotesInput, setDealNotesInput] = useState('')
+  const [deleteDealConfirmText, setDeleteDealConfirmText] = useState('')
+
+  // SOW edit
+  const [editSowOpen, setEditSowOpen] = useState(false)
+  const [deleteSowOpen, setDeleteSowOpen] = useState(false)
+  const [sowName, setSowName] = useState('')
+  const [sowVersion, setSowVersion] = useState('v1')
+  const [sowStatus, setSowStatus] = useState('active')
+  const [sowEffectiveDate, setSowEffectiveDate] = useState('')
+  const [sowNotes, setSowNotes] = useState('')
 
   // Queries
   const { data: deal, isLoading: dealLoading } = useQuery({
@@ -201,60 +227,143 @@ export default function DealDetailPage() {
       }
 
       if (brief?.id) {
-        await supabase.from('deal_briefs').update(payload).eq('id', brief.id)
+        const { error } = await supabase.from('deal_briefs').update(payload).eq('id', brief.id)
+        if (error) throw error
       } else {
-        await supabase.from('deal_briefs').insert(payload)
+        const { error } = await supabase.from('deal_briefs').insert(payload)
+        if (error) throw error
       }
 
       toast.success('Brief berhasil disimpan!')
       queryClient.invalidateQueries({ queryKey: ['deal-brief', id] })
     } catch (err) {
+      console.error('Failed to save brief:', err)
       toast.error(err instanceof Error ? err.message : 'Gagal menyimpan brief')
     } finally {
       setSaving(false)
     }
   }
 
-  async function handleCreateDeliverable(e: React.FormEvent) {
+  async function handleDeleteBrief() {
+    if (!brief?.id) return
+    setSaving(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('deal_briefs').delete().eq('id', brief.id)
+      if (error) throw error
+      toast.success('Brief dihapus.')
+      setBriefCampaign(''); setBriefObjective(''); setBriefKeyMessage(''); setBriefMandatory('')
+      setBriefDoList(''); setBriefDontList(''); setBriefReferences('')
+      queryClient.invalidateQueries({ queryKey: ['deal-brief', id] })
+    } catch (err) {
+      console.error('Failed to delete brief:', err)
+      toast.error(err instanceof Error ? err.message : 'Gagal menghapus brief')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function resetDeliverableForm() {
+    setDelEditingId(null)
+    setDelName('')
+    setDelPlatform('tiktok')
+    setDelQty('1')
+    setDelUnit('content')
+    setDelDeadline('')
+    setDelDesc('')
+    setDelStatus('planned')
+  }
+
+  function openEditDeliverable(del: DealDeliverable) {
+    setDelEditingId(del.id)
+    setDelName(del.name || '')
+    setDelPlatform(del.platform || 'tiktok')
+    setDelQty(String(del.quantity ?? 1))
+    setDelUnit(del.unit || 'content')
+    setDelDeadline(del.deadline || '')
+    setDelDesc(del.description || '')
+    setDelStatus(del.status || 'planned')
+    setAddDeliverableOpen(true)
+  }
+
+  async function handleSaveDeliverable(e: React.FormEvent) {
     e.preventDefault()
     if (!delName.trim()) return
     setSaving(true)
     try {
       const supabase = createClient()
-      // Ensure SOW exists
-      let currentSowId = sow?.id
-      if (!currentSowId) {
-        const { data: newSow } = await supabase.from('deal_sows').insert({
+
+      if (delEditingId) {
+        // deal_deliverables has `name`, not `title` — see 032.
+        const { error } = await supabase.from('deal_deliverables').update({
+          name: delName.trim(),
+          platform: delPlatform,
+          quantity: Number(delQty) || 1,
+          unit: delUnit,
+          deadline: delDeadline || null,
+          description: delDesc || null,
+          status: delStatus,
+          updated_at: new Date().toISOString(),
+        }).eq('id', delEditingId)
+        if (error) throw error
+        toast.success('Deliverable berhasil diperbarui!')
+      } else {
+        // Ensure SOW exists (never create a second one — reuse if present).
+        let currentSowId = sow?.id
+        if (!currentSowId) {
+          const { data: newSow, error: sowErr } = await supabase.from('deal_sows').insert({
+            deal_id: id,
+            name: `${deal?.title || 'Deal'} SOW v1`,
+            version: 'v1',
+          }).select().single()
+          if (sowErr) {
+            console.error('Failed to create SOW:', sowErr)
+            throw sowErr
+          }
+          currentSowId = newSow?.id
+        }
+
+        const { error } = await supabase.from('deal_deliverables').insert({
           deal_id: id,
-          name: `${deal?.title || 'Deal'} SOW v1`,
-          version: 'v1',
-        }).select().single()
-        currentSowId = newSow?.id
+          sow_id: currentSowId || null,
+          name: delName.trim(),
+          platform: delPlatform,
+          quantity: Number(delQty) || 1,
+          unit: delUnit,
+          deadline: delDeadline || null,
+          description: delDesc || null,
+          status: 'planned',
+        })
+        if (error) throw error
+        toast.success('Deliverable berhasil ditambahkan!')
       }
 
-      const { error } = await supabase.from('deal_deliverables').insert({
-        deal_id: id,
-        sow_id: currentSowId || null,
-        // deal_deliverables has `name`, not `title` — see 032.
-        name: delName.trim(),
-        platform: delPlatform,
-        quantity: Number(delQty) || 1,
-        unit: delUnit,
-        deadline: delDeadline || null,
-        description: delDesc || null,
-        status: 'planned',
-      })
-
-      if (error) throw error
-      toast.success('Deliverable berhasil ditambahkan!')
       queryClient.invalidateQueries({ queryKey: ['deal-deliverables', id] })
       queryClient.invalidateQueries({ queryKey: ['deal-sow', id] })
       setAddDeliverableOpen(false)
-      setDelName('')
-      setDelDeadline('')
-      setDelDesc('')
+      resetDeliverableForm()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Gagal membuat deliverable')
+      console.error('Failed to save deliverable:', err)
+      toast.error(err instanceof Error ? err.message : 'Gagal menyimpan deliverable')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDeleteDeliverable() {
+    if (!deleteDeliverableTarget) return
+    setSaving(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('deal_deliverables').delete().eq('id', deleteDeliverableTarget.id)
+      if (error) throw error
+      toast.success('Deliverable dihapus.')
+      queryClient.invalidateQueries({ queryKey: ['deal-deliverables', id] })
+      queryClient.invalidateQueries({ queryKey: ['deal-content-junctions', id] })
+      setDeleteDeliverableTarget(null)
+    } catch (err) {
+      console.error('Failed to delete deliverable:', err)
+      toast.error(err instanceof Error ? err.message : 'Gagal menghapus deliverable')
     } finally {
       setSaving(false)
     }
@@ -277,6 +386,7 @@ export default function DealDetailPage() {
       setLinkContentOpen(false)
       setSelectedVideoId('')
     } catch (err) {
+      console.error('Failed to link content to deliverable:', err)
       toast.error(err instanceof Error ? err.message : 'Gagal menghubungkan konten')
     } finally {
       setSaving(false)
@@ -291,34 +401,61 @@ export default function DealDetailPage() {
       toast.success('Tautan konten dilepas')
       queryClient.invalidateQueries({ queryKey: ['deal-content-junctions', id] })
     } catch (err) {
+      console.error('Failed to unlink content:', err)
       toast.error('Gagal melepas tautan')
     }
   }
 
-  async function handleCreatePayment(e: React.FormEvent) {
+  function resetPaymentForm() {
+    setPayEditingId(null)
+    setPayAmount('')
+    setPayType('dp')
+    setPayDueDate('')
+    setPayStatus('pending')
+    setPayNotes('')
+  }
+
+  function openEditPayment(p: DealPayment) {
+    setPayEditingId(p.id)
+    setPayAmount(String(p.amount ?? ''))
+    setPayType(p.payment_type || 'dp')
+    setPayDueDate(p.due_date || '')
+    setPayStatus(p.status || 'pending')
+    setPayNotes(p.notes || '')
+    setAddPaymentOpen(true)
+  }
+
+  async function handleSavePayment(e: React.FormEvent) {
     e.preventDefault()
     if (!payAmount) return
     setSaving(true)
     try {
       const supabase = createClient()
-      const { error } = await supabase.from('deal_payments').insert({
-        deal_id: id,
+      const payload = {
         amount: Number(payAmount) || 0,
         payment_type: payType as any,
         due_date: payDueDate || null,
         status: payStatus as any,
         paid_date: payStatus === 'paid' ? new Date().toISOString().split('T')[0] : null,
         notes: payNotes || null,
-      })
+      }
 
-      if (error) throw error
-      toast.success('Pembayaran berhasil ditambahkan!')
+      if (payEditingId) {
+        const { error } = await supabase.from('deal_payments').update(payload).eq('id', payEditingId)
+        if (error) throw error
+        toast.success('Pembayaran berhasil diperbarui!')
+      } else {
+        const { error } = await supabase.from('deal_payments').insert({ deal_id: id, ...payload })
+        if (error) throw error
+        toast.success('Pembayaran berhasil ditambahkan!')
+      }
+
       queryClient.invalidateQueries({ queryKey: ['deal-payments', id] })
       setAddPaymentOpen(false)
-      setPayAmount('')
-      setPayNotes('')
+      resetPaymentForm()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Gagal menambahkan pembayaran')
+      console.error('Failed to save payment:', err)
+      toast.error(err instanceof Error ? err.message : 'Gagal menyimpan pembayaran')
     } finally {
       setSaving(false)
     }
@@ -328,14 +465,34 @@ export default function DealDetailPage() {
     const nextStatus = currentStatus === 'paid' ? 'pending' : 'paid'
     try {
       const supabase = createClient()
-      await supabase.from('deal_payments').update({
+      const { error } = await supabase.from('deal_payments').update({
         status: nextStatus,
         paid_date: nextStatus === 'paid' ? new Date().toISOString().split('T')[0] : null,
       }).eq('id', paymentId)
+      if (error) throw error
       toast.success(`Status pembayaran diubah ke ${nextStatus}`)
       queryClient.invalidateQueries({ queryKey: ['deal-payments', id] })
     } catch (err) {
+      console.error('Failed to toggle payment status:', err)
       toast.error('Gagal mengupdate pembayaran')
+    }
+  }
+
+  async function handleDeletePayment() {
+    if (!deletePaymentTarget) return
+    setSaving(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('deal_payments').delete().eq('id', deletePaymentTarget.id)
+      if (error) throw error
+      toast.success('Pembayaran dihapus.')
+      queryClient.invalidateQueries({ queryKey: ['deal-payments', id] })
+      setDeletePaymentTarget(null)
+    } catch (err) {
+      console.error('Failed to delete payment:', err)
+      toast.error(err instanceof Error ? err.message : 'Gagal menghapus pembayaran')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -358,8 +515,136 @@ export default function DealDetailPage() {
       setAddScheduleOpen(false)
       setSchedTitle('')
     } catch (err) {
+      console.error('Failed to create schedule:', err)
       toast.error('Gagal menambahkan jadwal')
     } finally {
+      setSaving(false)
+    }
+  }
+
+  // ── SOW ──────────────────────────────────────────────────────────────────
+
+  function openEditSow() {
+    if (!sow) return
+    setSowName(sow.name || '')
+    setSowVersion(sow.version || 'v1')
+    setSowStatus(sow.status || 'active')
+    setSowEffectiveDate(sow.effective_date || '')
+    setSowNotes(sow.notes || '')
+    setEditSowOpen(true)
+  }
+
+  async function handleSaveSow(e: React.FormEvent) {
+    e.preventDefault()
+    if (!sowName.trim() || !sow?.id) return
+    setSaving(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('deal_sows').update({
+        name: sowName.trim(),
+        version: sowVersion || 'v1',
+        status: sowStatus || 'active',
+        effective_date: sowEffectiveDate || null,
+        notes: sowNotes || null,
+        updated_at: new Date().toISOString(),
+      }).eq('id', sow.id)
+      if (error) throw error
+      toast.success('SOW berhasil diperbarui!')
+      queryClient.invalidateQueries({ queryKey: ['deal-sow', id] })
+      setEditSowOpen(false)
+    } catch (err) {
+      console.error('Failed to save SOW:', err)
+      toast.error(err instanceof Error ? err.message : 'Gagal menyimpan SOW')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDeleteSow() {
+    if (!sow?.id) return
+    setSaving(true)
+    try {
+      const supabase = createClient()
+      // deal_deliverables.sow_id is ON DELETE SET NULL — deleting the SOW
+      // un-links its deliverables (they remain, along with their Content),
+      // it does not destroy them.
+      const { error } = await supabase.from('deal_sows').delete().eq('id', sow.id)
+      if (error) throw error
+      toast.success('SOW dihapus. Deliverable yang ada tetap tersimpan (kini tanpa SOW).')
+      queryClient.invalidateQueries({ queryKey: ['deal-sow', id] })
+      queryClient.invalidateQueries({ queryKey: ['deal-deliverables', id] })
+      setDeleteSowOpen(false)
+    } catch (err) {
+      console.error('Failed to delete SOW:', err)
+      toast.error(err instanceof Error ? err.message : 'Gagal menghapus SOW')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ── Deal ─────────────────────────────────────────────────────────────────
+
+  function openEditDeal() {
+    if (!deal) return
+    setDealTitleInput(deal.title || deal.nama_campaign || '')
+    setDealCollabType(deal.collaboration_type || 'Campaign')
+    setDealTotalValue(String(deal.total_value ?? deal.nilai_total ?? ''))
+    setDealStartDate(deal.start_date || deal.tanggal_mulai || '')
+    setDealEndDate(deal.end_date || deal.tanggal_selesai || '')
+    setDealStatusInput(deal.status || 'dp_pending')
+    setDealNotesInput(deal.notes || '')
+    setEditDealOpen(true)
+  }
+
+  async function handleUpdateDeal(e: React.FormEvent) {
+    e.preventDefault()
+    if (!dealTitleInput.trim()) return
+    setSaving(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('deals').update({
+        title: dealTitleInput.trim(),
+        nama_campaign: dealTitleInput.trim(),
+        collaboration_type: dealCollabType,
+        total_value: Number(dealTotalValue) || 0,
+        nilai_total: Number(dealTotalValue) || 0,
+        start_date: dealStartDate || null,
+        tanggal_mulai: dealStartDate || null,
+        end_date: dealEndDate || null,
+        tanggal_selesai: dealEndDate || null,
+        status: dealStatusInput,
+        notes: dealNotesInput || null,
+        updated_at: new Date().toISOString(),
+      }).eq('id', id)
+      if (error) throw error
+      toast.success('Deal berhasil diperbarui!')
+      queryClient.invalidateQueries({ queryKey: ['deal-detail', id] })
+      queryClient.invalidateQueries({ queryKey: ['brand-deals', deal?.brand_id] })
+      setEditDealOpen(false)
+    } catch (err) {
+      console.error('Failed to update deal:', err)
+      toast.error(err instanceof Error ? err.message : 'Gagal memperbarui deal')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDeleteDeal() {
+    if (!deal) return
+    setSaving(true)
+    try {
+      const supabase = createClient()
+      // deal_briefs/deal_sows/deal_deliverables/deal_payments/deal_schedules
+      // all CASCADE from deals.id (032/033). content_deliverables CASCADEs
+      // from deal_deliverables.id, so linked Content rows are only unlinked,
+      // never deleted — videos.deal_id is ON DELETE SET NULL, not CASCADE.
+      const { error } = await supabase.from('deals').delete().eq('id', id)
+      if (error) throw error
+      toast.success('Deal dihapus.')
+      router.push(`/brand/${deal.brand_id}`)
+    } catch (err) {
+      console.error('Failed to delete deal:', err)
+      toast.error(err instanceof Error ? err.message : 'Gagal menghapus deal')
       setSaving(false)
     }
   }
@@ -368,6 +653,8 @@ export default function DealDetailPage() {
   const totalValueNum = Number(deal?.total_value || deal?.nilai_total || 0)
   const paidNum = payments.filter((p) => p.status === 'paid').reduce((sum, p) => sum + Number(p.amount || 0), 0)
   const outstandingNum = Math.max(0, totalValueNum - paidNum)
+  // Derived purely from deal_payments records — never a separately-tracked value.
+  const paymentStatusLabel = totalValueNum <= 0 ? 'Belum Ada Nilai' : paidNum <= 0 ? 'Belum Dibayar' : outstandingNum <= 0 ? 'Lunas' : 'Sebagian'
 
   // Map deliverables with linked content counts
   const deliverablesWithContent = deliverables.map((del) => {
@@ -447,16 +734,32 @@ export default function DealDetailPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-4 text-right font-mono">
-          <div>
-            <p className="text-[10px] uppercase font-semibold text-text-muted">Nilai Deal</p>
-            <p className="text-sm font-bold text-emerald-700">{formatRupiah(totalValueNum)}</p>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 text-right font-mono">
+            <div>
+              <p className="text-[10px] uppercase font-semibold text-text-muted">Nilai Deal</p>
+              <p className="text-sm font-bold text-emerald-700">{formatRupiah(totalValueNum)}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase font-semibold text-text-muted">Outstanding</p>
+              <p className={cn('text-sm font-bold', outstandingNum > 0 ? 'text-amber-600' : 'text-text-muted')}>
+                {formatRupiah(outstandingNum)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase font-semibold text-text-muted">Status Bayar</p>
+              <Badge variant="outline" className={cn('text-[10px] font-bold uppercase mt-0.5', paymentStatusLabel === 'Lunas' ? 'text-emerald-700 border-emerald-300 bg-emerald-50' : paymentStatusLabel === 'Sebagian' ? 'text-amber-700 border-amber-300 bg-amber-50' : 'text-text-muted')}>
+                {paymentStatusLabel}
+              </Badge>
+            </div>
           </div>
-          <div>
-            <p className="text-[10px] uppercase font-semibold text-text-muted">Outstanding</p>
-            <p className={cn('text-sm font-bold', outstandingNum > 0 ? 'text-amber-600' : 'text-text-muted')}>
-              {formatRupiah(outstandingNum)}
-            </p>
+          <div className="flex items-center gap-1.5 border-l border-border pl-4">
+            <Button size="sm" variant="outline" className="h-8 text-xs font-semibold gap-1.5" onClick={openEditDeal}>
+              <Pencil className="w-3.5 h-3.5" /> Edit Deal
+            </Button>
+            <Button size="sm" variant="ghost" className="h-8 text-xs font-semibold text-error hover:text-error hover:bg-error/10" onClick={() => { setDeleteDealConfirmText(''); setDeleteDealOpen(true) }}>
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
           </div>
         </div>
       </div>
@@ -568,10 +871,17 @@ export default function DealDetailPage() {
           <form onSubmit={handleSaveBrief} className="bg-white border border-border rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <h3 className="font-semibold text-sm text-text-primary">Brief Collaboration / Campaign</h3>
-              <Button type="submit" size="sm" className="bg-accent hover:bg-accent/90 h-8 text-xs font-semibold" disabled={saving}>
-                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
-                Simpan Brief
-              </Button>
+              <div className="flex items-center gap-1.5">
+                {brief?.id && (
+                  <Button type="button" size="sm" variant="ghost" className="h-8 text-xs font-semibold text-error hover:text-error hover:bg-error/10" onClick={handleDeleteBrief} disabled={saving}>
+                    <Trash2 className="w-3.5 h-3.5 mr-1" /> Hapus
+                  </Button>
+                )}
+                <Button type="submit" size="sm" className="bg-accent hover:bg-accent/90 h-8 text-xs font-semibold" disabled={saving}>
+                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+                  Simpan Brief
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -619,12 +929,33 @@ export default function DealDetailPage() {
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div>
                 <span className="text-[10px] font-bold uppercase font-mono text-accent">Scope of Work</span>
-                <h3 className="font-semibold text-sm text-text-primary mt-0.5">{sow?.name || `${dealTitleStr} SOW v1`}</h3>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <h3 className="font-semibold text-sm text-text-primary">{sow?.name || `${dealTitleStr} SOW v1`}</h3>
+                  {sow && (
+                    <>
+                      <Badge variant="outline" className="text-[9px] uppercase font-bold">{sow.version || 'v1'}</Badge>
+                      <Badge variant="secondary" className="text-[9px] uppercase font-bold capitalize">{sow.status || 'active'}</Badge>
+                    </>
+                  )}
+                </div>
+                {sow?.effective_date && <p className="text-[11px] text-text-muted mt-0.5">Berlaku sejak {formatDate(sow.effective_date)}</p>}
               </div>
-              <Button size="sm" onClick={() => setAddDeliverableOpen(true)} className="bg-accent hover:bg-accent/90 h-8 text-xs font-semibold gap-1">
-                <Plus className="w-3.5 h-3.5" />
-                <span>+ Tambah Deliverable</span>
-              </Button>
+              <div className="flex items-center gap-1.5">
+                {sow && (
+                  <>
+                    <Button size="sm" variant="outline" className="h-8 text-xs font-semibold gap-1" onClick={openEditSow}>
+                      <Pencil className="w-3.5 h-3.5" /> Edit SOW
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-8 text-xs font-semibold text-error hover:text-error hover:bg-error/10" onClick={() => setDeleteSowOpen(true)}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </>
+                )}
+                <Button size="sm" onClick={() => { resetDeliverableForm(); setAddDeliverableOpen(true) }} className="bg-accent hover:bg-accent/90 h-8 text-xs font-semibold gap-1">
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Tambah Deliverable</span>
+                </Button>
+              </div>
             </div>
 
             {/* Deliverables List Table */}
@@ -670,8 +1001,11 @@ export default function DealDetailPage() {
                               ⚠ No Content linked
                             </Badge>
                           ) : (
-                            <span className="font-mono font-bold px-2 py-0.5 rounded-full text-xs bg-teal-50 text-accent border border-teal-200">
-                              {del.contentCount} Konten
+                            <span className={cn(
+                              'font-mono font-bold px-2 py-0.5 rounded-full text-xs border',
+                              del.contentCount >= (del.quantity || 1) ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-teal-50 text-accent border-teal-200'
+                            )}>
+                              {del.contentCount} / {del.quantity || 1} Content
                             </span>
                           )}
                         </td>
@@ -703,6 +1037,20 @@ export default function DealDetailPage() {
                           >
                             + Buat Konten
                           </Button>
+                          <button
+                            onClick={() => openEditDeliverable(del)}
+                            className="p-1.5 rounded hover:bg-subtle text-text-muted hover:text-accent transition-colors"
+                            title="Edit deliverable"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setDeleteDeliverableTarget(del)}
+                            className="p-1.5 rounded hover:bg-error/10 text-text-muted hover:text-error transition-colors"
+                            title="Hapus deliverable"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </td>
                       </tr>
                     ))
@@ -856,7 +1204,7 @@ export default function DealDetailPage() {
                           {p.status}
                         </Badge>
                       </td>
-                      <td className="px-3 py-3 text-right">
+                      <td className="px-3 py-3 text-right space-x-1">
                         <Button
                           size="sm"
                           variant="ghost"
@@ -865,6 +1213,12 @@ export default function DealDetailPage() {
                         >
                           {p.status === 'paid' ? 'Tandai Pending' : 'Tandai Lunas'}
                         </Button>
+                        <button onClick={() => openEditPayment(p)} className="p-1 rounded hover:bg-subtle text-text-muted hover:text-accent transition-colors" title="Edit pembayaran">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => setDeletePaymentTarget(p)} className="p-1 rounded hover:bg-error/10 text-text-muted hover:text-error transition-colors" title="Hapus pembayaran">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -875,13 +1229,13 @@ export default function DealDetailPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Sheet: Add Deliverable */}
-      <Sheet open={addDeliverableOpen} onOpenChange={setAddDeliverableOpen}>
+      {/* Sheet: Add/Edit Deliverable */}
+      <Sheet open={addDeliverableOpen} onOpenChange={(v) => { setAddDeliverableOpen(v); if (!v) resetDeliverableForm() }}>
         <SheetContent side="right" className="w-full sm:w-[460px] overflow-y-auto p-0">
           <SheetHeader className="px-6 py-4 border-b border-border">
-            <SheetTitle className="text-base font-bold">Tambah Deliverable SOW</SheetTitle>
+            <SheetTitle className="text-base font-bold">{delEditingId ? 'Edit Deliverable' : 'Tambah Deliverable SOW'}</SheetTitle>
           </SheetHeader>
-          <form onSubmit={handleCreateDeliverable} className="px-6 py-5 space-y-4">
+          <form onSubmit={handleSaveDeliverable} className="px-6 py-5 space-y-4">
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Nama Deliverable <span className="text-error">*</span></Label>
               <Input value={delName} onChange={(e) => setDelName(e.target.value)} placeholder="misal Event Coverage, TikTok Main Video" className="h-9 text-xs" />
@@ -907,6 +1261,24 @@ export default function DealDetailPage() {
               </div>
             </div>
 
+            {delEditingId && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Status</Label>
+                <Select value={delStatus} onValueChange={setDelStatus}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="planned" className="text-xs">Planned</SelectItem>
+                    <SelectItem value="in_production" className="text-xs">In Production</SelectItem>
+                    <SelectItem value="submitted" className="text-xs">Submitted</SelectItem>
+                    <SelectItem value="revision" className="text-xs">Revision</SelectItem>
+                    <SelectItem value="approved" className="text-xs">Approved</SelectItem>
+                    <SelectItem value="published" className="text-xs">Published</SelectItem>
+                    <SelectItem value="completed" className="text-xs">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Deadline Output</Label>
               <Input type="date" value={delDeadline} onChange={(e) => setDelDeadline(e.target.value)} className="h-9 text-xs" />
@@ -920,13 +1292,37 @@ export default function DealDetailPage() {
             <div className="pt-3 flex gap-2 border-t border-border">
               <Button type="submit" className="flex-1 bg-accent hover:bg-accent/90 h-9 text-xs font-semibold" disabled={saving}>
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
-                Tambah Deliverable
+                {delEditingId ? 'Simpan Perubahan' : 'Tambah Deliverable'}
               </Button>
-              <Button type="button" variant="outline" className="h-9 text-xs" onClick={() => setAddDeliverableOpen(false)}>Batal</Button>
+              <Button type="button" variant="outline" className="h-9 text-xs" onClick={() => { setAddDeliverableOpen(false); resetDeliverableForm() }}>Batal</Button>
             </div>
           </form>
         </SheetContent>
       </Sheet>
+
+      {/* Dialog: Delete Deliverable confirm */}
+      <Dialog open={!!deleteDeliverableTarget} onOpenChange={(v) => { if (!v) setDeleteDeliverableTarget(null) }}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-error" /> Hapus Deliverable?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2 text-sm">
+            <p className="text-text-secondary">
+              Deliverable <strong className="text-text-primary">{deleteDeliverableTarget?.name}</strong> akan dihapus.
+              {(deleteDeliverableTarget?.contentCount ?? 0) > 0 && (
+                <> <strong className="text-amber-700">{deleteDeliverableTarget?.contentCount} Content</strong> yang tertaut akan dilepas tautannya (Content itu sendiri tidak akan terhapus).</>
+              )}
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 pt-3 border-t border-border">
+            <Button type="button" variant="outline" size="sm" onClick={() => setDeleteDeliverableTarget(null)}>Batal</Button>
+            <Button type="button" variant="destructive" size="sm" onClick={handleDeleteDeliverable} disabled={saving}>
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+              Hapus Deliverable
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog: Link Existing Content to Deliverable */}
       <Dialog open={linkContentOpen} onOpenChange={setLinkContentOpen}>
@@ -959,13 +1355,13 @@ export default function DealDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Sheet: Create Payment Term */}
-      <Sheet open={addPaymentOpen} onOpenChange={setAddPaymentOpen}>
+      {/* Sheet: Add/Edit Payment Term */}
+      <Sheet open={addPaymentOpen} onOpenChange={(v) => { setAddPaymentOpen(v); if (!v) resetPaymentForm() }}>
         <SheetContent side="right" className="w-full sm:w-[420px] overflow-y-auto p-0">
           <SheetHeader className="px-6 py-4 border-b border-border">
-            <SheetTitle className="text-base font-bold">Tambah Term Pembayaran</SheetTitle>
+            <SheetTitle className="text-base font-bold">{payEditingId ? 'Edit Pembayaran' : 'Tambah Term Pembayaran'}</SheetTitle>
           </SheetHeader>
-          <form onSubmit={handleCreatePayment} className="px-6 py-5 space-y-4">
+          <form onSubmit={handleSavePayment} className="px-6 py-5 space-y-4">
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Nominal Pembayaran (Rp) <span className="text-error">*</span></Label>
               <Input type="number" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} placeholder="10000000" className="h-9 text-xs font-mono" />
@@ -998,17 +1394,40 @@ export default function DealDetailPage() {
               <Label className="text-xs font-semibold">Jatuh Tempo</Label>
               <Input type="date" value={payDueDate} onChange={(e) => setPayDueDate(e.target.value)} className="h-9 text-xs" />
             </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Catatan</Label>
+              <Textarea value={payNotes} onChange={(e) => setPayNotes(e.target.value)} placeholder="Catatan pembayaran (opsional)..." rows={2} className="text-xs" />
+            </div>
 
             <div className="pt-3 flex gap-2 border-t border-border">
               <Button type="submit" className="flex-1 bg-accent hover:bg-accent/90 h-9 text-xs font-semibold" disabled={saving}>
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
-                Simpan Pembayaran
+                {payEditingId ? 'Simpan Perubahan' : 'Simpan Pembayaran'}
               </Button>
-              <Button type="button" variant="outline" className="h-9 text-xs" onClick={() => setAddPaymentOpen(false)}>Batal</Button>
+              <Button type="button" variant="outline" className="h-9 text-xs" onClick={() => { setAddPaymentOpen(false); resetPaymentForm() }}>Batal</Button>
             </div>
           </form>
         </SheetContent>
       </Sheet>
+
+      {/* Dialog: Delete Payment confirm */}
+      <Dialog open={!!deletePaymentTarget} onOpenChange={(v) => { if (!v) setDeletePaymentTarget(null) }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-error" /> Hapus Pembayaran?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-text-secondary pt-2">
+            Record pembayaran <strong className="text-text-primary">{deletePaymentTarget ? formatRupiah(Number(deletePaymentTarget.amount)) : ''}</strong> ({deletePaymentTarget?.payment_type}) akan dihapus permanen. Outstanding akan dihitung ulang.
+          </p>
+          <div className="flex justify-end gap-2 pt-3 border-t border-border">
+            <Button type="button" variant="outline" size="sm" onClick={() => setDeletePaymentTarget(null)}>Batal</Button>
+            <Button type="button" variant="destructive" size="sm" onClick={handleDeletePayment} disabled={saving}>
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+              Hapus Pembayaran
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Sheet: Create Milestone Schedule */}
       <Sheet open={addScheduleOpen} onOpenChange={setAddScheduleOpen}>
@@ -1054,6 +1473,192 @@ export default function DealDetailPage() {
           </form>
         </SheetContent>
       </Sheet>
+
+      {/* Sheet: Edit Deal — same field geometry as the Deal creation sheet
+          in /brand/[id], plus Status (not present at creation since a new
+          deal has no meaningful status choice — it always starts dp_pending). */}
+      <Sheet open={editDealOpen} onOpenChange={setEditDealOpen}>
+        <SheetContent side="right" className="w-full sm:w-[480px] overflow-y-auto p-0">
+          <SheetHeader className="px-6 py-4 border-b border-border">
+            <SheetTitle className="text-base font-bold">Edit Deal / Kolaborasi</SheetTitle>
+          </SheetHeader>
+          <form onSubmit={handleUpdateDeal} className="px-6 py-5 space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Judul Deal / Campaign <span className="text-error">*</span></Label>
+              <Input value={dealTitleInput} onChange={(e) => setDealTitleInput(e.target.value)} className="h-9 text-xs" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Tipe Kolaborasi</Label>
+                <Select value={dealCollabType} onValueChange={setDealCollabType}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Campaign" className="text-xs">Campaign</SelectItem>
+                    <SelectItem value="Event" className="text-xs">Event</SelectItem>
+                    <SelectItem value="Product Review" className="text-xs">Product Review</SelectItem>
+                    <SelectItem value="Content Partnership" className="text-xs">Content Partnership</SelectItem>
+                    <SelectItem value="Retainer" className="text-xs">Retainer</SelectItem>
+                    <SelectItem value="One-off Collaboration" className="text-xs">One-off Collaboration</SelectItem>
+                    <SelectItem value="Barter" className="text-xs">Barter</SelectItem>
+                    <SelectItem value="Other" className="text-xs">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Nilai Total Deal (Rp)</Label>
+                <Input type="number" value={dealTotalValue} onChange={(e) => setDealTotalValue(e.target.value)} className="h-9 text-xs font-mono" />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Status Deal</Label>
+              <Select value={dealStatusInput} onValueChange={setDealStatusInput}>
+                <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dp_pending" className="text-xs">DP Pending</SelectItem>
+                  <SelectItem value="dp_paid" className="text-xs">DP Paid</SelectItem>
+                  <SelectItem value="on_progress" className="text-xs">On Progress</SelectItem>
+                  <SelectItem value="delivered" className="text-xs">Delivered</SelectItem>
+                  <SelectItem value="completed" className="text-xs">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Tanggal Mulai</Label>
+                <Input type="date" value={dealStartDate} onChange={(e) => setDealStartDate(e.target.value)} className="h-9 text-xs" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Tanggal Selesai</Label>
+                <Input type="date" value={dealEndDate} onChange={(e) => setDealEndDate(e.target.value)} className="h-9 text-xs" />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Catatan Deal</Label>
+              <Textarea value={dealNotesInput} onChange={(e) => setDealNotesInput(e.target.value)} rows={3} className="text-xs" />
+            </div>
+
+            <div className="pt-3 flex gap-2 border-t border-border">
+              <Button type="submit" className="flex-1 bg-accent hover:bg-accent/90 h-9 text-xs font-semibold" disabled={saving}>
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+                Simpan Perubahan
+              </Button>
+              <Button type="button" variant="outline" className="h-9 text-xs" onClick={() => setEditDealOpen(false)}>Batal</Button>
+            </div>
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      {/* Dialog: Delete Deal confirm — shows exactly what will be affected */}
+      <Dialog open={deleteDealOpen} onOpenChange={(v) => { setDeleteDealOpen(v); if (!v) setDeleteDealConfirmText('') }}>
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-error" /> Hapus Deal Ini?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2 text-sm">
+            <p className="text-text-secondary">
+              Ini akan menghapus deal <strong className="text-text-primary">{dealTitleStr}</strong> beserta:
+            </p>
+            <ul className="text-xs space-y-1 bg-subtle/50 border border-border rounded-lg p-3">
+              <li>• <strong>{brief ? 1 : 0}</strong> Brief {brief && <span className="text-error font-semibold">(akan dihapus permanen)</span>}</li>
+              <li>• <strong>{sow ? 1 : 0}</strong> SOW {sow && <span className="text-error font-semibold">(akan dihapus permanen)</span>}</li>
+              <li>• <strong>{deliverables.length}</strong> Deliverable {deliverables.length > 0 && <span className="text-error font-semibold">(akan dihapus permanen)</span>}</li>
+              <li>• <strong>{payments.length}</strong> Record Pembayaran {payments.length > 0 && <span className="text-error font-semibold">(akan dihapus permanen)</span>}</li>
+              <li>• <strong>{schedules.length}</strong> Milestone Jadwal {schedules.length > 0 && <span className="text-error font-semibold">(akan dihapus permanen)</span>}</li>
+              <li>• <strong>{allUniqueContent.length}</strong> Content terkait <span className="text-emerald-700 font-semibold">(tidak dihapus — hanya dilepas tautannya)</span></li>
+            </ul>
+            {(deliverables.length > 0 || payments.length > 0) && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Ketik <span className="font-mono text-error">{dealTitleStr}</span> untuk konfirmasi</Label>
+                <Input value={deleteDealConfirmText} onChange={(e) => setDeleteDealConfirmText(e.target.value)} className="h-9 text-xs" />
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 pt-3 border-t border-border">
+            <Button type="button" variant="outline" size="sm" onClick={() => setDeleteDealOpen(false)}>Batal</Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteDeal}
+              disabled={saving || ((deliverables.length > 0 || payments.length > 0) && deleteDealConfirmText !== dealTitleStr)}
+            >
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+              Hapus Deal
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sheet: Edit SOW */}
+      <Sheet open={editSowOpen} onOpenChange={setEditSowOpen}>
+        <SheetContent side="right" className="w-full sm:w-[420px] overflow-y-auto p-0">
+          <SheetHeader className="px-6 py-4 border-b border-border">
+            <SheetTitle className="text-base font-bold">Edit SOW</SheetTitle>
+          </SheetHeader>
+          <form onSubmit={handleSaveSow} className="px-6 py-5 space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Nama SOW <span className="text-error">*</span></Label>
+              <Input value={sowName} onChange={(e) => setSowName(e.target.value)} className="h-9 text-xs" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Versi</Label>
+                <Input value={sowVersion} onChange={(e) => setSowVersion(e.target.value)} className="h-9 text-xs" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Status</Label>
+                <Select value={sowStatus} onValueChange={setSowStatus}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active" className="text-xs">Active</SelectItem>
+                    <SelectItem value="superseded" className="text-xs">Superseded</SelectItem>
+                    <SelectItem value="closed" className="text-xs">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Tanggal Berlaku</Label>
+              <Input type="date" value={sowEffectiveDate} onChange={(e) => setSowEffectiveDate(e.target.value)} className="h-9 text-xs" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Catatan</Label>
+              <Textarea value={sowNotes} onChange={(e) => setSowNotes(e.target.value)} rows={3} className="text-xs" />
+            </div>
+            <div className="pt-3 flex gap-2 border-t border-border">
+              <Button type="submit" className="flex-1 bg-accent hover:bg-accent/90 h-9 text-xs font-semibold" disabled={saving}>
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+                Simpan Perubahan
+              </Button>
+              <Button type="button" variant="outline" className="h-9 text-xs" onClick={() => setEditSowOpen(false)}>Batal</Button>
+            </div>
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      {/* Dialog: Delete SOW confirm */}
+      <Dialog open={deleteSowOpen} onOpenChange={setDeleteSowOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-error" /> Hapus SOW?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-text-secondary pt-2">
+            SOW <strong className="text-text-primary">{sow?.name}</strong> akan dihapus.
+            {deliverables.length > 0 && <> <strong className="text-text-primary">{deliverables.length} Deliverable</strong> yang ada tetap tersimpan (kini tanpa SOW).</>}
+          </p>
+          <div className="flex justify-end gap-2 pt-3 border-t border-border">
+            <Button type="button" variant="outline" size="sm" onClick={() => setDeleteSowOpen(false)}>Batal</Button>
+            <Button type="button" variant="destructive" size="sm" onClick={handleDeleteSow} disabled={saving}>
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+              Hapus SOW
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Sheet: Create Content pre-populated with Brand + Deal + Deliverable —
           the user is never asked to re-select context already known from
