@@ -36,7 +36,7 @@ export function useCalendarEvents(workspaceId: string | null, startDate: string,
         safeQuery('publishing schedules', async () => {
           const { data, error } = await supabase
             .from('video_platform_schedules')
-            .select('*, videos!inner(id, judul, no_video, thumbnail_url, status, workspace_id, deal_id, deals(title, nama_campaign, brands(name, nama_brand)))')
+            .select('*, videos!inner(id, judul, no_video, thumbnail_url, status, workspace_id, deal_id, deals!deal_id(title, nama_campaign, brands(name, nama_brand)))')
             .eq('videos.workspace_id', workspaceId)
             .gte('tanggal_tayang', startDate)
             .lte('tanggal_tayang', endDate)
@@ -49,7 +49,7 @@ export function useCalendarEvents(workspaceId: string | null, startDate: string,
             .from('videos')
             .select(`id, judul, no_video, status, tanggal_shooting, deadline_posting, brand_id, deal_id,
               production_status, approval_status, publishing_status,
-              deals(id, title, nama_campaign, brands(name, nama_brand)),
+              deals!deal_id(id, title, nama_campaign, brands(name, nama_brand)),
               content_deliverables(deal_deliverables(name, platform))`)
             .eq('workspace_id', workspaceId)
             .or(`and(tanggal_shooting.gte.${startDate},tanggal_shooting.lte.${endDate}),and(deadline_posting.gte.${startDate},deadline_posting.lte.${endDate})`)
@@ -91,7 +91,7 @@ export function useCalendarEvents(workspaceId: string | null, startDate: string,
           const { data, error } = await supabase
             .from('videos')
             .select(`id, judul, no_video, approval_status, approval_waiting_since, production_status, publishing_status, deal_id,
-              deals(id, title, nama_campaign, brands(name, nama_brand)),
+              deals!deal_id(id, title, nama_campaign, brands(name, nama_brand)),
               content_deliverables(deal_deliverables(name, platform))`)
             .eq('workspace_id', workspaceId)
             .in('approval_status', ['waiting_approval', 'revision_requested'])
