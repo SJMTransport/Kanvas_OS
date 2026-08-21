@@ -40,7 +40,6 @@ import { formatRupiah } from '@/lib/utils/formatters'
 import { ScriptBlocks, type ScriptBlock } from '@/components/content/ScriptBlocks'
 import { ContentIdentity } from '@/components/content/ContentIdentity'
 import { LifecycleIndicator } from '@/components/content/LifecycleIndicator'
-import { ContentLifecycleControl } from '@/components/content/ContentLifecycleControl'
 import { VideoWorkBadges } from '@/components/content/VideoWorkBadges'
 import { PlatformEmbed } from '@/components/content/PlatformEmbed'
 import type { Platform } from '@/lib/types'
@@ -1270,8 +1269,9 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
   // Publishing status — Phase 5, Part B: same reasoning as Approval but
   // with no history table (none exists for this dimension, and Part O
   // forbids inventing a second status/history table). Production status
-  // is edited exclusively via the header's ContentLifecycleControl
-  // (Phase 03E) — no second write surface for that field here.
+  // is edited exclusively by clicking the lifecycle stepper in the
+  // always-visible header (Phase 03E, corrected) — no second write
+  // surface for that field here.
   const [newPublishingStatus, setNewPublishingStatus] = useState(video.publishing_status || 'not_scheduled')
   const [updatingPublishing, setUpdatingPublishing] = useState(false)
   const [workflowDetailOpen, setWorkflowDetailOpen] = useState(false)
@@ -1651,9 +1651,8 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
         </button>
         {workflowDetailOpen && (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 pt-0">
-        {/* Dimension 1: Production Status — read-only here; the single
-            editable control lives in the always-visible header
-            (ContentLifecycleControl) so it's reachable from any tab. */}
+        {/* Dimension 1: Production Status — read-only here; edited by
+            clicking the lifecycle stepper in the always-visible header. */}
         <div className="bg-white border border-border rounded-xl p-4 space-y-2 shadow-xs">
           <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">1. Production Status</span>
           <div className="flex items-center justify-between pt-1">
@@ -1919,6 +1918,7 @@ export default function ContentDetailPage() {
 
   const [activePlatform, setActivePlatform] = useState<Platform>('tiktok')
   const [activeDetailTab, setActiveDetailTab] = useState('perencanaan')
+  const [savingLifecycleStage, setSavingLifecycleStage] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState(0)
 
@@ -2026,6 +2026,30 @@ export default function ContentDetailPage() {
     headerScheduleRows.length > 0
   )
 
+  // Phase 03E UI correction — the lifecycle stepper IS the control; there
+  // is no separate status row anymore. Clicking a stage writes the one
+  // canonical field (production_status) it maps to.
+  async function handleSelectLifecycleStage(_stage: any, productionStatus: string) {
+    if (!video) return
+    const videoId = video.id
+    setSavingLifecycleStage(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('videos').update({ production_status: productionStatus }).eq('id', videoId)
+      if (error) {
+        console.error('Failed to update production_status:', error)
+        throw error
+      }
+      toast.success('Status konten diperbarui')
+      queryClient.invalidateQueries({ queryKey: ['video-detail', videoId] })
+      queryClient.invalidateQueries({ queryKey: ['videos'], refetchType: 'all' })
+    } catch {
+      toast.error('Gagal mengubah status konten')
+    } finally {
+      setSavingLifecycleStage(false)
+    }
+  }
+
   const totalViews = Object.values(platformData).reduce((sum, d: any) => sum + (Number(d?.views) || 0), 0)
   const totalLikes = Object.values(platformData).reduce((sum, d: any) => sum + (Number(d?.likes) || 0), 0)
   const totalComments = Object.values(platformData).reduce((sum, d: any) => sum + (Number(d?.comments) || 0), 0)
@@ -2055,14 +2079,8 @@ export default function ContentDetailPage() {
             )}
             <VideoWorkBadges videoId={video.id} />
           </div>
-          <div className="pt-2 max-w-2xl space-y-2">
-            <LifecycleIndicator stage={lifecycleStage} />
-            <ContentLifecycleControl
-              videoId={video.id}
-              productionStatus={video.production_status}
-              onGoToBrandTab={() => setActiveDetailTab('brand')}
-              onGoToDistributionTab={() => setActiveDetailTab('distribusi')}
-            />
+          <div className="pt-2 max-w-2xl">
+            <LifecycleIndicator stage={lifecycleStage} onSelectStage={handleSelectLifecycleStage} disabled={savingLifecycleStage} />
           </div>
         </div>
 
