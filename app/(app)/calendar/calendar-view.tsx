@@ -7,9 +7,10 @@ import { restrictToWindowEdges } from '@dnd-kit/modifiers'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
+import { useCalendarEvents } from '@/lib/hooks/useCalendarEvents'
 import { format, addMonths, subMonths, addWeeks, subWeeks, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Plus, List, LayoutGrid, CalendarDays, Check } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, List, LayoutGrid, CalendarDays, Check, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -19,13 +20,26 @@ import { ListView } from './list-view'
 import { EventDetail } from './event-detail'
 import { QuickAdd } from './quick-add'
 import { cn } from '@/lib/utils'
-import type { ScheduleEvent, ViewMode } from './types'
+import { isReadyToPublish } from '@/lib/utils/workflow'
+import { CALENDAR_CATEGORY_GROUP, type CalendarEvent, type ViewMode } from './types'
 import type { Platform } from '@/lib/types'
+import Link from 'next/link'
 
 const PLATFORMS: Platform[] = ['tiktok', 'instagram', 'youtube', 'facebook']
 const PLATFORM_LABELS: Record<Platform, string> = {
   tiktok: 'TikTok', instagram: 'Instagram', youtube: 'YouTube', facebook: 'Facebook',
 }
+function getPlatformBgColor(p: Platform): string {
+  return { tiktok: '#000000', instagram: '#E1306C', youtube: '#FF0000', facebook: '#1877F2' }[p]
+}
+
+const CATEGORY_GROUPS: { key: 'all' | 'content' | 'deal' | 'financial' | 'approval'; label: string }[] = [
+  { key: 'all', label: 'Semua' },
+  { key: 'content', label: 'Content' },
+  { key: 'deal', label: 'Deal' },
+  { key: 'financial', label: 'Financial' },
+  { key: 'approval', label: 'Approval' },
+]
 
 export function CalendarView() {
   const { workspaceId } = useWorkspace()
@@ -33,8 +47,9 @@ export function CalendarView() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const [viewMode, setViewMode] = useState<ViewMode>('month')
   const [activeDate, setActiveDate] = useState(new Date())
+  const [activeGroup, setActiveGroup] = useState<'all' | 'content' | 'deal' | 'financial' | 'approval'>('all')
   const [activePlatforms, setActivePlatforms] = useState<Platform[]>([...PLATFORMS])
-  const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null)
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [quickAddDate, setQuickAddDate] = useState<string | null>(null)
   const [quickAddOpen, setQuickAddOpen] = useState(false)
@@ -49,30 +64,34 @@ export function CalendarView() {
   // Date range for query
   const { startDate, endDate } = getDateRange(viewMode, activeDate)
 
-  const { data: events = [], isLoading } = useQuery<ScheduleEvent[]>({
-    queryKey: ['schedules', workspaceId, startDate, endDate, activePlatforms],
-    queryFn: async () => {
-      if (!workspaceId) return []
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('video_platform_schedules')
-        .select('*, videos(id, judul, thumbnail_url, status, workspace_id)')
-        .gte('tanggal_tayang', startDate)
-        .lte('tanggal_tayang', endDate)
-        .in('platform', activePlatforms)
-      // Filter by workspace
-      return ((data ?? []) as (ScheduleEvent & { videos: ScheduleEvent['videos'] & { workspace_id: string } | null })[])
-        .filter((e) => e.videos?.workspace_id === workspaceId)
-    },
-    enabled: !!workspaceId,
-    staleTime: 30_000,
-  })
+  const { data: allEvents = [], isLoading } = useCalendarEvents(workspaceId, startDate, endDate)
+
+  const events = allEvents
+    .filter((e) => activeGroup === 'all' || CALENDAR_CATEGORY_GROUP[e.category] === activeGroup)
+    .filter((e) => e.category !== 'publishing' || activePlatforms.includes(e.raw.platform))
 
   function togglePlatform(p: Platform) {
-    setActivePlatforms((prev) =>
-      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
-    )
+    setActivePlatforms((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p])
   }
+
+  // Ready-to-publish has no intrinsic calendar date (production=ready +
+  // approval=approved + publishing!=published is a state, not a date) — so
+  // it's a workspace-wide summary banner, not a dated cell, using the same
+  // derived logic already built in Phase 2/3 (lib/utils/workflow.ts).
+  const { data: readyToPublishCount = 0 } = useQuery({
+    queryKey: ['calendar-ready-to-publish', workspaceId],
+    enabled: !!workspaceId,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('videos')
+        .select('id, status, production_status, approval_status, publishing_status')
+        .eq('workspace_id', workspaceId)
+      if (error) { console.error('Failed to load ready-to-publish count:', error); return 0 }
+      return (data ?? []).filter((v: any) => isReadyToPublish(v)).length
+    },
+    staleTime: 30_000,
+  })
 
   function navigate(dir: 1 | -1) {
     if (viewMode === 'month') setActiveDate((d) => dir === 1 ? addMonths(d, 1) : subMonths(d, 1))
@@ -89,11 +108,13 @@ export function CalendarView() {
     setQuickAddOpen(true)
   }
 
-  function handleEventClick(event: ScheduleEvent) {
+  function handleEventClick(event: CalendarEvent) {
     setSelectedEvent(event)
     setDetailOpen(true)
   }
 
+  // Drag-to-reschedule only applies to publishing events — the schedule id
+  // lives at ev.raw.id (the CalendarEvent's own id is category-prefixed).
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     if (!over) return
@@ -101,14 +122,14 @@ export function CalendarView() {
     const newDate = over.data.current?.date as string
     if (!scheduleId || !newDate) return
 
-    const queryKey = ['schedules', workspaceId, startDate, endDate, activePlatforms]
-    const previous = queryClient.getQueryData<ScheduleEvent[]>(queryKey)
+    const queryKey = ['calendar-events', workspaceId, startDate, endDate]
+    const previous = queryClient.getQueryData<CalendarEvent[]>(queryKey)
     if (!previous) return
-    const target = previous.find((e) => e.id === scheduleId)
-    if (!target || target.tanggal_tayang === newDate) return
+    const target = previous.find((e) => e.category === 'publishing' && e.raw.id === scheduleId)
+    if (!target || target.date === newDate) return
 
-    queryClient.setQueryData<ScheduleEvent[]>(queryKey, (old) =>
-      (old ?? []).map((e) => e.id === scheduleId ? { ...e, tanggal_tayang: newDate } : e)
+    queryClient.setQueryData<CalendarEvent[]>(queryKey, (old) =>
+      (old ?? []).map((e) => (e.category === 'publishing' && e.raw.id === scheduleId) ? { ...e, date: newDate, raw: { ...e.raw, tanggal_tayang: newDate } } : e)
     )
 
     const supabase = createClient()
@@ -118,10 +139,12 @@ export function CalendarView() {
       .eq('id', scheduleId)
 
     if (error) {
+      console.error('Failed to reschedule:', error)
       queryClient.setQueryData(queryKey, previous)
       toast.error('Gagal mengubah jadwal')
     } else {
       toast.success('Jadwal diperbarui')
+      queryClient.invalidateQueries({ queryKey })
     }
   }
 
@@ -131,6 +154,20 @@ export function CalendarView() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-white rounded-[16px] border border-[#E8EEEC] overflow-hidden">
+      {/* Ready to Publish banner */}
+      {readyToPublishCount > 0 && (
+        <Link href="/content" className="shrink-0">
+          <div className="bg-emerald-500 text-white px-4 py-2 flex items-center justify-between text-sm hover:bg-emerald-600 transition-colors">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4" />
+              <span className="font-semibold">Ready to Publish</span>
+              <span className="opacity-90">— {readyToPublishCount} Content siap dijadwalkan</span>
+            </div>
+            <span className="text-xs underline">Buka Konten</span>
+          </div>
+        </Link>
+      )}
+
       {/* Quiet Calendar Workspace Control Header */}
       <div className="bg-[#F7FAF9] border-b border-[#E8EEEC] px-4 py-2 flex items-center justify-between gap-2 flex-wrap shrink-0">
         <div className="flex items-center gap-2">
@@ -186,6 +223,22 @@ export function CalendarView() {
         </div>
       </div>
 
+      {/* Category filter */}
+      <div className="bg-white border-b border-border px-4 py-2 flex items-center gap-1.5 flex-wrap shrink-0">
+        {CATEGORY_GROUPS.map((g) => (
+          <button
+            key={g.key}
+            onClick={() => setActiveGroup(g.key)}
+            className={cn(
+              'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
+              activeGroup === g.key ? 'bg-accent text-white border-accent' : 'bg-white text-text-secondary border-border hover:bg-subtle'
+            )}
+          >
+            {g.label}
+          </button>
+        ))}
+      </div>
+
       {/* Calendar body */}
       {isLoading ? (
         <div className="flex-1 flex items-center justify-center">
@@ -213,7 +266,7 @@ export function CalendarView() {
         />
       )}
 
-      {/* Legend / platform filter — checkbox style */}
+      {/* Platform legend / filter — only affects publishing events */}
       {viewMode !== 'list' && (
         <div className="bg-white border-t border-border px-4 py-2.5 flex items-center gap-5 flex-wrap shrink-0">
           {PLATFORMS.map((p) => {
@@ -279,8 +332,4 @@ function getDateRange(viewMode: ViewMode, activeDate: Date) {
     startDate: format(startOfMonth(activeDate), 'yyyy-MM-dd'),
     endDate: format(endOfMonth(activeDate), 'yyyy-MM-dd'),
   }
-}
-
-function getPlatformBgColor(p: Platform): string {
-  return { tiktok: '#000000', instagram: '#E1306C', youtube: '#FF0000', facebook: '#1877F2' }[p]
 }

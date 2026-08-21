@@ -8,44 +8,50 @@ import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/utils'
 import { getPlatformDot } from '@/lib/utils/platform'
-import type { ScheduleEvent } from './types'
+import { CALENDAR_CATEGORY_CONFIG, type CalendarEvent } from './types'
 
 const DAY_NAMES = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
 const MAX_VISIBLE = 3
 
 interface Props {
   activeDate: Date
-  events: ScheduleEvent[]
+  events: CalendarEvent[]
   onDayClick: (date: string) => void
-  onEventClick: (event: ScheduleEvent) => void
+  onEventClick: (event: CalendarEvent) => void
 }
 
-function EventChip({ ev, onEventClick }: { ev: ScheduleEvent; onEventClick: (e: ScheduleEvent) => void }) {
+function EventChip({ ev, onEventClick }: { ev: CalendarEvent; onEventClick: (e: CalendarEvent) => void }) {
+  const draggable = ev.category === 'publishing'
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: ev.id,
-    data: { scheduleId: ev.id },
+    data: { scheduleId: ev.raw.id },
+    disabled: !draggable,
   })
-
-  const isTarget = ev.videos && !['scheduled', 'live'].includes(ev.videos.status)
+  const cfg = CALENDAR_CATEGORY_CONFIG[ev.category]
 
   return (
     <button
       ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      style={{ transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.5 : 1 }}
+      {...(draggable ? { ...listeners, ...attributes } : {})}
+      style={draggable ? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.5 : 1 } : undefined}
       className={cn(
-        'w-full flex items-center gap-1.5 text-left text-[11px] px-2 py-1 rounded-lg bg-white border border-border/80 leading-tight font-medium',
-        'hover:border-teal-500 hover:shadow-subtle transition-all cursor-grab active:cursor-grabbing touch-none',
-        isDragging && 'shadow-modal ring-2 ring-teal-500/40',
-        isTarget && 'border-dashed'
+        'w-full flex items-center gap-1.5 text-left text-[11px] px-2 py-1 rounded-lg bg-white border leading-tight font-medium',
+        'hover:border-teal-500 hover:shadow-subtle transition-all touch-none',
+        draggable && 'cursor-grab active:cursor-grabbing',
+        ev.severity === 'overdue' ? 'border-rose-300 bg-rose-50/50' : ev.severity === 'attention' ? 'border-amber-300 bg-amber-50/40' : 'border-border/80',
+        isDragging && 'shadow-modal ring-2 ring-teal-500/40'
       )}
       onClick={(e) => { e.stopPropagation(); onEventClick(ev) }}
-      title={`${ev.platform} · ${ev.videos?.judul ?? ''}${isTarget ? ' (Target/Reminder)' : ''}`}
+      title={`${cfg.label} · ${ev.title}`}
     >
-      <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', getPlatformDot(ev.platform))} />
-      {ev.jam_post && <span className="text-text-muted shrink-0 text-[10px]">{ev.jam_post.slice(0, 5)}</span>}
-      <span className="truncate text-text-primary">{ev.videos?.judul ?? 'Video'}</span>
+      <span
+        className="w-1.5 h-1.5 rounded-full shrink-0"
+        style={{ backgroundColor: ev.category === 'publishing' ? undefined : cfg.dot }}
+      >
+        {ev.category === 'publishing' && <span className={cn('block w-1.5 h-1.5 rounded-full', getPlatformDot(ev.raw.platform))} />}
+      </span>
+      {ev.time && <span className="text-text-muted shrink-0 text-[10px]">{ev.time.slice(0, 5)}</span>}
+      <span className="truncate text-text-primary">{ev.title}</span>
     </button>
   )
 }
@@ -76,7 +82,7 @@ export function MonthView({ activeDate, events, onDayClick, onEventClick }: Prop
 
   function getEventsForDay(date: Date) {
     const dateStr = format(date, 'yyyy-MM-dd')
-    return events.filter((e) => e.tanggal_tayang === dateStr)
+    return events.filter((e) => e.date === dateStr)
   }
 
   return (
