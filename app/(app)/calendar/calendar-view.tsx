@@ -18,6 +18,7 @@ import { MonthView } from './month-view'
 import { WeekView } from './week-view'
 import { ListView } from './list-view'
 import { EventDetail } from './event-detail'
+import { DailyAgenda } from './daily-agenda'
 import { QuickAdd } from './quick-add'
 import { cn } from '@/lib/utils'
 import { isReadyToPublish } from '@/lib/utils/workflow'
@@ -51,6 +52,9 @@ export function CalendarView() {
   const [activePlatforms, setActivePlatforms] = useState<Platform[]>([...PLATFORMS])
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
+  const [agendaDate, setAgendaDate] = useState<string | null>(null)
+  const [agendaOpen, setAgendaOpen] = useState(false)
+  const [cameFromAgenda, setCameFromAgenda] = useState(false)
   const [quickAddDate, setQuickAddDate] = useState<string | null>(null)
   const [quickAddOpen, setQuickAddOpen] = useState(false)
 
@@ -103,14 +107,34 @@ export function CalendarView() {
     setActiveDate(new Date())
   }
 
+  // Clicking a date opens the Level 3 Daily Agenda. "Tambah Jadwal" (Quick
+  // Add) stays reachable via its own header button — unaffected.
   function handleDayClick(dateStr: string) {
-    setQuickAddDate(dateStr)
-    setQuickAddOpen(true)
+    setAgendaDate(dateStr)
+    setAgendaOpen(true)
+    setDetailOpen(false)
   }
 
   function handleEventClick(event: CalendarEvent) {
     setSelectedEvent(event)
     setDetailOpen(true)
+    setAgendaOpen(false)
+    setCameFromAgenda(false)
+  }
+
+  // From within the Daily Agenda, an activity opens the Level 2 preview
+  // rather than navigating away — the date is preserved via agendaDate so
+  // "← Semua Aktivitas" can return to the same day's agenda.
+  function handleAgendaEventClick(event: CalendarEvent) {
+    setSelectedEvent(event)
+    setDetailOpen(true)
+    setAgendaOpen(false)
+    setCameFromAgenda(true)
+  }
+
+  function handleBackToAgenda() {
+    setDetailOpen(false)
+    setAgendaOpen(true)
   }
 
   // Drag-to-reschedule only applies to publishing events — the schedule id
@@ -286,26 +310,44 @@ export function CalendarView() {
         </div>
       )}
 
-      {/* Desktop side panel */}
+      {/* Desktop side panel — Level 3 Daily Agenda or Level 2 event detail */}
       <div className={cn(
         'hidden lg:flex fixed right-0 top-14 bottom-0 w-80 bg-white border-l border-border flex-col z-20 transition-transform duration-200',
-        detailOpen ? 'translate-x-0' : 'translate-x-full'
+        (detailOpen || agendaOpen) ? 'translate-x-0' : 'translate-x-full'
       )}>
-        {selectedEvent && (
+        {agendaOpen && agendaDate && (
+          <DailyAgenda
+            dateStr={agendaDate}
+            events={allEvents}
+            onClose={() => setAgendaOpen(false)}
+            onEventClick={handleAgendaEventClick}
+          />
+        )}
+        {detailOpen && selectedEvent && (
           <EventDetail
             event={selectedEvent}
             onClose={() => setDetailOpen(false)}
+            onBack={cameFromAgenda ? handleBackToAgenda : undefined}
           />
         )}
       </div>
 
       {/* Mobile bottom sheet */}
-      <Sheet open={detailOpen && typeof window !== 'undefined' && window.innerWidth < 1024} onOpenChange={setDetailOpen}>
+      <Sheet open={(detailOpen || agendaOpen) && typeof window !== 'undefined' && window.innerWidth < 1024} onOpenChange={(open) => { setDetailOpen(open && detailOpen); setAgendaOpen(open && agendaOpen) }}>
         <SheetContent side="bottom" className="h-[75vh] p-0">
-          {selectedEvent && (
+          {agendaOpen && agendaDate && (
+            <DailyAgenda
+              dateStr={agendaDate}
+              events={allEvents}
+              onClose={() => setAgendaOpen(false)}
+              onEventClick={handleAgendaEventClick}
+            />
+          )}
+          {detailOpen && selectedEvent && (
             <EventDetail
               event={selectedEvent}
               onClose={() => setDetailOpen(false)}
+              onBack={cameFromAgenda ? handleBackToAgenda : undefined}
             />
           )}
         </SheetContent>

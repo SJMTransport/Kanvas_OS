@@ -36,7 +36,7 @@ export function useCalendarEvents(workspaceId: string | null, startDate: string,
         safeQuery('publishing schedules', async () => {
           const { data, error } = await supabase
             .from('video_platform_schedules')
-            .select('*, videos!inner(id, judul, thumbnail_url, status, workspace_id)')
+            .select('*, videos!inner(id, judul, no_video, thumbnail_url, status, workspace_id, deal_id, deals(title, nama_campaign, brands(name, nama_brand)))')
             .eq('videos.workspace_id', workspaceId)
             .gte('tanggal_tayang', startDate)
             .lte('tanggal_tayang', endDate)
@@ -47,7 +47,10 @@ export function useCalendarEvents(workspaceId: string | null, startDate: string,
         safeQuery('content shooting/deadline dates', async () => {
           const { data, error } = await supabase
             .from('videos')
-            .select('id, judul, no_video, status, tanggal_shooting, deadline_posting, brand_id')
+            .select(`id, judul, no_video, status, tanggal_shooting, deadline_posting, brand_id, deal_id,
+              production_status, approval_status, publishing_status,
+              deals(id, title, nama_campaign, brands(name, nama_brand)),
+              content_deliverables(deal_deliverables(name, platform))`)
             .eq('workspace_id', workspaceId)
             .or(`and(tanggal_shooting.gte.${startDate},tanggal_shooting.lte.${endDate}),and(deadline_posting.gte.${startDate},deadline_posting.lte.${endDate})`)
           if (error) throw error
@@ -57,7 +60,7 @@ export function useCalendarEvents(workspaceId: string | null, startDate: string,
         safeQuery('deal start/end dates', async () => {
           const { data, error } = await supabase
             .from('deals')
-            .select('id, title, nama_campaign, start_date, tanggal_mulai, end_date, tanggal_selesai, brand_id, brands(name, nama_brand)')
+            .select('id, title, nama_campaign, start_date, tanggal_mulai, end_date, tanggal_selesai, total_value, brand_id, brands(name, nama_brand)')
             .eq('workspace_id', workspaceId)
             .or(`and(start_date.gte.${startDate},start_date.lte.${endDate}),and(end_date.gte.${startDate},end_date.lte.${endDate})`)
           if (error) throw error
@@ -87,7 +90,9 @@ export function useCalendarEvents(workspaceId: string | null, startDate: string,
         safeQuery('approval waiting/revision', async () => {
           const { data, error } = await supabase
             .from('videos')
-            .select('id, judul, approval_status, approval_waiting_since')
+            .select(`id, judul, no_video, approval_status, approval_waiting_since, production_status, publishing_status, deal_id,
+              deals(id, title, nama_campaign, brands(name, nama_brand)),
+              content_deliverables(deal_deliverables(name, platform))`)
             .eq('workspace_id', workspaceId)
             .in('approval_status', ['waiting_approval', 'revision_requested'])
             .not('approval_waiting_since', 'is', null)
@@ -98,6 +103,26 @@ export function useCalendarEvents(workspaceId: string | null, startDate: string,
         }, [] as any[]),
       ])
 
+      // Builds the shared Level-1/Level-2 context for a videos row — brand,
+      // deal, first linked deliverable, and the 3 workflow dimensions.
+      function videoCtx(v: any) {
+        const brandName = v.deals?.brands?.name || v.deals?.brands?.nama_brand || null
+        const deliverableName = v.content_deliverables?.[0]?.deal_deliverables?.name || null
+        return {
+          videoNo: v.no_video || null,
+          brandName,
+          dealId: v.deal_id || v.deals?.id || null,
+          dealTitle: v.deals?.title || v.deals?.nama_campaign || null,
+          deliverableName,
+          productionStatus: v.production_status || null,
+          approvalStatus: v.approval_status || null,
+          publishingStatus: v.publishing_status || null,
+        }
+      }
+      function videoLabel(v: any) {
+        return v.no_video ? `${v.no_video} · ${v.judul ?? 'Video'}` : (v.judul ?? 'Video')
+      }
+
       // ── Publishing ────────────────────────────────────────────────────
       for (const s of schedules) {
         if (s.videos?.workspace_id !== workspaceId) continue
@@ -106,29 +131,32 @@ export function useCalendarEvents(workspaceId: string | null, startDate: string,
           category: 'publishing',
           date: s.tanggal_tayang,
           time: s.jam_post,
-          title: s.videos?.judul ?? 'Video',
+          title: s.videos ? videoLabel(s.videos) : 'Video',
           subtitle: s.platform,
           href: s.videos?.id ? `/content/${s.videos.id}` : '/content',
           overdue: false,
           severity: 'normal',
           raw: s,
+          ctx: s.videos ? videoCtx(s.videos) : undefined,
         })
       }
 
       // ── Content shooting / deadline ──────────────────────────────────
       for (const v of videosInRange) {
+        const ctx = videoCtx(v)
         if (v.tanggal_shooting && v.tanggal_shooting >= startDate && v.tanggal_shooting <= endDate) {
           const dateObj = new Date(v.tanggal_shooting)
           events.push({
             id: `shooting-${v.id}`,
             category: 'shooting',
             date: v.tanggal_shooting,
-            title: v.judul ?? 'Video',
-            subtitle: v.no_video || undefined,
+            title: videoLabel(v),
+            subtitle: ctx.brandName || undefined,
             href: `/content/${v.id}`,
             overdue: dateObj < today && !['scheduled', 'live', 'archived'].includes(v.status),
             severity: dateObj < today && !['scheduled', 'live', 'archived'].includes(v.status) ? 'overdue' : 'normal',
             raw: v,
+            ctx,
           })
         }
         if (v.deadline_posting && v.deadline_posting >= startDate && v.deadline_posting <= endDate) {
@@ -138,12 +166,13 @@ export function useCalendarEvents(workspaceId: string | null, startDate: string,
             id: `deadline-${v.id}`,
             category: 'deadline',
             date: v.deadline_posting,
-            title: v.judul ?? 'Video',
-            subtitle: v.no_video || undefined,
+            title: videoLabel(v),
+            subtitle: ctx.brandName || undefined,
             href: `/content/${v.id}`,
             overdue: dateObj < today && !isDone,
             severity: dateObj < today && !isDone ? 'overdue' : 'normal',
             raw: v,
+            ctx,
           })
         }
       }
@@ -154,11 +183,12 @@ export function useCalendarEvents(workspaceId: string | null, startDate: string,
         const title = d.title || d.nama_campaign || 'Deal'
         const start = d.start_date || d.tanggal_mulai
         const end = d.end_date || d.tanggal_selesai
+        const dealCtx = { brandName, dealId: d.id, dealTitle: title }
         if (start && start >= startDate && start <= endDate) {
           events.push({
             id: `deal_start-${d.id}`, category: 'deal_start', date: start,
             title, subtitle: brandName, href: `/brand/deals/${d.id}`,
-            overdue: false, severity: 'normal', raw: d,
+            overdue: false, severity: 'normal', raw: d, ctx: dealCtx,
           })
         }
         if (end && end >= startDate && end <= endDate) {
@@ -166,7 +196,7 @@ export function useCalendarEvents(workspaceId: string | null, startDate: string,
           events.push({
             id: `deal_end-${d.id}`, category: 'deal_end', date: end,
             title, subtitle: brandName, href: `/brand/deals/${d.id}`,
-            overdue: dateObj < today, severity: dateObj < today ? 'attention' : 'normal', raw: d,
+            overdue: dateObj < today, severity: dateObj < today ? 'attention' : 'normal', raw: d, ctx: dealCtx,
           })
         }
       }
@@ -189,6 +219,7 @@ export function useCalendarEvents(workspaceId: string | null, startDate: string,
           overdue,
           severity: overdue ? 'overdue' : inv.status === 'paid' ? 'normal' : 'attention',
           raw: inv,
+          ctx: { brandName, dealId: inv.deal_id || null, dealTitle: dealTitle || null },
         })
       }
 
@@ -208,6 +239,7 @@ export function useCalendarEvents(workspaceId: string | null, startDate: string,
           overdue,
           severity: overdue ? 'overdue' : p.status === 'paid' ? 'normal' : 'attention',
           raw: p,
+          ctx: { brandName, dealId: p.deal_id || null, dealTitle: dealTitle || null },
         })
       }
 
@@ -222,18 +254,20 @@ export function useCalendarEvents(workspaceId: string | null, startDate: string,
       for (const v of approvalVideos as any[]) {
         const sinceDate = (v.approval_waiting_since as string).split('T')[0]
         if (sinceDate < startDate || sinceDate > endDate) continue
+        const ctx = videoCtx(v)
         if (v.approval_status === 'waiting_approval') {
           const severity = getApprovalSeverity(v.approval_waiting_since)
           events.push({
             id: `waiting_approval-${v.id}`,
             category: 'waiting_approval',
             date: sinceDate,
-            title: v.judul ?? 'Video',
+            title: videoLabel(v),
             subtitle: getApprovalAgingText(v.approval_waiting_since),
             href: `/content/${v.id}`,
             overdue: severity === 'overdue',
             severity,
             raw: v,
+            ctx,
           })
         }
         if (v.approval_status === 'revision_requested') {
@@ -241,12 +275,13 @@ export function useCalendarEvents(workspaceId: string | null, startDate: string,
             id: `revision-${v.id}`,
             category: 'revision',
             date: sinceDate,
-            title: v.judul ?? 'Video',
+            title: videoLabel(v),
             subtitle: 'Revision requested',
             href: `/content/${v.id}`,
             overdue: false,
             severity: 'attention',
             raw: v,
+            ctx,
           })
         }
       }

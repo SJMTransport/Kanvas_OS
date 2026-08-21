@@ -15,6 +15,20 @@ export type CalendarEventCategory =
   | 'waiting_approval'
   | 'revision'
 
+// Additive context used to enrich Level 1 labels and Level 2 previews.
+// Every field is optional — populated only when the source row actually
+// has it (e.g. a video with no deal_id simply omits brandName/dealTitle).
+export interface CalendarEventContext {
+  videoNo?: string | null
+  brandName?: string | null
+  dealId?: string | null
+  dealTitle?: string | null
+  deliverableName?: string | null
+  productionStatus?: string | null
+  approvalStatus?: string | null
+  publishingStatus?: string | null
+}
+
 export interface CalendarEvent {
   id: string
   category: CalendarEventCategory
@@ -26,6 +40,7 @@ export interface CalendarEvent {
   overdue: boolean
   severity: 'normal' | 'attention' | 'overdue'
   raw: any
+  ctx?: CalendarEventContext
 }
 
 export const CALENDAR_CATEGORY_GROUP: Record<CalendarEventCategory, 'content' | 'financial' | 'deal' | 'approval'> = {

@@ -3,36 +3,49 @@
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import { Video, ExternalLink, Edit2, X, AlertTriangle } from 'lucide-react'
+import { Video, ExternalLink, X, AlertTriangle, ChevronLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { getPlatformBadge } from '@/lib/utils/platform'
 import { formatRupiah } from '@/lib/utils/formatters'
 import { STATUS_CONFIG } from '@/lib/utils/status'
-import { PRODUCTION_STATUS_CONFIG, APPROVAL_STATUS_CONFIG } from '@/lib/utils/workflow'
+import { PRODUCTION_STATUS_CONFIG, APPROVAL_STATUS_CONFIG, PUBLISHING_STATUS_CONFIG } from '@/lib/utils/workflow'
 import { cn } from '@/lib/utils'
 import { CALENDAR_CATEGORY_CONFIG, type CalendarEvent } from './types'
 
 interface Props {
   event: CalendarEvent
   onClose: () => void
-  onEdit?: (event: CalendarEvent) => void
+  onBack?: () => void
 }
 
-export function EventDetail({ event, onClose, onEdit }: Props) {
+function ctaLabel(category: CalendarEvent['category']) {
+  if (['publishing', 'shooting', 'deadline', 'waiting_approval', 'revision'].includes(category)) return 'Buka Content'
+  if (['invoice_due', 'payment_due', 'deal_start', 'deal_end'].includes(category)) return 'Buka Deal'
+  return 'Buka Detail'
+}
+
+export function EventDetail({ event, onClose, onBack }: Props) {
   const cfg = CALENDAR_CATEGORY_CONFIG[event.category]
-  const dateStr = format(new Date(event.date), 'EEEE, d MMMM yyyy', { locale: localeId })
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between p-4 border-b border-border">
         <div className="flex items-center gap-2">
-          {event.severity === 'overdue' && <AlertTriangle className="w-4 h-4 text-error" />}
-          <h3 className="font-heading font-semibold text-text-primary text-sm">{cfg.label}{event.severity === 'overdue' ? ' — Overdue' : ''}</h3>
+          {onBack && (
+            <button onClick={onBack} className="text-text-muted hover:text-text-primary p-1 -ml-1 rounded flex items-center gap-1 text-xs font-medium">
+              <ChevronLeft className="w-3.5 h-3.5" /> Semua Aktivitas
+            </button>
+          )}
         </div>
         <button onClick={onClose} className="text-text-muted hover:text-text-primary p-1 rounded">
           <X className="w-4 h-4" />
         </button>
+      </div>
+
+      <div className="px-4 pt-3 flex items-center gap-2">
+        {event.severity === 'overdue' && <AlertTriangle className="w-4 h-4 text-error" />}
+        <h3 className="font-heading font-semibold text-text-primary text-sm">{cfg.label}{event.severity === 'overdue' ? ' — Overdue' : ''}</h3>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -46,15 +59,7 @@ export function EventDetail({ event, onClose, onEdit }: Props) {
 
       <div className="p-4 border-t border-border">
         <Link href={event.href} className="block">
-          <Button variant="default" className="w-full">
-            {event.category === 'publishing' || event.category === 'shooting' || event.category === 'deadline' || event.category === 'waiting_approval' || event.category === 'revision' ? (
-              <>Lihat Detail Konten</>
-            ) : event.category === 'invoice_due' || event.category === 'payment_due' || event.category === 'deal_start' || event.category === 'deal_end' ? (
-              <>Buka Deal</>
-            ) : (
-              <>Buka Detail</>
-            )}
-          </Button>
+          <Button variant="default" className="w-full">{ctaLabel(event.category)}</Button>
         </Link>
       </div>
     </div>
@@ -70,6 +75,40 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
+function WorkflowSummary({ ctx }: { ctx?: CalendarEvent['ctx'] }) {
+  if (!ctx || (!ctx.productionStatus && !ctx.approvalStatus && !ctx.publishingStatus)) return null
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {ctx.productionStatus && (
+        <Badge variant="outline" className={PRODUCTION_STATUS_CONFIG[ctx.productionStatus]?.badgeClass}>
+          {PRODUCTION_STATUS_CONFIG[ctx.productionStatus]?.label ?? ctx.productionStatus}
+        </Badge>
+      )}
+      {ctx.approvalStatus && (
+        <Badge variant="outline" className={APPROVAL_STATUS_CONFIG[ctx.approvalStatus]?.badgeClass}>
+          {APPROVAL_STATUS_CONFIG[ctx.approvalStatus]?.label ?? ctx.approvalStatus}
+        </Badge>
+      )}
+      {ctx.publishingStatus && (
+        <Badge variant="outline" className={PUBLISHING_STATUS_CONFIG[ctx.publishingStatus]?.badgeClass}>
+          {PUBLISHING_STATUS_CONFIG[ctx.publishingStatus]?.label ?? ctx.publishingStatus}
+        </Badge>
+      )}
+    </div>
+  )
+}
+
+function BrandDealFields({ ctx }: { ctx?: CalendarEvent['ctx'] }) {
+  if (!ctx || (!ctx.brandName && !ctx.dealTitle)) return null
+  return (
+    <>
+      {ctx.brandName && <Field label="Brand">{ctx.brandName}</Field>}
+      {ctx.dealTitle && <Field label="Deal">{ctx.dealTitle}</Field>}
+      {ctx.deliverableName && <Field label="Deliverable">{ctx.deliverableName}</Field>}
+    </>
+  )
+}
+
 function PublishingDetail({ event }: { event: CalendarEvent }) {
   const s = event.raw
   return (
@@ -82,6 +121,7 @@ function PublishingDetail({ event }: { event: CalendarEvent }) {
         )}
       </div>
       <Field label="Konten">{event.title}</Field>
+      <BrandDealFields ctx={event.ctx} />
       <div className="flex items-center gap-2">
         <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', getPlatformBadge(s.platform))}>{s.platform}</span>
         <Badge variant="secondary">{STATUS_CONFIG[s.videos?.status as keyof typeof STATUS_CONFIG]?.label ?? s.videos?.status}</Badge>
@@ -101,11 +141,12 @@ function ContentDateDetail({ event }: { event: CalendarEvent }) {
   const v = event.raw
   return (
     <div className="space-y-4">
-      <Field label="Konten">{event.title} {v.no_video && <span className="text-text-muted font-mono text-xs">({v.no_video})</span>}</Field>
+      <Field label="Konten">{v.judul ?? event.title} {v.no_video && <span className="text-text-muted font-mono text-xs">({v.no_video})</span>}</Field>
+      <BrandDealFields ctx={event.ctx} />
       <Field label="Tanggal">{format(new Date(event.date), 'd MMMM yyyy', { locale: localeId })}</Field>
-      <Field label="Status">
-        <Badge variant="secondary">{STATUS_CONFIG[v.status as keyof typeof STATUS_CONFIG]?.label ?? v.status}</Badge>
-      </Field>
+      {event.ctx && (event.ctx.productionStatus || event.ctx.approvalStatus || event.ctx.publishingStatus) && (
+        <Field label="Status Workflow"><WorkflowSummary ctx={event.ctx} /></Field>
+      )}
       {event.severity === 'overdue' && (
         <div className="flex items-start gap-2 bg-rose-50 border border-rose-200 rounded-lg p-3 text-xs text-rose-800">
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -123,6 +164,9 @@ function DealDetail({ event }: { event: CalendarEvent }) {
       <Field label="Brand">{event.subtitle}</Field>
       <Field label="Deal">{event.title}</Field>
       <Field label="Tanggal">{format(new Date(event.date), 'd MMMM yyyy', { locale: localeId })}</Field>
+      {typeof d.total_value === 'number' && d.total_value > 0 && (
+        <Field label="Nilai Deal">{formatRupiah(Number(d.total_value))}</Field>
+      )}
       <Field label="Status Deal"><Badge variant="outline" className="capitalize">{d.status}</Badge></Field>
     </div>
   )
@@ -132,8 +176,7 @@ function InvoiceDetail({ event }: { event: CalendarEvent }) {
   const inv = event.raw
   return (
     <div className="space-y-4">
-      <Field label="Brand">{inv.brands?.name || inv.brands?.nama_brand}</Field>
-      {(inv.deals?.title || inv.deals?.nama_campaign) && <Field label="Campaign">{inv.deals?.title || inv.deals?.nama_campaign}</Field>}
+      <BrandDealFields ctx={event.ctx} />
       <Field label="Invoice">{inv.invoice_number}</Field>
       <Field label="Nominal">{formatRupiah(Number(inv.total))}</Field>
       <Field label="Jatuh Tempo">{format(new Date(event.date), 'd MMMM yyyy', { locale: localeId })}</Field>
@@ -150,8 +193,7 @@ function PaymentDetail({ event }: { event: CalendarEvent }) {
   const p = event.raw
   return (
     <div className="space-y-4">
-      <Field label="Brand">{p.deals?.brands?.name || p.deals?.brands?.nama_brand}</Field>
-      {(p.deals?.title || p.deals?.nama_campaign) && <Field label="Campaign">{p.deals?.title || p.deals?.nama_campaign}</Field>}
+      <BrandDealFields ctx={event.ctx} />
       <Field label="Tipe">{p.payment_type?.toUpperCase()}</Field>
       <Field label="Nominal">{formatRupiah(Number(p.amount))}</Field>
       <Field label="Jatuh Tempo">{format(new Date(event.date), 'd MMMM yyyy', { locale: localeId })}</Field>
@@ -168,7 +210,8 @@ function ApprovalDetail({ event }: { event: CalendarEvent }) {
   const v = event.raw
   return (
     <div className="space-y-4">
-      <Field label="Konten">{event.title}</Field>
+      <Field label="Konten">{v.judul ?? event.title} {v.no_video && <span className="text-text-muted font-mono text-xs">({v.no_video})</span>}</Field>
+      <BrandDealFields ctx={event.ctx} />
       <Field label="Production">{PRODUCTION_STATUS_CONFIG[v.production_status as keyof typeof PRODUCTION_STATUS_CONFIG]?.label ?? '—'}</Field>
       <Field label="Approval">
         <Badge variant="outline" className={cn(event.category === 'revision' ? 'text-rose-700 border-rose-300 bg-rose-50' : 'text-amber-700 border-amber-300 bg-amber-50')}>
