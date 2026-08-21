@@ -1,3 +1,5 @@
+import type { ProductionStatus, ApprovalStatus, PublishingStatus } from './brand'
+
 export type Platform = 'tiktok' | 'instagram' | 'youtube' | 'facebook'
 export type WorkspaceRole = 'owner' | 'manager' | 'editor'
 export type VideoStatus = 'ide' | 'scripting' | 'produksi' | 'editing' | 'scheduled' | 'live' | 'archived'
@@ -75,6 +77,10 @@ export interface Video {
   content_type: ContentType
   image_urls: string[] | null
   status: VideoStatus
+  production_status?: ProductionStatus | string
+  approval_status?: ApprovalStatus | string
+  publishing_status?: PublishingStatus | string
+  approval_waiting_since?: string | null
   pilar_konten: string | null
   created_at: string
   updated_at: string

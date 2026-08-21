@@ -22,6 +22,14 @@ import { cn } from '@/lib/utils'
 import { getStatusBadgeClass, STATUS_CONFIG } from '@/lib/utils/status'
 import { getPlatformDot, getPlatformBadge } from '@/lib/utils/platform'
 import { formatNumber, formatDate } from '@/lib/utils/formatters'
+import {
+  getApprovalAgingText,
+  getApprovalSeverity,
+  isReadyToPublish,
+  APPROVAL_STATUS_CONFIG,
+  PRODUCTION_STATUS_CONFIG,
+  PUBLISHING_STATUS_CONFIG,
+} from '@/lib/utils/workflow'
 import { ScriptBlocks, type ScriptBlock } from '@/components/content/ScriptBlocks'
 import { VideoWorkBadges } from '@/components/content/VideoWorkBadges'
 import { PlatformEmbed } from '@/components/content/PlatformEmbed'
@@ -1209,6 +1217,11 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
   const [selectedDeliverableId, setSelectedDeliverableId] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // Approval status update form
+  const [newApprovalStatus, setNewApprovalStatus] = useState(video.approval_status || 'waiting_approval')
+  const [approvalNote, setApprovalNote] = useState('')
+  const [updatingApproval, setUpdatingApproval] = useState(false)
+
   // Query linked deliverables for this video
   const { data: linkedJunctions = [] } = useQuery({
     queryKey: ['content-brand-junctions', video.id],
@@ -1218,6 +1231,20 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
         .from('content_deliverables')
         .select('*, deal_deliverables(*, deals(*, brands(*))))')
         .eq('content_id', video.id)
+      return data ?? []
+    },
+  })
+
+  // Query approval history
+  const { data: approvalHistory = [] } = useQuery({
+    queryKey: ['approval-history', video.id],
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('content_approval_history')
+        .select('*')
+        .eq('content_id', video.id)
+        .order('created_at', { ascending: false })
       return data ?? []
     },
   })
@@ -1270,7 +1297,6 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
     setSaving(true)
     try {
       const supabase = createClient()
-      // Update video.brand_id & deal_id
       await supabase.from('videos').update({
         brand_id: selectedBrandId,
         deal_id: selectedDealId || null,
@@ -1295,12 +1321,60 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
     }
   }
 
+  async function handleUpdateApprovalStatus(e: React.FormEvent) {
+    e.preventDefault()
+    setUpdatingApproval(true)
+    try {
+      const supabase = createClient()
+      const isWaiting = newApprovalStatus === 'waiting_approval'
+      const payload: Record<string, unknown> = {
+        approval_status: newApprovalStatus,
+      }
+      if (isWaiting) {
+        payload.approval_waiting_since = new Date().toISOString()
+      }
+
+      const { error } = await supabase.from('videos').update(payload).eq('id', video.id)
+      if (error) throw error
+
+      // Log to approval history (never overwrite past records)
+      await supabase.from('content_approval_history').insert({
+        content_id: video.id,
+        action_status: newApprovalStatus,
+        notes: approvalNote.trim() || null,
+      })
+
+      toast.success('Status persetujuan berhasil diupdate!')
+      queryClient.invalidateQueries({ queryKey: ['video-detail', video.id] })
+      queryClient.invalidateQueries({ queryKey: ['approval-history', video.id] })
+      setApprovalNote('')
+    } catch (err) {
+      toast.error('Gagal mengupdate status persetujuan')
+    } finally {
+      setUpdatingApproval(false)
+    }
+  }
+
   const primaryJunction = linkedJunctions[0] as any
   const deliverable = primaryJunction?.deal_deliverables
   const deal = deliverable?.deals
   const brand = deal?.brands || directBrand
 
   const isOrganic = !brand && linkedJunctions.length === 0
+
+  const prodStatus = video.production_status || video.status || 'idea'
+  const appStatus = video.approval_status || (isOrganic ? 'not_required' : 'not_submitted')
+  const pubStatus = video.publishing_status || (video.status === 'live' ? 'published' : video.status === 'scheduled' ? 'scheduled' : 'not_scheduled')
+
+  const readyToPublish = isReadyToPublish({
+    production_status: prodStatus,
+    status: video.status,
+    approval_status: appStatus,
+    publishing_status: pubStatus,
+  })
+
+  const agingText = getApprovalAgingText(video.approval_waiting_since)
+  const severity = getApprovalSeverity(video.approval_waiting_since)
 
   if (isOrganic) {
     return (
@@ -1323,7 +1397,63 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
 
   return (
     <div className="space-y-6">
-      {/* Collaboration & Deliverable Summary */}
+      {/* Derived Operational Banner: READY TO PUBLISH */}
+      {readyToPublish && (
+        <div className="bg-emerald-500 text-white rounded-xl p-4 shadow-md flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Check className="w-5 h-5 bg-white text-emerald-600 rounded-full p-0.5" />
+            <div>
+              <p className="font-bold text-sm">✓ Approved → Ready to Publish</p>
+              <p className="text-xs text-emerald-100">Produksi & persetujuan brand telah selesai! Konten siap dijadwalkan / ditayangkan.</p>
+            </div>
+          </div>
+          <Badge className="bg-white text-emerald-800 font-bold uppercase text-[10px]">Ready</Badge>
+        </div>
+      )}
+
+      {/* 3-Dimensional Workflow Status Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Dimension 1: Production Status */}
+        <div className="bg-white border border-border rounded-xl p-4 space-y-2 shadow-xs">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">1. Production Status</span>
+          <div className="flex items-center justify-between pt-1">
+            <Badge variant="outline" className={cn('text-xs font-bold capitalize', PRODUCTION_STATUS_CONFIG[prodStatus]?.badgeClass)}>
+              {PRODUCTION_STATUS_CONFIG[prodStatus]?.label || prodStatus}
+            </Badge>
+            <span className="text-[10px] text-text-muted capitalize">Workflow: {video.status}</span>
+          </div>
+        </div>
+
+        {/* Dimension 2: Approval Status */}
+        <div className="bg-white border border-border rounded-xl p-4 space-y-2 shadow-xs">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">2. Approval Status</span>
+          <div className="space-y-1.5 pt-1">
+            <div className="flex items-center justify-between">
+              <Badge variant="outline" className={cn('text-xs font-bold capitalize', APPROVAL_STATUS_CONFIG[appStatus]?.badgeClass)}>
+                {APPROVAL_STATUS_CONFIG[appStatus]?.label || appStatus}
+              </Badge>
+            </div>
+            {appStatus === 'waiting_approval' && (
+              <p className={cn('text-[11px] font-mono font-semibold mt-1', severity === 'overdue' ? 'text-rose-600 font-bold' : severity === 'attention' ? 'text-amber-600' : 'text-text-muted')}>
+                ⏳ {agingText}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Dimension 3: Publishing Status */}
+        <div className="bg-white border border-border rounded-xl p-4 space-y-2 shadow-xs">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">3. Publishing Status</span>
+          <div className="flex items-center justify-between pt-1">
+            <Badge variant="outline" className={cn('text-xs font-bold capitalize', PUBLISHING_STATUS_CONFIG[pubStatus]?.badgeClass)}>
+              {PUBLISHING_STATUS_CONFIG[pubStatus]?.label || pubStatus}
+            </Badge>
+            {video.deadline_posting && <span className="text-[10px] font-mono text-text-muted">DL: {formatDate(video.deadline_posting)}</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Collaboration & Deliverable Summary Card */}
       <div className="bg-white border border-border rounded-xl p-6 shadow-sm space-y-6">
         {/* Section 1: COLLABORATION */}
         <div className="space-y-2 border-b border-border pb-4">
@@ -1371,15 +1501,58 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
           </div>
         </div>
 
-        {/* Section 3: BRIEF SUMMARY */}
-        <div className="space-y-2 border-b border-border pb-4">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Section 3 — Brief Summary</span>
-          <div className="bg-subtle/40 rounded-lg p-3 space-y-2 text-xs">
-            <div>
-              <span className="font-bold text-text-primary">Campaign Objective:</span>
-              <p className="text-text-secondary mt-0.5">{deal?.notes || 'Promosi campaign & awareness produk brand.'}</p>
+        {/* Section 3: APPROVAL UPDATE & LOG NOTES */}
+        <div className="space-y-3 border-b border-border pb-4">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Section 3 — Update Status Persetujuan & Log Notes</span>
+          <form onSubmit={handleUpdateApprovalStatus} className="bg-subtle/40 border border-border/80 rounded-xl p-4 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">Ubah Status Approval</Label>
+                <Select value={newApprovalStatus} onValueChange={setNewApprovalStatus}>
+                  <SelectTrigger className="h-9 text-xs bg-white"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="not_submitted" className="text-xs">Not Submitted</SelectItem>
+                    <SelectItem value="waiting_approval" className="text-xs">Waiting Approval (Ajukan ke Client)</SelectItem>
+                    <SelectItem value="revision_requested" className="text-xs">Revision Requested (Ada Revisi)</SelectItem>
+                    <SelectItem value="revision_submitted" className="text-xs">Revision Submitted (Ajukan Revisi)</SelectItem>
+                    <SelectItem value="approved" className="text-xs">Approved (Persetujuan ACC)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">Catatan / Poin Revisi Client</Label>
+                <Textarea value={approvalNote} onChange={(e) => setApprovalNote(e.target.value)} placeholder="Tuliskan feedback / arahan dari client..." rows={1} className="text-xs bg-white resize-none" />
+              </div>
             </div>
-          </div>
+            <div className="flex justify-end">
+              <Button type="submit" size="sm" className="bg-accent hover:bg-accent/90 text-xs font-semibold h-8" disabled={updatingApproval}>
+                {updatingApproval ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+                Update Status Approval & Log
+              </Button>
+            </div>
+          </form>
+
+          {/* Approval Timeline History */}
+          {approvalHistory.length > 0 && (
+            <div className="pt-2 space-y-2">
+              <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">Approval History Timeline</h4>
+              <div className="space-y-2 divide-y divide-border/50">
+                {approvalHistory.map((h: any) => (
+                  <div key={h.id} className="pt-2 flex items-start justify-between text-xs">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px] font-bold capitalize">
+                          {APPROVAL_STATUS_CONFIG[h.action_status]?.label || h.action_status}
+                        </Badge>
+                        <span className="text-[10px] text-text-muted font-mono">{formatDate(h.created_at)}</span>
+                      </div>
+                      {h.notes && <p className="text-text-secondary italic mt-1 pl-1">"{h.notes}"</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Section 4: QUICK ACTIONS */}

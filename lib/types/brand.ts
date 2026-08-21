@@ -1,6 +1,27 @@
 import type { Video } from './index'
 
 export type BrandType = 'direct' | 'agency' | 'other'
+
+export type ProductionStatus = 'idea' | 'scripting' | 'production' | 'editing' | 'ready'
+
+export type ApprovalStatus = 
+  | 'not_required'
+  | 'not_submitted'
+  | 'waiting_approval'
+  | 'revision_requested'
+  | 'revision_submitted'
+  | 'approved'
+
+export type PublishingStatus = 'not_scheduled' | 'scheduled' | 'published'
+
+export interface ContentApprovalHistory {
+  id: string
+  content_id: string
+  action_status: string
+  notes?: string | null
+  created_by?: string | null
+  created_at: string
+}
 export type BrandStatus = 'active' | 'inactive' | 'prospect' | 'approach' | 'negosiasi' | 'deal' | 'aktif' | 'selesai' | 'cold'
 
 export type CollaborationType = 

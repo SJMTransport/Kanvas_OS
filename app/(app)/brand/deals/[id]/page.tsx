@@ -20,6 +20,12 @@ import {
   CheckCircle2, Link as LinkIcon, Trash2, ExternalLink, Layers
 } from 'lucide-react'
 import { formatDate, formatRupiah } from '@/lib/utils/formatters'
+import {
+  getApprovalAgingText,
+  getApprovalSeverity,
+  isReadyToPublish,
+  APPROVAL_STATUS_CONFIG,
+} from '@/lib/utils/workflow'
 import { cn } from '@/lib/utils'
 import type { DealDeliverable, DealPayment, DealSchedule, DealBrief, DealSow } from '@/lib/types/brand'
 import { AddVideoSheet } from '@/app/(app)/content/add-video-sheet'
@@ -376,6 +382,31 @@ export default function DealDetailPage() {
     new Map(contentJunctions.map((j: any) => [j.videos?.id, j.videos])).values()
   ).filter(Boolean)
 
+  const publishedCount = allUniqueContent.filter((v: any) => v.publishing_status === 'published' || v.status === 'live').length
+  const waitingApprovalCount = allUniqueContent.filter((v: any) => v.approval_status === 'waiting_approval').length
+  const revisionRequestedCount = allUniqueContent.filter((v: any) => v.approval_status === 'revision_requested').length
+  const readyToPublishCount = allUniqueContent.filter((v: any) => isReadyToPublish(v)).length
+
+  // Items needing attention
+  const attentionItems = allUniqueContent.map((v: any) => {
+    const isReady = isReadyToPublish(v)
+    const isWaiting = v.approval_status === 'waiting_approval'
+    const isRevision = v.approval_status === 'revision_requested'
+
+    if (isReady) {
+      return { video: v, type: 'ready', label: 'Ready to Publish', icon: 'check' }
+    }
+    if (isRevision) {
+      return { video: v, type: 'revision', label: 'Revision Requested', icon: 'warning' }
+    }
+    if (isWaiting) {
+      const agingText = getApprovalAgingText(v.approval_waiting_since)
+      const severity = getApprovalSeverity(v.approval_waiting_since)
+      return { video: v, type: 'waiting', label: agingText, severity, icon: 'clock' }
+    }
+    return null
+  }).filter(Boolean)
+
   if (dealLoading) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-6 space-y-4">
@@ -441,20 +472,71 @@ export default function DealDetailPage() {
 
         {/* TAB 1: OVERVIEW */}
         <TabsContent value="overview" className="space-y-6 outline-none">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white border border-border rounded-xl p-4 space-y-1">
-              <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Total Deliverables</p>
-              <p className="text-2xl font-bold font-mono text-text-primary">{deliverables.length}</p>
+          {/* CONTENT PROGRESS Aggregation */}
+          <div className="bg-white border border-border rounded-xl p-5 space-y-4 shadow-xs">
+            <div className="flex items-center justify-between border-b border-border pb-2">
+              <h3 className="font-semibold text-sm text-text-primary uppercase tracking-wider">Content Progress Summary</h3>
+              <span className="text-xs font-mono font-bold text-accent">{allUniqueContent.length} Total Konten</span>
             </div>
-            <div className="bg-white border border-border rounded-xl p-4 space-y-1">
-              <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Konten Diproduksi</p>
-              <p className="text-2xl font-bold font-mono text-text-primary">{allUniqueContent.length}</p>
-            </div>
-            <div className="bg-white border border-border rounded-xl p-4 space-y-1">
-              <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Pembayaran Lunas</p>
-              <p className="text-2xl font-bold font-mono text-emerald-700">{formatRupiah(paidNum)}</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+              <div className="p-3 bg-subtle/50 rounded-lg border border-border/60">
+                <p className="text-[10px] uppercase font-bold text-text-muted">Published</p>
+                <p className="text-xl font-bold font-mono text-emerald-700 mt-1">{publishedCount}</p>
+              </div>
+              <div className="p-3 bg-amber-50/50 rounded-lg border border-amber-200/60">
+                <p className="text-[10px] uppercase font-bold text-amber-800">Waiting Approval</p>
+                <p className="text-xl font-bold font-mono text-amber-700 mt-1">{waitingApprovalCount}</p>
+              </div>
+              <div className="p-3 bg-rose-50/50 rounded-lg border border-rose-200/60">
+                <p className="text-[10px] uppercase font-bold text-rose-800">Revision Requested</p>
+                <p className="text-xl font-bold font-mono text-rose-700 mt-1">{revisionRequestedCount}</p>
+              </div>
+              <div className="p-3 bg-emerald-50/50 rounded-lg border border-emerald-200/60">
+                <p className="text-[10px] uppercase font-bold text-emerald-800">Ready to Publish</p>
+                <p className="text-xl font-bold font-mono text-emerald-600 mt-1">{readyToPublishCount}</p>
+              </div>
             </div>
           </div>
+
+          {/* NEEDS ATTENTION Section */}
+          {attentionItems.length > 0 && (
+            <div className="bg-white border border-amber-200 rounded-xl p-5 space-y-3 shadow-xs">
+              <div className="flex items-center justify-between border-b border-border/60 pb-2">
+                <h3 className="font-bold text-xs uppercase tracking-wider text-amber-800 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                  Needs Attention ({attentionItems.length})
+                </h3>
+                <span className="text-[10px] text-text-muted">Bottlenecks & Priority Items</span>
+              </div>
+              <div className="space-y-2">
+                {attentionItems.map((item: any) => (
+                  <div
+                    key={item.video.id}
+                    onClick={() => router.push(`/content/${item.video.id}`)}
+                    className="p-3 rounded-lg border bg-subtle/30 hover:bg-subtle flex items-center justify-between cursor-pointer transition-colors text-xs"
+                  >
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <span className="font-mono font-bold text-accent">{item.video.no_video || '—'}</span>
+                      <span className="font-semibold text-text-primary truncate">{item.video.judul}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {item.type === 'ready' && (
+                        <Badge className="bg-emerald-600 text-white text-[10px] font-bold">✓ Ready to Publish</Badge>
+                      )}
+                      {item.type === 'revision' && (
+                        <Badge variant="outline" className="text-[10px] font-bold text-rose-700 border-rose-300 bg-rose-50">⚠ Revision Requested</Badge>
+                      )}
+                      {item.type === 'waiting' && (
+                        <Badge variant="outline" className={cn('text-[10px] font-bold font-mono', item.severity === 'overdue' ? 'text-rose-700 border-rose-300 bg-rose-50' : 'text-amber-700 border-amber-300 bg-amber-50')}>
+                          ⏳ {item.label}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="bg-white border border-border rounded-xl p-5 space-y-4">
             <h3 className="font-semibold text-sm text-text-primary border-b border-border pb-2">Detail Parameter Deal</h3>
@@ -581,9 +663,15 @@ export default function DealDetailPage() {
                           {del.deadline ? formatDate(del.deadline) : '—'}
                         </td>
                         <td className="px-4 py-3.5 text-center">
-                          <span className={cn('font-mono font-bold px-2 py-0.5 rounded-full text-xs', del.contentCount > 0 ? 'bg-teal-50 text-accent border border-teal-200' : 'bg-slate-100 text-slate-500')}>
-                            {del.contentCount} Konten
-                          </span>
+                          {del.contentCount === 0 ? (
+                            <Badge variant="outline" className="text-[10px] font-bold text-amber-700 border-amber-300 bg-amber-50">
+                              ⚠ No Content linked
+                            </Badge>
+                          ) : (
+                            <span className="font-mono font-bold px-2 py-0.5 rounded-full text-xs bg-teal-50 text-accent border border-teal-200">
+                              {del.contentCount} Konten
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3.5 text-center">
                           <Badge variant="outline" className="text-[9px] uppercase font-bold capitalize">
