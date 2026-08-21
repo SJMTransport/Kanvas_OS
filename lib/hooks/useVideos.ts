@@ -77,13 +77,27 @@ export function useVideos(opts: UseVideosOptions = {}) {
         q = q.gte('updated_at', startOfMonth.toISOString())
       }
 
-      const from = page * pageSize
-      const to = pageSize >= 10000 ? 99999 : (page + 1) * pageSize - 1
+      if (sortBy === 'no_video') {
+        const { data } = await q
+        const list = ((data ?? []) as unknown as VideoWithSchedules[])
+        list.sort((a, b) => {
+          const numA = a.no_video ?? ''
+          const numB = b.no_video ?? ''
+          const cmp = numA.localeCompare(numB, undefined, { numeric: true, sensitivity: 'base' })
+          return sortDir === 'asc' ? cmp : -cmp
+        })
+        const from = page * pageSize
+        const to = (page + 1) * pageSize
+        return list.slice(from, to)
+      } else {
+        const from = page * pageSize
+        const to = pageSize >= 10000 ? 99999 : (page + 1) * pageSize - 1
 
-      q = q.order(sortBy, { ascending: sortDir === 'asc' }).range(from, to)
+        q = q.order(sortBy, { ascending: sortDir === 'asc' }).range(from, to)
 
-      const { data } = await q
-      return (data ?? []) as unknown as VideoWithSchedules[]
+        const { data } = await q
+        return (data ?? []) as unknown as VideoWithSchedules[]
+      }
     },
     // Rely on the cache instead of the old staleTime:0/refetchOnMount:'always'.
     // Mutations invalidate ['videos'] so data stays correct without refetching
