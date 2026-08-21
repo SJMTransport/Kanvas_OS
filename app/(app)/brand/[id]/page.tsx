@@ -119,7 +119,7 @@ export default function BrandDetailPage() {
       if (deals.length === 0) return []
       const supabase = createClient()
       const dealIds = deals.map((d: any) => d.id)
-      const { data } = await supabase.from('deal_payments').select('*, deals(title, name, nama_campaign)').in('deal_id', dealIds).order('due_date', { ascending: true })
+      const { data } = await supabase.from('deal_payments').select('*, deals(title, nama_campaign)').in('deal_id', dealIds).order('due_date', { ascending: true })
       return data ?? []
     },
     enabled: deals.length > 0,
@@ -146,7 +146,12 @@ export default function BrandDetailPage() {
         end_date: endDate || null,
         tanggal_selesai: endDate || null,
         notes: dealNotes || null,
-        status: 'confirmed',
+        // 'confirmed' is not a valid deals.status value — the CHECK constraint
+        // (005_brand.sql, unchanged since) only allows dp_pending/dp_paid/
+        // on_progress/delivered/completed, matching the deal's payment
+        // lifecycle. A brand-new deal has no payment recorded yet, so
+        // dp_pending (also the column's own DB default) is correct here.
+        status: 'dp_pending',
       }).select().single()
 
       if (error) throw error

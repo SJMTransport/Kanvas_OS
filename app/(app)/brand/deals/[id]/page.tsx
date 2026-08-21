@@ -169,7 +169,7 @@ export default function DealDetailPage() {
   // Sync brief form
   useState(() => {
     if (brief) {
-      setBriefCampaign(brief.campaign || brief.title || '')
+      setBriefCampaign(brief.title || '')
       setBriefObjective(brief.objective || '')
       setBriefKeyMessage(brief.key_message || '')
       setBriefMandatory(brief.mandatory_message || '')
@@ -185,10 +185,12 @@ export default function DealDetailPage() {
     setSaving(true)
     try {
       const supabase = createClient()
+      // `campaign` is not a real deal_briefs column (deal_briefs has `title`,
+      // not `campaign` — see 032_brand_collaboration_system.sql). The
+      // "Campaign / Judul Brief" field maps to `title`, the real column.
       const payload = {
         deal_id: id,
         title: briefCampaign || deal?.title || 'Brief',
-        campaign: briefCampaign || null,
         objective: briefObjective || null,
         key_message: briefKeyMessage || null,
         mandatory_message: briefMandatory || null,
@@ -233,8 +235,8 @@ export default function DealDetailPage() {
       const { error } = await supabase.from('deal_deliverables').insert({
         deal_id: id,
         sow_id: currentSowId || null,
+        // deal_deliverables has `name`, not `title` — see 032.
         name: delName.trim(),
-        title: delName.trim(),
         platform: delPlatform,
         quantity: Number(delQty) || 1,
         unit: delUnit,
@@ -650,7 +652,7 @@ export default function DealDetailPage() {
                     deliverablesWithContent.map((del) => (
                       <tr key={del.id} className="hover:bg-subtle/30 transition-colors">
                         <td className="px-4 py-3.5">
-                          <p className="font-bold text-text-primary text-sm">{del.name || del.title}</p>
+                          <p className="font-bold text-text-primary text-sm">{del.name}</p>
                           {del.description && <p className="text-[11px] text-text-muted mt-0.5 line-clamp-1">{del.description}</p>}
                         </td>
                         <td className="px-4 py-3.5 capitalize font-medium text-text-secondary">

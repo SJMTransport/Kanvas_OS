@@ -22,7 +22,9 @@ export interface ContentApprovalHistory {
   created_by?: string | null
   created_at: string
 }
-export type BrandStatus = 'active' | 'inactive' | 'prospect' | 'approach' | 'negosiasi' | 'deal' | 'aktif' | 'selesai' | 'cold'
+// Matches brands.status CHECK constraint (005_brand.sql, unchanged since).
+// 'active'/'inactive' were never real DB values — removed; nothing wrote them.
+export type BrandStatus = 'prospect' | 'approach' | 'negosiasi' | 'deal' | 'aktif' | 'selesai' | 'cold'
 
 export type CollaborationType = 
   | 'Campaign'
@@ -34,17 +36,15 @@ export type CollaborationType =
   | 'Barter'
   | 'Other'
 
-export type DealStatus = 
-  | 'negotiation'
-  | 'confirmed'
-  | 'production'
-  | 'approval'
-  | 'completed'
-  | 'cancelled'
+// Matches deals.status CHECK constraint (005_brand.sql, unchanged since).
+// negotiation/confirmed/production/approval/cancelled were never real DB
+// values — removed after the Deal-creation bug they caused was fixed.
+export type DealStatus =
   | 'dp_pending'
   | 'dp_paid'
   | 'on_progress'
   | 'delivered'
+  | 'completed'
 
 export type DeliverableStatus = 
   | 'planned'
@@ -76,13 +76,13 @@ export interface Brand {
   workspace_id: string
   name: string
   nama_brand?: string
-  brand_type?: BrandType
-  type?: string
+  // No `brand_type` column exists on brands — `type` is the real column
+  // (added by 032). No `catatan` column exists either — `notes` is real.
+  type?: BrandType | string
   industry?: string | null
   industri?: string | null
   website?: string | null
   notes?: string | null
-  catatan?: string | null
   status: BrandStatus
   pic_name?: string | null
   pic_email?: string | null
@@ -94,10 +94,11 @@ export interface Brand {
 export interface DealBrief {
   id: string
   deal_id: string
+  // No `campaign` column exists on deal_briefs — the "campaign name" concept
+  // maps to `title`, the real column.
   title?: string | null
   brief_content?: string | null
   objective?: string | null
-  campaign?: string | null
   key_message?: string | null
   mandatory_message?: string | null
   do_list?: string | null
@@ -125,8 +126,9 @@ export interface DealDeliverable {
   id: string
   deal_id: string
   sow_id?: string | null
+  // No `title` column exists on deal_deliverables — `name` is the only
+  // real column for this; do not reintroduce `title` here.
   name: string
-  title?: string
   description?: string | null
   platform?: string | null
   quantity: number

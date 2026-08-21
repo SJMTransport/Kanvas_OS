@@ -101,15 +101,26 @@ export function AddVideoSheet({ open, onOpenChange, defaultValues, workId, brand
 
       // Context Inheritance: link to the Deliverable it was created from, so
       // this Content counts against that Deliverable immediately — the
-      // entire point of creating from inside a Deliverable row.
+      // entire point of creating from inside a Deliverable row. The user
+      // must be told if this specific step fails — never report a blanket
+      // success when the deliverable link didn't actually happen.
+      let deliverableLinkFailed = false
       if (deliverableId && newVideo?.id) {
         const { error: delErr } = await supabase
           .from('content_deliverables')
           .insert({ content_id: newVideo.id, deliverable_id: deliverableId })
-        if (delErr) console.error('Failed to link video to deliverable:', delErr)
+        if (delErr) {
+          console.error('Failed to link video to deliverable:', delErr)
+          deliverableLinkFailed = true
+        }
       }
 
-      toast.success(contentType === 'video' ? 'Konten video dibuat!' : 'Konten foto/carousel dibuat!')
+      const createdLabel = contentType === 'video' ? 'Konten video dibuat!' : 'Konten foto/carousel dibuat!'
+      if (deliverableLinkFailed) {
+        toast.warning(`${createdLabel} Tapi gagal menghubungkan ke Deliverable — tautkan manual lewat tab Brand.`)
+      } else {
+        toast.success(createdLabel)
+      }
       queryClient.invalidateQueries({ queryKey: ['videos'] })
       queryClient.invalidateQueries({ queryKey: ['work-items', workId] })
       queryClient.invalidateQueries({ queryKey: ['brand-videos', effectiveBrandId] })

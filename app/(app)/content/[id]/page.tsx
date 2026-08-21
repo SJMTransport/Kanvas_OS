@@ -1302,7 +1302,7 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
     enabled: connectOpen && !!selectedDealId,
     queryFn: async () => {
       const supabase = createClient()
-      const { data } = await supabase.from('deal_deliverables').select('id, name, title').eq('deal_id', selectedDealId)
+      const { data } = await supabase.from('deal_deliverables').select('id, name').eq('deal_id', selectedDealId)
       return data ?? []
     },
   })
@@ -1313,17 +1313,37 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
     setSaving(true)
     try {
       const supabase = createClient()
-      await supabase.from('videos').update({
+      const { error: videoErr } = await supabase.from('videos').update({
         brand_id: selectedBrandId,
         deal_id: selectedDealId || null,
         is_endorsement: true,
       }).eq('id', video.id)
 
+      if (videoErr) {
+        console.error('Failed to link video to brand/deal:', videoErr)
+        throw videoErr
+      }
+
+      // Deliverable link is a separate write — check it independently so a
+      // failure here can never be reported as overall success.
       if (selectedDeliverableId) {
-        await supabase.from('content_deliverables').insert({
+        const { error: delErr } = await supabase.from('content_deliverables').insert({
           content_id: video.id,
           deliverable_id: selectedDeliverableId,
         })
+        if (delErr) {
+          console.error('Failed to link content to deliverable:', delErr)
+          if (delErr.code === '23505') {
+            // UNIQUE(content_id, deliverable_id) — already linked, not a real failure.
+            toast.success('Brand & Deal terhubung. Konten ini sudah tertaut ke deliverable tersebut sebelumnya.')
+          } else {
+            toast.warning('Brand & Deal terhubung, tapi gagal menghubungkan ke Deliverable. Coba lagi lewat "Hubungkan Deliverable Lain".')
+          }
+          queryClient.invalidateQueries({ queryKey: ['content-brand-junctions', video.id] })
+          queryClient.invalidateQueries({ queryKey: ['video-detail', video.id] })
+          setConnectOpen(false)
+          return
+        }
       }
 
       toast.success('Konten berhasil dihubungkan ke Brand!')
@@ -1331,6 +1351,7 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
       queryClient.invalidateQueries({ queryKey: ['video-detail', video.id] })
       setConnectOpen(false)
     } catch (err) {
+      console.error('Failed to connect content to brand:', err)
       toast.error('Gagal menghubungkan brand')
     } finally {
       setSaving(false)
@@ -1393,11 +1414,21 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
 
   const isOrganic = !brand && linkedJunctions.length === 0
 
-  // Part G: brand_id and deal_id can disagree because nothing in the schema
-  // reconciles them. Surface it — never silently overwrite either value.
-  const brandDealMismatch = Boolean(
+  // Part G: brand_id, deal_id, and whatever deal a linked deliverable
+  // belongs to can all disagree — nothing in the schema reconciles them.
+  // Surface it, never silently overwrite any of them.
+  const authoritativeBrandId = deal?.brands?.id || directBrand?.id
+  const directMismatch = Boolean(
     directBrand && directDeal && directDeal.brand_id && directBrand.id !== directDeal.brand_id
   )
+  const deliverableMismatch = Boolean(
+    authoritativeBrandId &&
+    linkedJunctions.some((j: any) => {
+      const jBrandId = j.deal_deliverables?.deals?.brand_id
+      return jBrandId && jBrandId !== authoritativeBrandId
+    })
+  )
+  const brandDealMismatch = directMismatch || deliverableMismatch
 
   const prodStatus = video.production_status || video.status || 'idea'
   const appStatus = video.approval_status || (isOrganic ? 'not_required' : 'not_submitted')
@@ -1439,9 +1470,15 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
         <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex items-start gap-3">
           <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
           <div className="text-xs">
-            <p className="font-bold text-amber-900">Brand langsung dan Brand pada Deal berbeda</p>
+            <p className="font-bold text-amber-900">Ada ketidakcocokan Brand pada konten ini</p>
             <p className="text-amber-800 mt-0.5">
-              Konten ini terhubung langsung ke <strong>{directBrand?.name || directBrand?.nama_brand}</strong>, tapi Deal-nya milik <strong>{directDeal?.brands?.name || directDeal?.brands?.nama_brand}</strong>. Ini tidak diperbaiki otomatis — silakan tinjau lewat tombol "Hubungkan Deliverable Lain" di bawah.
+              {directMismatch && (
+                <>Konten ini terhubung langsung ke <strong>{directBrand?.name || directBrand?.nama_brand}</strong>, tapi Deal-nya milik <strong>{directDeal?.brands?.name || directDeal?.brands?.nama_brand}</strong>. </>
+              )}
+              {deliverableMismatch && (
+                <>Salah satu Deliverable yang tertaut berasal dari Deal milik brand lain. </>
+              )}
+              Ini tidak diperbaiki otomatis — silakan tinjau lewat tombol "Hubungkan Deliverable Lain" di bawah.
             </p>
           </div>
         </div>
@@ -1472,6 +1509,7 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
             </Badge>
             <span className="text-[10px] text-text-muted capitalize">Workflow: {video.status}</span>
           </div>
+          <p className="text-[10px] text-text-muted italic">Belum ada update manual — ubah lewat Status Stepper di atas.</p>
         </div>
 
         {/* Dimension 2: Approval Status */}
@@ -1500,6 +1538,7 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
             </Badge>
             {video.deadline_posting && <span className="text-[10px] font-mono text-text-muted">DL: {formatDate(video.deadline_posting)}</span>}
           </div>
+          <p className="text-[10px] text-text-muted italic">Belum ada update manual — ubah lewat Status Stepper di atas.</p>
         </div>
       </div>
 
@@ -1550,7 +1589,7 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
                   <div key={j.id} className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs bg-subtle/30 border border-border/60 rounded-lg p-3 items-center">
                     <div className="sm:col-span-2">
                       <span className="text-text-muted">Deliverable Output:</span>
-                      <p className="font-bold text-sm text-accent mt-0.5">{del?.name || del?.title || 'Deliverable'}</p>
+                      <p className="font-bold text-sm text-accent mt-0.5">{del?.name || 'Deliverable'}</p>
                     </div>
                     <div>
                       <span className="text-text-muted">Target Deadline:</span>
@@ -1688,7 +1727,7 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
                   <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Pilih deliverable..." /></SelectTrigger>
                   <SelectContent>
                     {dealDeliverables.map((del: any) => (
-                      <SelectItem key={del.id} value={del.id} className="text-xs">{del.name || del.title}</SelectItem>
+                      <SelectItem key={del.id} value={del.id} className="text-xs">{del.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
