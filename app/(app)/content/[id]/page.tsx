@@ -344,13 +344,24 @@ function DistributionTab({
   perfRecords,
   refetchPerformance
 }: { 
-  video: VideoWithSchedules 
+  video: VideoWithSchedules
   activePlatform: Platform
   setActivePlatform: (p: Platform) => void
   perfRecords: any[]
   refetchPerformance: () => void
 }) {
   const queryClient = useQueryClient()
+
+  // Phase 03B-2 fix — Dashboard's "Jadwal Hari Ini" and Calendar both read
+  // schedule data under their own query keys (['dashboard', workspaceId] and
+  // ['calendar-events', ...]), which this tab's schedule mutations never
+  // invalidated (only ['schedules']/['schedules-video', ...] were, which
+  // don't match either). That's the confirmed reason those screens required
+  // a hard refresh to show a newly-saved schedule.
+  function invalidateScheduleDependents() {
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+    queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
+  }
   const { workspaceId } = useWorkspace()
   const [adding, setAdding] = useState<Platform | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -392,6 +403,7 @@ function DistributionTab({
       toast.success('Konten berhasil dipublikasikan secara otomatis!')
       queryClient.invalidateQueries({ queryKey: ['schedules-video', video.id] })
       queryClient.invalidateQueries({ queryKey: ['schedules'] })
+      invalidateScheduleDependents()
     } catch (err: any) {
       toast.error('Gagal auto-posting: ' + err.message)
     } finally {
@@ -460,6 +472,7 @@ function DistributionTab({
     toast.success(platformsToSave.length > 1 ? 'Jadwal disimpan untuk semua platform pilihan!' : 'Jadwal disimpan!')
     queryClient.invalidateQueries({ queryKey: ['schedules-video', video.id] })
     queryClient.invalidateQueries({ queryKey: ['schedules'] })
+    invalidateScheduleDependents()
     setAdding(null)
     setEditingId(null)
     setForm({ social_account_id: '', tanggal_tayang: '', jam_post: '', caption_override: '', media_url: '', is_story: false, cross_platforms: [] })
@@ -487,6 +500,7 @@ function DistributionTab({
     toast.success('Jadwal dihapus')
     queryClient.invalidateQueries({ queryKey: ['schedules-video', video.id] })
     queryClient.invalidateQueries({ queryKey: ['schedules'] })
+    invalidateScheduleDependents()
   }
 
   async function markPosted(id: string, url: string) {
@@ -501,6 +515,7 @@ function DistributionTab({
     if (error) { toast.error('Gagal menyimpan: ' + error.message); return }
     queryClient.invalidateQueries({ queryKey: ['schedules-video', video.id] })
     queryClient.invalidateQueries({ queryKey: ['schedules'] })
+    invalidateScheduleDependents()
     toast.success('Jadwal ditandai telah tayang!')
   }
 
@@ -1223,10 +1238,6 @@ function ContentLifecycleHeader({
           )}
         </div>
       )}
-
-      <div className="pt-1">
-        <LifecycleIndicator stage={stage} showBadge={false} showSteps />
-      </div>
     </div>
   )
 }
