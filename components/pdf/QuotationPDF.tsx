@@ -1,191 +1,152 @@
-import { Document, Page, View, Text, StyleSheet, Font } from '@react-pdf/renderer'
+import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer'
+import { terbilangRupiah } from '@/lib/utils/terbilang'
 
-Font.register({
-  family: 'Inter',
-  src: 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff',
-})
+// No Font.register() here on purpose — the previous version registered a
+// remote Google Fonts URL fetched at render time in the browser. If that
+// fetch fails (network policy, offline, rate limit) @react-pdf/renderer
+// throws, and the calling page's catch block showed only a generic
+// "Gagal generate PDF" with no console.error — that was the actual root
+// cause of the bug this file was rewritten to fix. Helvetica is one of
+// the 14 standard PDF fonts built into every PDF viewer; it needs no
+// network fetch and matches the plain, document-like look requested.
 
 const s = StyleSheet.create({
-  page: { fontFamily: 'Inter', padding: 40, fontSize: 10, color: '#111' },
-  accentBar: { height: 4, backgroundColor: '#D4860A', marginBottom: 24, marginHorizontal: -40, marginTop: -40 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
-  companyName: { fontSize: 16, fontWeight: 'bold', color: '#111', marginBottom: 4 },
-  companyInfo: { fontSize: 9, color: '#666', lineHeight: 1.5 },
-  docTitle: { fontSize: 20, fontWeight: 'bold', color: '#D4860A', textAlign: 'right' },
-  docMeta: { fontSize: 9, color: '#666', textAlign: 'right', lineHeight: 1.7 },
-  divider: { height: 1, backgroundColor: '#eee', marginVertical: 16 },
-  brandBox: { backgroundColor: '#fafafa', borderRadius: 6, padding: 12, marginBottom: 16 },
-  brandLabel: { fontSize: 8, color: '#888', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
-  brandName: { fontSize: 13, fontWeight: 'bold' },
-  tableHeader: { flexDirection: 'row', backgroundColor: '#111', color: '#fff', padding: '6 8', borderRadius: 4, marginBottom: 2 },
-  tableRow: { flexDirection: 'row', padding: '5 8', borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  tableRowAlt: { backgroundColor: '#fafafa' },
-  col1: { flex: 3 },
-  col2: { flex: 1.5, textAlign: 'center' },
-  col3: { flex: 1, textAlign: 'center' },
-  col4: { flex: 1.2, textAlign: 'right' },
-  col5: { flex: 1.5, textAlign: 'right' },
-  headerCell: { fontSize: 8, color: '#fff', fontWeight: 'bold', textTransform: 'uppercase' },
-  totalsSection: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16 },
-  totalsBox: { width: 220 },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
-  totalLabel: { color: '#666', fontSize: 9 },
-  totalValue: { fontSize: 9, fontWeight: 'bold' },
-  grandTotalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5, borderTopWidth: 1, borderTopColor: '#111', marginTop: 4 },
-  grandLabel: { fontWeight: 'bold', fontSize: 11 },
-  grandValue: { fontWeight: 'bold', fontSize: 11, color: '#D4860A' },
-  notes: { marginTop: 24, padding: 12, backgroundColor: '#fafafa', borderRadius: 6 },
-  notesTitle: { fontSize: 8, fontWeight: 'bold', color: '#888', textTransform: 'uppercase', marginBottom: 4 },
-  notesText: { fontSize: 9, color: '#555', lineHeight: 1.5 },
-  signArea: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 40 },
-  signBox: { width: 160, alignItems: 'center' },
-  signLine: { height: 1, backgroundColor: '#111', width: '100%', marginTop: 48, marginBottom: 4 },
-  signLabel: { fontSize: 8, color: '#888' },
-  footer: { position: 'absolute', bottom: 20, left: 40, right: 40, flexDirection: 'row', justifyContent: 'space-between' },
-  footerText: { fontSize: 8, color: '#bbb' },
+  page: { padding: 48, fontSize: 10, color: '#1a1a1a', lineHeight: 1.4 },
+  title: { fontSize: 18, fontWeight: 'bold', marginBottom: 20 },
+  metaRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
+  toBlock: { maxWidth: 260 },
+  label: { fontSize: 9, color: '#666', marginBottom: 2 },
+  recipientName: { fontSize: 11, fontWeight: 'bold', marginBottom: 2 },
+  recipientLine: { fontSize: 10, color: '#333' },
+  metaBlock: { alignItems: 'flex-end' },
+  metaLine: { fontSize: 10, marginBottom: 2 },
+  table: { marginTop: 8, borderTopWidth: 1, borderTopColor: '#1a1a1a' },
+  tableHeadRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#1a1a1a', paddingVertical: 5 },
+  tableRow: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#ccc', paddingVertical: 6 },
+  th: { fontSize: 9, fontWeight: 'bold' },
+  colDesc: { flex: 4, paddingRight: 8 },
+  colPrice: { flex: 1.3, textAlign: 'right' },
+  colQty: { flex: 0.8, textAlign: 'center' },
+  colTotal: { flex: 1.3, textAlign: 'right' },
+  descLine: { fontSize: 9.5 },
+  bonusTag: { fontSize: 8, color: '#666', fontStyle: 'italic' },
+  totalsBlock: { marginTop: 12, alignItems: 'flex-end' },
+  grandTotalRow: { flexDirection: 'row', justifyContent: 'space-between', width: 220, borderTopWidth: 1, borderTopColor: '#1a1a1a', paddingTop: 6, marginTop: 4 },
+  grandLabel: { fontSize: 11, fontWeight: 'bold' },
+  grandValue: { fontSize: 11, fontWeight: 'bold' },
+  terbilang: { fontSize: 9.5, color: '#333', marginTop: 4, textAlign: 'right', width: 260, alignSelf: 'flex-end' },
+  section: { marginTop: 20 },
+  sectionLabel: { fontSize: 9, color: '#666', marginBottom: 3 },
+  sectionText: { fontSize: 9.5, color: '#333' },
+  paymentRow: { flexDirection: 'row', marginTop: 2 },
+  paymentLabel: { fontSize: 9.5, width: 100 },
+  paymentValue: { fontSize: 9.5, fontWeight: 'bold' },
+  signatureBlock: { marginTop: 36 },
+  signatureLine: { fontSize: 9.5, marginBottom: 40 },
+  signatureName: { fontSize: 9.5, fontWeight: 'bold' },
 })
 
 function formatRp(n: number): string {
-  return 'Rp ' + n.toLocaleString('id-ID')
+  return 'Rp' + Math.round(n).toLocaleString('id-ID')
 }
 
-interface LineItem {
-  deskripsi: string
-  platform: string
-  format: string
+export interface DocLineItem {
+  description: string
+  price: number
   qty: number
-  harga: number
+  is_bonus?: boolean
 }
 
 interface QuotationPDFProps {
-  nomor: string
+  quotationNumber: string
   tanggal: string
-  berlakuHingga: string
-  brandNama: string
-  brandPic?: string
-  workspaceName?: string
-  workspaceAddress?: string
-  items: LineItem[]
-  subtotal: number
-  diskon: number
-  pajak: number
-  pajakAmount: number
-  total: number
-  paymentTerms?: string
-  catatan?: string
+  expiredDate?: string
+  recipientName: string
+  recipientAddress?: string
+  items: DocLineItem[]
+  notes?: string
+  bankName?: string
+  accountNumber?: string
+  accountHolder?: string
+  signatoryName?: string
 }
 
 export function QuotationPDF({
-  nomor, tanggal, berlakuHingga, brandNama, brandPic,
-  workspaceName = 'Kanvas OS', workspaceAddress = '',
-  items, subtotal, diskon, pajak, pajakAmount, total,
-  paymentTerms, catatan,
+  quotationNumber, tanggal, expiredDate,
+  recipientName, recipientAddress,
+  items, notes,
+  bankName, accountNumber, accountHolder,
+  signatoryName,
 }: QuotationPDFProps) {
+  const total = items.filter((it) => !it.is_bonus).reduce((sum, it) => sum + it.price * it.qty, 0)
+
   return (
     <Document>
       <Page size="A4" style={s.page}>
-        <View style={s.accentBar} />
+        <Text style={s.title}>Quotation</Text>
 
-        {/* Header */}
-        <View style={s.header}>
-          <View>
-            <Text style={s.companyName}>{workspaceName}</Text>
-            {workspaceAddress && <Text style={s.companyInfo}>{workspaceAddress}</Text>}
+        <View style={s.metaRow}>
+          <View style={s.toBlock}>
+            <Text style={s.label}>To:</Text>
+            <Text style={s.recipientName}>{recipientName}</Text>
+            {recipientAddress && <Text style={s.recipientLine}>{recipientAddress}</Text>}
           </View>
-          <View>
-            <Text style={s.docTitle}>QUOTATION</Text>
-            <Text style={s.docMeta}>No: {nomor}</Text>
-            <Text style={s.docMeta}>Tanggal: {tanggal}</Text>
-            <Text style={s.docMeta}>Berlaku hingga: {berlakuHingga}</Text>
+          <View style={s.metaBlock}>
+            <Text style={s.metaLine}>No: {quotationNumber}</Text>
+            <Text style={s.metaLine}>{tanggal}</Text>
+            {expiredDate && <Text style={[s.metaLine, { fontSize: 9, color: '#666' }]}>Berlaku hingga {expiredDate}</Text>}
           </View>
         </View>
 
-        <View style={s.divider} />
-
-        {/* Brand info */}
-        <View style={s.brandBox}>
-          <Text style={s.brandLabel}>Ditujukan kepada</Text>
-          <Text style={s.brandName}>{brandNama}</Text>
-          {brandPic && <Text style={{ fontSize: 9, color: '#666', marginTop: 2 }}>PIC: {brandPic}</Text>}
-        </View>
-
-        {/* Table */}
-        <View style={s.tableHeader}>
-          <Text style={[s.headerCell, s.col1]}>Deskripsi</Text>
-          <Text style={[s.headerCell, s.col2]}>Platform</Text>
-          <Text style={[s.headerCell, s.col3]}>Qty</Text>
-          <Text style={[s.headerCell, s.col4]}>Harga</Text>
-          <Text style={[s.headerCell, s.col5]}>Subtotal</Text>
-        </View>
-        {items.map((item, i) => (
-          <View key={i} style={[s.tableRow, i % 2 === 1 ? s.tableRowAlt : {}]}>
-            <View style={s.col1}>
-              <Text>{item.deskripsi || '—'}</Text>
-              {item.format && <Text style={{ fontSize: 8, color: '#888' }}>{item.format}</Text>}
+        <View style={s.table}>
+          <View style={s.tableHeadRow}>
+            <Text style={[s.th, s.colDesc]}>Deskripsi</Text>
+            <Text style={[s.th, s.colPrice]}>Harga</Text>
+            <Text style={[s.th, s.colQty]}>Jumlah</Text>
+            <Text style={[s.th, s.colTotal]}>Total</Text>
+          </View>
+          {items.map((item, i) => (
+            <View key={i} style={s.tableRow}>
+              <View style={s.colDesc}>
+                {item.description.split('\n').map((line, li) => (
+                  <Text key={li} style={s.descLine}>{line}</Text>
+                ))}
+                {item.is_bonus && <Text style={s.bonusTag}>Bonus</Text>}
+              </View>
+              <Text style={[s.descLine, s.colPrice]}>{item.price > 0 ? formatRp(item.price) : '—'}</Text>
+              <Text style={[s.descLine, s.colQty]}>{item.qty}</Text>
+              <Text style={[s.descLine, s.colTotal]}>{item.is_bonus ? 'Bonus' : formatRp(item.price * item.qty)}</Text>
             </View>
-            <Text style={s.col2}>{item.platform || '—'}</Text>
-            <Text style={s.col3}>{item.qty}</Text>
-            <Text style={s.col4}>{formatRp(item.harga)}</Text>
-            <Text style={s.col5}>{formatRp(item.qty * item.harga)}</Text>
-          </View>
-        ))}
-
-        {/* Totals */}
-        <View style={s.totalsSection}>
-          <View style={s.totalsBox}>
-            <View style={s.totalRow}>
-              <Text style={s.totalLabel}>Subtotal</Text>
-              <Text style={s.totalValue}>{formatRp(subtotal)}</Text>
-            </View>
-            {diskon > 0 && (
-              <View style={s.totalRow}>
-                <Text style={s.totalLabel}>Diskon</Text>
-                <Text style={s.totalValue}>- {formatRp(diskon)}</Text>
-              </View>
-            )}
-            {pajak > 0 && (
-              <View style={s.totalRow}>
-                <Text style={s.totalLabel}>Pajak ({pajak}%)</Text>
-                <Text style={s.totalValue}>{formatRp(pajakAmount)}</Text>
-              </View>
-            )}
-            <View style={s.grandTotalRow}>
-              <Text style={s.grandLabel}>TOTAL</Text>
-              <Text style={s.grandValue}>{formatRp(total)}</Text>
-            </View>
-          </View>
+          ))}
         </View>
 
-        {/* Notes */}
-        {(paymentTerms || catatan) && (
-          <View style={s.notes}>
-            {paymentTerms && (
-              <View style={{ marginBottom: catatan ? 8 : 0 }}>
-                <Text style={s.notesTitle}>Payment Terms</Text>
-                <Text style={s.notesText}>{paymentTerms}</Text>
-              </View>
-            )}
-            {catatan && (
-              <View>
-                <Text style={s.notesTitle}>Catatan</Text>
-                <Text style={s.notesText}>{catatan}</Text>
-              </View>
-            )}
+        <View style={s.totalsBlock}>
+          <View style={s.grandTotalRow}>
+            <Text style={s.grandLabel}>Total</Text>
+            <Text style={s.grandValue}>{formatRp(total)}</Text>
+          </View>
+          <Text style={s.terbilang}>Terbilang: {terbilangRupiah(total)}</Text>
+        </View>
+
+        {notes && (
+          <View style={s.section}>
+            <Text style={s.sectionLabel}>Ket:</Text>
+            <Text style={s.sectionText}>{notes}</Text>
           </View>
         )}
 
-        {/* Signature */}
-        <View style={s.signArea}>
-          <View style={s.signBox}>
-            <View style={s.signLine} />
-            <Text style={s.signLabel}>{workspaceName}</Text>
+        {(bankName || accountNumber || accountHolder) && (
+          <View style={s.section}>
+            <Text style={s.sectionLabel}>Detail pembayaran:</Text>
+            {bankName && <View style={s.paymentRow}><Text style={s.paymentLabel}>Bank</Text><Text style={s.paymentValue}>{bankName}</Text></View>}
+            {accountNumber && <View style={s.paymentRow}><Text style={s.paymentLabel}>Nomor Rekening</Text><Text style={s.paymentValue}>{accountNumber}</Text></View>}
+            {accountHolder && <View style={s.paymentRow}><Text style={s.paymentLabel}>A/n</Text><Text style={s.paymentValue}>{accountHolder}</Text></View>}
           </View>
-        </View>
+        )}
 
-        {/* Footer */}
-        <View style={s.footer}>
-          <Text style={s.footerText}>Dokumen ini dibuat secara digital oleh {workspaceName}</Text>
-          <Text style={s.footerText}>{nomor}</Text>
+        <View style={s.signatureBlock}>
+          <Text style={s.signatureLine}>Hormat Kami,</Text>
+          {signatoryName && <Text style={s.signatureName}>({signatoryName})</Text>}
         </View>
       </Page>
     </Document>

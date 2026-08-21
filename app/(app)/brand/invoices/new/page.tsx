@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
-import { useWorkspace } from '@/lib/hooks/useWorkspace'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -30,21 +29,20 @@ function newItem(): LineItem {
   return { id: Math.random().toString(36).slice(2), description: '', price: 0, qty: 1, is_bonus: false }
 }
 
-export default function QuotationNewPage() {
+export default function InvoiceNewPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { workspaceId } = useWorkspace()
   const queryClient = useQueryClient()
 
-  const brandIdParam = searchParams.get('brandId') ?? ''
   const dealIdParam = searchParams.get('dealId') ?? ''
+  const quotationIdParam = searchParams.get('quotationId') ?? ''
   const editId = searchParams.get('editId') ?? ''
 
-  const [brandId, setBrandId] = useState(brandIdParam)
   const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0])
-  const [berlakuHingga, setBerlakuHingga] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() + 14); return d.toISOString().split('T')[0]
-  })
+  const [dueDate, setDueDate] = useState('')
+  const [type, setType] = useState<'dp' | 'pelunasan' | 'full'>('dp')
+  const [status, setStatus] = useState<'draft' | 'sent' | 'paid' | 'cancelled'>('draft')
+  const [quotationId, setQuotationId] = useState(quotationIdParam)
   const [items, setItems] = useState<LineItem[]>([newItem()])
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
@@ -52,25 +50,33 @@ export default function QuotationNewPage() {
   const [previewUrl, setPreviewUrl] = useState('')
   const [generating, setGenerating] = useState(false)
 
-  const { data: brands } = useQuery({
-    queryKey: ['brands-list', workspaceId],
+  const { data: deal } = useQuery({
+    queryKey: ['invoice-source-deal', dealIdParam],
+    enabled: !!dealIdParam,
     queryFn: async () => {
-      if (!workspaceId) return []
       const supabase = createClient()
-      const { data } = await supabase.from('brands').select('id, nama_brand').eq('workspace_id', workspaceId).limit(100)
-      return (data ?? []) as { id: string; nama_brand: string }[]
+      const { data, error } = await supabase.from('deals').select('*, brands(*)').eq('id', dealIdParam).single()
+      if (error) throw error
+      return data
     },
-    enabled: !!workspaceId,
   })
 
-  // Workspace billing/bank details — already exist (008_billing.sql +
-  // Settings page), reused here rather than hardcoding into the PDF.
-  const { data: billing } = useQuery({
-    queryKey: ['workspace-billing', workspaceId],
-    enabled: !!workspaceId,
+  const { data: quotations = [] } = useQuery({
+    queryKey: ['deal-quotations-for-invoice', dealIdParam],
+    enabled: !!dealIdParam,
     queryFn: async () => {
       const supabase = createClient()
-      const { data } = await supabase.from('workspaces').select('billing_bank_name, billing_bank_account, billing_bank_holder').eq('id', workspaceId).single()
+      const { data } = await supabase.from('quotations').select('id, quotation_number, status, items, total').eq('deal_id', dealIdParam).order('created_at', { ascending: false })
+      return data ?? []
+    },
+  })
+
+  const { data: billing } = useQuery({
+    queryKey: ['workspace-billing', deal?.workspace_id],
+    enabled: !!deal?.workspace_id,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase.from('workspaces').select('billing_bank_name, billing_bank_account, billing_bank_holder').eq('id', deal.workspace_id).single()
       return data
     },
   })
@@ -86,29 +92,30 @@ export default function QuotationNewPage() {
     },
   })
 
-  // If created from a Deal, lock the Brand to that Deal's brand — the
-  // context is already known, no need to ask the user to re-select it.
-  const { data: linkedDeal } = useQuery({
-    queryKey: ['quotation-source-deal', dealIdParam],
-    enabled: !!dealIdParam,
-    queryFn: async () => {
-      const supabase = createClient()
-      const { data } = await supabase.from('deals').select('id, brand_id, title, nama_campaign').eq('id', dealIdParam).single()
-      return data
-    },
-  })
+  // Prefill line items from the selected Quotation — "Create Invoice from
+  // Quotation" — but only ever a one-time copy on selection, never a live
+  // sync (the two documents diverge on purpose after this point).
+  function applyQuotation(qId: string) {
+    setQuotationId(qId)
+    const q = quotations.find((x: any) => x.id === qId)
+    if (q && Array.isArray(q.items) && q.items.length > 0) {
+      setItems(q.items.map((it: any) => ({
+        id: Math.random().toString(36).slice(2),
+        description: it.description || it.deskripsi || '',
+        price: Number(it.price ?? it.harga ?? 0),
+        qty: Number(it.qty ?? 1),
+        is_bonus: Boolean(it.is_bonus),
+      })))
+    }
+  }
 
-  useEffect(() => {
-    if (linkedDeal?.brand_id) setBrandId(linkedDeal.brand_id)
-  }, [linkedDeal])
-
-  // Edit mode — load the existing quotation.
+  // Edit mode — load the existing invoice.
   const { data: existing, isLoading: loadingExisting } = useQuery({
-    queryKey: ['quotation-edit', editId],
+    queryKey: ['invoice-edit', editId],
     enabled: !!editId,
     queryFn: async () => {
       const supabase = createClient()
-      const { data, error } = await supabase.from('quotations').select('*').eq('id', editId).single()
+      const { data, error } = await supabase.from('invoices').select('*').eq('id', editId).single()
       if (error) throw error
       return data
     },
@@ -116,9 +123,11 @@ export default function QuotationNewPage() {
 
   useEffect(() => {
     if (!existing) return
-    setBrandId(existing.brand_id)
     setTanggal(existing.tanggal)
-    setBerlakuHingga(existing.expired_date || '')
+    setDueDate(existing.due_date || '')
+    setType(existing.type)
+    setStatus(existing.status)
+    setQuotationId(existing.quotation_id || '')
     setNotes(existing.notes || '')
     const loadedItems = Array.isArray(existing.items) && existing.items.length > 0
       ? existing.items.map((it: any) => ({
@@ -138,61 +147,46 @@ export default function QuotationNewPage() {
     setItems((prev) => prev.map((it) => it.id === id ? { ...it, [field]: value } : it))
   }
 
-  async function save(status: 'draft' | 'sent') {
-    if (!workspaceId || !brandId) { toast.error('Pilih brand terlebih dahulu'); return }
-    if (items.every((it) => !it.description.trim())) { toast.error('Isi minimal satu item quotation'); return }
+  async function save() {
+    if (!deal && !editId) { toast.error('Deal tidak ditemukan'); return }
+    if (items.every((it) => !it.description.trim())) { toast.error('Isi minimal satu item invoice'); return }
     setSaving(true)
     try {
       const supabase = createClient()
       const itemsPayload = items.filter((it) => it.description.trim()).map(({ id: _id, ...rest }) => rest)
 
       if (editId) {
-        const { error } = await supabase.from('quotations').update({
-          brand_id: brandId,
-          tanggal,
-          expired_date: berlakuHingga || null,
-          items: itemsPayload,
-          subtotal: total,
-          total,
-          notes: notes || null,
-          status,
+        const { error } = await supabase.from('invoices').update({
+          type, tanggal, due_date: dueDate || null,
+          items: itemsPayload, subtotal: total, total,
+          status, quotation_id: quotationId || null, notes: notes || null,
           updated_at: new Date().toISOString(),
         }).eq('id', editId)
-        if (error) { console.error('Failed to update quotation:', error); throw error }
-        toast.success('Quotation berhasil diperbarui!')
+        if (error) { console.error('Failed to update invoice:', error); throw error }
+        toast.success('Invoice berhasil diperbarui!')
       } else {
-        // generate_doc_number(ws_id, doc_type) — see 007_functions.sql.
-        // Column names below match quotations' actual schema (005_brand.sql):
-        // quotation_number/expired_date/notes — not nomor/berlaku_hingga/
-        // catatan, which never existed and silently broke every save this
-        // page ever attempted before this fix.
-        const { data: numData, error: numErr } = await supabase.rpc('generate_doc_number', { ws_id: workspaceId, doc_type: 'QUO' })
-        if (numErr) console.error('Failed to generate quotation number:', numErr)
-        const quotationNumber = numData ?? `QUO-${Date.now()}`
+        const { data: numData, error: numErr } = await supabase.rpc('generate_doc_number', { ws_id: deal.workspace_id, doc_type: 'INV' })
+        if (numErr) console.error('Failed to generate invoice number:', numErr)
+        const invoiceNumber = numData ?? `INV-${Date.now()}`
 
-        const payload = {
-          workspace_id: workspaceId,
-          brand_id: brandId,
-          deal_id: dealIdParam || null,
-          quotation_number: quotationNumber,
-          tanggal,
-          expired_date: berlakuHingga || null,
-          items: itemsPayload,
-          subtotal: total,
-          total,
-          notes: notes || null,
-          status,
-        }
-        const { error } = await supabase.from('quotations').insert(payload)
-        if (error) { console.error('Failed to save quotation:', error); throw error }
-        toast.success(status === 'draft' ? 'Draft tersimpan!' : 'Quotation terkirim!')
+        const { error } = await supabase.from('invoices').insert({
+          workspace_id: deal.workspace_id,
+          brand_id: deal.brand_id,
+          deal_id: dealIdParam,
+          quotation_id: quotationId || null,
+          invoice_number: invoiceNumber,
+          type, tanggal, due_date: dueDate || null,
+          items: itemsPayload, subtotal: total, total,
+          status, notes: notes || null,
+        })
+        if (error) { console.error('Failed to save invoice:', error); throw error }
+        toast.success('Invoice draft tersimpan!')
       }
 
-      queryClient.invalidateQueries({ queryKey: ['brand-quotations', brandId] })
-      queryClient.invalidateQueries({ queryKey: ['deal-quotations', dealIdParam] })
-      router.push(dealIdParam ? `/brand/deals/${dealIdParam}` : brandId ? `/brand/${brandId}` : '/brand')
+      queryClient.invalidateQueries({ queryKey: ['deal-invoices', dealIdParam] })
+      router.push(`/brand/deals/${dealIdParam}`)
     } catch (err) {
-      console.error('Quotation save failed:', err)
+      console.error('Invoice save failed:', err)
       toast.error(err instanceof Error ? err.message : 'Terjadi kesalahan')
     } finally {
       setSaving(false)
@@ -200,15 +194,15 @@ export default function QuotationNewPage() {
   }
 
   async function buildPdfBlob() {
-    const brand = brands?.find((b) => b.id === brandId)
-    const { QuotationPDF } = await import('@/components/pdf/QuotationPDF')
+    const brandName = deal?.brands?.name || deal?.brands?.nama_brand || ''
+    const { InvoicePDF } = await import('@/components/pdf/InvoicePDF')
     const { pdf } = await import('@react-pdf/renderer')
     const { createElement } = await import('react')
-    const element = createElement(QuotationPDF, {
-      quotationNumber: editId ? (existing?.quotation_number ?? 'DRAFT') : `DRAFT-${Date.now()}`,
+    const element = createElement(InvoicePDF, {
+      invoiceNumber: editId ? (existing?.invoice_number ?? 'DRAFT') : `DRAFT-${Date.now()}`,
       tanggal,
-      expiredDate: berlakuHingga || undefined,
-      recipientName: brand?.nama_brand ?? '',
+      dueDate: dueDate || undefined,
+      recipientName: brandName,
       items: items.filter((it) => it.description.trim()).map(({ description, price, qty, is_bonus }) => ({ description, price, qty, is_bonus })),
       notes: notes || undefined,
       bankName: billing?.billing_bank_name || undefined,
@@ -220,7 +214,6 @@ export default function QuotationNewPage() {
   }
 
   async function previewPDF() {
-    if (!brandId) { toast.error('Pilih brand terlebih dahulu'); return }
     setGenerating(true)
     try {
       const blob = await buildPdfBlob()
@@ -228,7 +221,7 @@ export default function QuotationNewPage() {
       setPreviewUrl(url)
       setPreviewOpen(true)
     } catch (err) {
-      console.error('Quotation PDF preview failed:', err)
+      console.error('Invoice PDF preview failed:', err)
       toast.error(err instanceof Error ? `Gagal generate PDF: ${err.message}` : 'Gagal generate PDF')
     } finally {
       setGenerating(false)
@@ -236,24 +229,26 @@ export default function QuotationNewPage() {
   }
 
   async function downloadPDF() {
-    if (!brandId) { toast.error('Pilih brand terlebih dahulu'); return }
     setGenerating(true)
     try {
       const blob = await buildPdfBlob()
       const url = URL.createObjectURL(blob)
-      const a = document.createElement('a'); a.href = url; a.download = `quotation-${editId ? existing?.quotation_number : 'preview'}.pdf`; a.click()
+      const a = document.createElement('a'); a.href = url; a.download = `invoice-${editId ? existing?.invoice_number : 'preview'}.pdf`; a.click()
       URL.revokeObjectURL(url)
     } catch (err) {
-      console.error('Quotation PDF download failed:', err)
+      console.error('Invoice PDF download failed:', err)
       toast.error(err instanceof Error ? `Gagal generate PDF: ${err.message}` : 'Gagal generate PDF')
     } finally {
       setGenerating(false)
     }
   }
 
-  if (editId && loadingExisting) {
+  if ((editId && loadingExisting) || (!editId && dealIdParam && !deal)) {
     return <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-64 w-full rounded-xl" /></div>
   }
+
+  const brandName = deal?.brands?.name || deal?.brands?.nama_brand || ''
+  const dealTitle = deal?.title || deal?.nama_campaign || ''
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
@@ -262,42 +257,69 @@ export default function QuotationNewPage() {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
-          <h1 className="font-heading text-xl font-bold text-text-primary">{editId ? 'Edit Quotation' : 'Buat Quotation'}</h1>
-          {linkedDeal && (
+          <h1 className="font-heading text-xl font-bold text-text-primary">{editId ? 'Edit Invoice' : 'Buat Invoice'}</h1>
+          {dealTitle && (
             <p className="text-xs text-text-muted mt-0.5">
-              Untuk Deal: <strong className="text-accent">{linkedDeal.title || linkedDeal.nama_campaign}</strong>
+              Untuk Deal: <strong className="text-accent">{dealTitle}</strong> {brandName && `(${brandName})`}
             </p>
           )}
         </div>
       </div>
 
       <div className="space-y-6">
-        {/* Header */}
-        <div className="bg-white border border-border rounded-xl p-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white border border-border rounded-xl p-5 grid grid-cols-1 sm:grid-cols-4 gap-4">
           <div className="space-y-1.5">
-            <Label>Brand <span className="text-error">*</span></Label>
-            <Select value={brandId} onValueChange={setBrandId} disabled={!!dealIdParam}>
-              <SelectTrigger><SelectValue placeholder="Pilih brand" /></SelectTrigger>
+            <Label>Tipe Invoice</Label>
+            <Select value={type} onValueChange={(v) => setType(v as any)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {(brands ?? []).map((b) => <SelectItem key={b.id} value={b.id}>{b.nama_brand}</SelectItem>)}
+                <SelectItem value="dp">DP (Down Payment)</SelectItem>
+                <SelectItem value="pelunasan">Pelunasan</SelectItem>
+                <SelectItem value="full">Full Payment</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label>Tanggal</Label>
+            <Label>Tanggal Invoice</Label>
             <Input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label>Berlaku Hingga</Label>
-            <Input type="date" value={berlakuHingga} onChange={(e) => setBerlakuHingga(e.target.value)} />
+            <Label>Jatuh Tempo</Label>
+            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           </div>
+          <div className="space-y-1.5">
+            <Label>Status</Label>
+            <Select value={status} onValueChange={(v) => setStatus(v as any)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="sent">Sent</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {quotations.length > 0 && (
+            <div className="space-y-1.5 sm:col-span-4">
+              <Label>Berdasarkan Quotation (Opsional)</Label>
+              <Select value={quotationId || '__none__'} onValueChange={(v) => v === '__none__' ? setQuotationId('') : applyQuotation(v)}>
+                <SelectTrigger><SelectValue placeholder="Tidak berdasarkan quotation" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Tidak berdasarkan quotation</SelectItem>
+                  {quotations.map((q: any) => (
+                    <SelectItem key={q.id} value={q.id}>{q.quotation_number} ({q.status}) — {formatRupiah(Number(q.total))}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-text-muted">Memilih quotation akan menyalin item-nya ke invoice ini (satu kali, tidak tersinkron otomatis setelahnya).</p>
+            </div>
+          )}
         </div>
 
-        {/* Line items — free-form: multiline description, price, qty/label,
-            optional Bonus flag. No forced Product/SKU/Tax/Discount columns. */}
+        {/* Line items — same free-form model as Quotation. */}
         <div className="bg-white border border-border rounded-xl overflow-hidden">
           <div className="px-5 py-3 border-b border-border">
-            <p className="font-semibold text-sm text-text-primary">Item Penawaran</p>
+            <p className="font-semibold text-sm text-text-primary">Item Tagihan</p>
             <p className="text-xs text-text-muted mt-0.5">Deskripsi bebas, boleh multi-baris. Tandai Bonus untuk item tanpa biaya.</p>
           </div>
           <div className="p-5 space-y-4">
@@ -306,7 +328,7 @@ export default function QuotationNewPage() {
                 <Textarea
                   value={item.description}
                   onChange={(e) => updateItem(item.id, 'description', e.target.value)}
-                  placeholder={'Deskripsi item, boleh multi-baris. Contoh:\nEndorsement Video:\nVideo 1: Pra event I - non visit\nVideo 2: Pra event II - non visit + same day edit\n\nUpload di akun TikTok @namaakun'}
+                  placeholder={'Deskripsi item, boleh multi-baris. Contoh:\nEndorsement Video:\nVideo 1: Pra event I - non visit\nVideo 2: Pra event II - non visit + same day edit\n\nUpload di reels Instagram, 1x Instagram story, Youtube Short'}
                   rows={4}
                   className="text-sm"
                 />
@@ -338,7 +360,6 @@ export default function QuotationNewPage() {
             </button>
           </div>
 
-          {/* Totals */}
           <div className="border-t border-border px-5 py-4 flex justify-end">
             <div className="w-72 space-y-1 text-sm text-right">
               <div className="flex justify-between font-semibold border-t border-border pt-2">
@@ -350,22 +371,16 @@ export default function QuotationNewPage() {
           </div>
         </div>
 
-        {/* Notes */}
         <div className="bg-white border border-border rounded-xl p-5 space-y-4">
           <div className="space-y-1.5">
             <Label>Ket / Catatan</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Contoh: DP 50% di awal, sisanya setelah konten selesai" rows={2} />
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Contoh: Down payment (DP) 50%, Pelunasan 50%" rows={2} />
           </div>
         </div>
 
-        {/* Actions — draft/send are explicit saves; PDF preview/download are
-            separate explicit actions, never triggered automatically on save. */}
         <div className="flex flex-wrap gap-3">
-          <Button variant="secondary" onClick={() => save('draft')} disabled={saving}>
-            {saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />} Simpan Draft
-          </Button>
-          <Button onClick={() => save('sent')} disabled={saving}>
-            {saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />} Tandai Terkirim
+          <Button onClick={save} disabled={saving}>
+            {saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />} Simpan
           </Button>
           <Button variant="outline" onClick={previewPDF} disabled={generating}>
             {generating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
@@ -381,9 +396,9 @@ export default function QuotationNewPage() {
       <Dialog open={previewOpen} onOpenChange={(v) => { setPreviewOpen(v); if (!v && previewUrl) { URL.revokeObjectURL(previewUrl); setPreviewUrl('') } }}>
         <DialogContent className="sm:max-w-3xl h-[85vh] p-0">
           <DialogHeader className="px-4 py-3 border-b border-border">
-            <DialogTitle className="text-sm font-semibold">Preview Quotation</DialogTitle>
+            <DialogTitle className="text-sm font-semibold">Preview Invoice</DialogTitle>
           </DialogHeader>
-          {previewUrl && <iframe src={previewUrl} className="w-full h-full" title="Quotation PDF preview" />}
+          {previewUrl && <iframe src={previewUrl} className="w-full h-full" title="Invoice PDF preview" />}
         </DialogContent>
       </Dialog>
     </div>

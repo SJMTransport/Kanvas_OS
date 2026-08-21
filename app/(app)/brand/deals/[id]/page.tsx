@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { toast } from 'sonner'
 import {
   ArrowLeft, Plus, Loader2, FileText, Video, DollarSign, Calendar,
-  CheckCircle2, Link as LinkIcon, Trash2, ExternalLink, Layers, Pencil, AlertTriangle, Upload, Paperclip
+  CheckCircle2, Link as LinkIcon, Trash2, ExternalLink, Layers, Pencil, AlertTriangle, Upload, Paperclip, Eye, Download
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDate, formatRupiah } from '@/lib/utils/formatters'
@@ -73,17 +73,15 @@ export default function DealDetailPage() {
   const [uploadingProof, setUploadingProof] = useState(false)
   const [deletePaymentTarget, setDeletePaymentTarget] = useState<DealPayment | null>(null)
 
-  // Invoice Form (shared by create + edit)
-  const [addInvoiceOpen, setAddInvoiceOpen] = useState(false)
-  const [invEditingId, setInvEditingId] = useState<string | null>(null)
-  const [invType, setInvType] = useState<'dp' | 'pelunasan' | 'full'>('dp')
-  const [invTotal, setInvTotal] = useState('')
-  const [invTanggal, setInvTanggal] = useState(new Date().toISOString().split('T')[0])
-  const [invDueDate, setInvDueDate] = useState('')
-  const [invStatus, setInvStatus] = useState<'draft' | 'sent' | 'overdue' | 'paid' | 'cancelled'>('draft')
-  const [invQuotationId, setInvQuotationId] = useState('')
-  const [invNotes, setInvNotes] = useState('')
+  // Invoice — create/edit lives on /brand/invoices/new; only delete stays here.
   const [deleteInvoiceTarget, setDeleteInvoiceTarget] = useState<Invoice | null>(null)
+
+  // Inline PDF preview for Quotation/Invoice rows (Edit still goes to the
+  // dedicated page — full line-item editing needs more room than a row).
+  const [docPreviewOpen, setDocPreviewOpen] = useState(false)
+  const [docPreviewUrl, setDocPreviewUrl] = useState('')
+  const [docPreviewTitle, setDocPreviewTitle] = useState('')
+  const [generatingDoc, setGeneratingDoc] = useState(false)
 
   // Schedule Form
   const [schedTitle, setSchedTitle] = useState('')
@@ -210,6 +208,27 @@ export default function DealDetailPage() {
       return (data ?? []) as DealSchedule[]
     },
     enabled: !!id,
+  })
+
+  const { data: billing } = useQuery({
+    queryKey: ['workspace-billing', deal?.workspace_id],
+    enabled: !!deal?.workspace_id,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase.from('workspaces').select('billing_bank_name, billing_bank_account, billing_bank_holder').eq('id', deal.workspace_id).single()
+      return data
+    },
+  })
+
+  const { data: currentUser } = useQuery({
+    queryKey: ['current-user-name'],
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return null
+      const { data } = await supabase.from('users').select('full_name').eq('id', user.id).single()
+      return data
+    },
   })
 
   // All workspace videos for linking dialog
@@ -591,86 +610,10 @@ export default function DealDetailPage() {
   }
 
   // ── Invoice ──────────────────────────────────────────────────────────────
-
-  function resetInvoiceForm() {
-    setInvEditingId(null)
-    setInvType('dp')
-    setInvTotal('')
-    setInvTanggal(new Date().toISOString().split('T')[0])
-    setInvDueDate('')
-    setInvStatus('draft')
-    setInvQuotationId('')
-    setInvNotes('')
-  }
-
-  function openEditInvoice(inv: Invoice) {
-    setInvEditingId(inv.id)
-    setInvType(inv.type)
-    setInvTotal(String(inv.total ?? ''))
-    setInvTanggal(inv.tanggal || new Date().toISOString().split('T')[0])
-    setInvDueDate(inv.due_date || '')
-    setInvStatus(inv.status)
-    setInvQuotationId(inv.quotation_id || '')
-    setInvNotes(inv.notes || '')
-    setAddInvoiceOpen(true)
-  }
-
-  async function handleSaveInvoice(e: React.FormEvent) {
-    e.preventDefault()
-    if (!invTotal || !deal) return
-    setSaving(true)
-    try {
-      const supabase = createClient()
-      const total = Number(invTotal) || 0
-
-      if (invEditingId) {
-        const { error } = await supabase.from('invoices').update({
-          type: invType,
-          tanggal: invTanggal,
-          due_date: invDueDate || null,
-          subtotal: total,
-          total,
-          status: invStatus,
-          quotation_id: invQuotationId || null,
-          notes: invNotes || null,
-          updated_at: new Date().toISOString(),
-        }).eq('id', invEditingId)
-        if (error) throw error
-        toast.success('Invoice berhasil diperbarui!')
-      } else {
-        const { data: numData, error: numErr } = await supabase.rpc('generate_doc_number', { ws_id: deal.workspace_id, doc_type: 'INV' })
-        if (numErr) console.error('Failed to generate invoice number:', numErr)
-        const invoiceNumber = numData ?? `INV-${Date.now()}`
-
-        const { error } = await supabase.from('invoices').insert({
-          workspace_id: deal.workspace_id,
-          brand_id: deal.brand_id,
-          deal_id: id,
-          quotation_id: invQuotationId || null,
-          invoice_number: invoiceNumber,
-          type: invType,
-          tanggal: invTanggal,
-          due_date: invDueDate || null,
-          items: [],
-          subtotal: total,
-          total,
-          status: invStatus,
-          notes: invNotes || null,
-        })
-        if (error) throw error
-        toast.success('Invoice berhasil dibuat!')
-      }
-
-      queryClient.invalidateQueries({ queryKey: ['deal-invoices', id] })
-      setAddInvoiceOpen(false)
-      resetInvoiceForm()
-    } catch (err) {
-      console.error('Failed to save invoice:', err)
-      toast.error(err instanceof Error ? err.message : 'Gagal menyimpan invoice')
-    } finally {
-      setSaving(false)
-    }
-  }
+  // Create/edit (with full flexible line items + PDF preview) happens on
+  // the dedicated /brand/invoices/new page — see Part 2/11 of the Phase 3.5
+  // follow-up: creating an Invoice must go through Draft -> Preview PDF ->
+  // Generate, never be conflated with Payment. Only delete lives here.
 
   async function handleDeleteInvoice() {
     if (!deleteInvoiceTarget) return
@@ -687,6 +630,110 @@ export default function DealDetailPage() {
       toast.error(err instanceof Error ? err.message : 'Gagal menghapus invoice')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // ── PDF preview/download for Quotation & Invoice rows ───────────────────
+
+  function openDocPreview(url: string, title: string) {
+    setDocPreviewUrl(url)
+    setDocPreviewTitle(title)
+    setDocPreviewOpen(true)
+  }
+
+  async function buildQuotationPdfBlob(q: Quotation) {
+    const brandName = deal?.brands?.name || deal?.brands?.nama_brand || ''
+    const { QuotationPDF } = await import('@/components/pdf/QuotationPDF')
+    const { pdf } = await import('@react-pdf/renderer')
+    const { createElement } = await import('react')
+    const element = createElement(QuotationPDF, {
+      quotationNumber: q.quotation_number,
+      tanggal: q.tanggal,
+      expiredDate: q.expired_date || undefined,
+      recipientName: brandName,
+      items: (q.items || []).map((it: any) => ({ description: it.description || it.deskripsi || '', price: Number(it.price ?? it.harga ?? 0), qty: Number(it.qty ?? 1), is_bonus: Boolean(it.is_bonus) })),
+      notes: q.notes || undefined,
+      bankName: billing?.billing_bank_name || undefined,
+      accountNumber: billing?.billing_bank_account || undefined,
+      accountHolder: billing?.billing_bank_holder || undefined,
+      signatoryName: currentUser?.full_name || undefined,
+    })
+    return pdf(element as any).toBlob()
+  }
+
+  async function buildInvoicePdfBlob(inv: Invoice) {
+    const brandName = deal?.brands?.name || deal?.brands?.nama_brand || ''
+    const { InvoicePDF } = await import('@/components/pdf/InvoicePDF')
+    const { pdf } = await import('@react-pdf/renderer')
+    const { createElement } = await import('react')
+    const element = createElement(InvoicePDF, {
+      invoiceNumber: inv.invoice_number,
+      tanggal: inv.tanggal,
+      dueDate: inv.due_date || undefined,
+      recipientName: brandName,
+      items: (inv.items || []).map((it: any) => ({ description: it.description || it.deskripsi || '', price: Number(it.price ?? it.harga ?? 0), qty: Number(it.qty ?? 1), is_bonus: Boolean(it.is_bonus) })),
+      notes: inv.notes || undefined,
+      bankName: billing?.billing_bank_name || undefined,
+      accountNumber: billing?.billing_bank_account || undefined,
+      accountHolder: billing?.billing_bank_holder || undefined,
+      signatoryName: currentUser?.full_name || undefined,
+    })
+    return pdf(element as any).toBlob()
+  }
+
+  async function handlePreviewQuotation(q: Quotation) {
+    setGeneratingDoc(true)
+    try {
+      const blob = await buildQuotationPdfBlob(q)
+      openDocPreview(URL.createObjectURL(blob), `Quotation ${q.quotation_number}`)
+    } catch (err) {
+      console.error('Quotation PDF preview failed:', err)
+      toast.error(err instanceof Error ? `Gagal generate PDF: ${err.message}` : 'Gagal generate PDF')
+    } finally {
+      setGeneratingDoc(false)
+    }
+  }
+
+  async function handleDownloadQuotation(q: Quotation) {
+    setGeneratingDoc(true)
+    try {
+      const blob = await buildQuotationPdfBlob(q)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a'); a.href = url; a.download = `quotation-${q.quotation_number}.pdf`; a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Quotation PDF download failed:', err)
+      toast.error(err instanceof Error ? `Gagal generate PDF: ${err.message}` : 'Gagal generate PDF')
+    } finally {
+      setGeneratingDoc(false)
+    }
+  }
+
+  async function handlePreviewInvoice(inv: Invoice) {
+    setGeneratingDoc(true)
+    try {
+      const blob = await buildInvoicePdfBlob(inv)
+      openDocPreview(URL.createObjectURL(blob), `Invoice ${inv.invoice_number}`)
+    } catch (err) {
+      console.error('Invoice PDF preview failed:', err)
+      toast.error(err instanceof Error ? `Gagal generate PDF: ${err.message}` : 'Gagal generate PDF')
+    } finally {
+      setGeneratingDoc(false)
+    }
+  }
+
+  async function handleDownloadInvoice(inv: Invoice) {
+    setGeneratingDoc(true)
+    try {
+      const blob = await buildInvoicePdfBlob(inv)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a'); a.href = url; a.download = `invoice-${inv.invoice_number}.pdf`; a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Invoice PDF download failed:', err)
+      toast.error(err instanceof Error ? `Gagal generate PDF: ${err.message}` : 'Gagal generate PDF')
+    } finally {
+      setGeneratingDoc(false)
     }
   }
 
@@ -846,7 +893,9 @@ export default function DealDetailPage() {
   // Calculate Financials — every figure below is derived from actual
   // invoice/payment records, never a separately-tracked/duplicated total.
   const totalValueNum = Number(deal?.total_value || deal?.nilai_total || 0)
-  const invoicedTotal = invoices.reduce((sum, inv) => sum + Number(inv.total || 0), 0)
+  // Draft/cancelled invoices are not yet real billing — a draft being
+  // edited shouldn't inflate "Invoiced" before it's actually issued.
+  const invoicedTotal = invoices.filter((inv) => inv.status !== 'draft' && inv.status !== 'cancelled').reduce((sum, inv) => sum + Number(inv.total || 0), 0)
   const paidNum = payments.filter((p) => p.status === 'paid').reduce((sum, p) => sum + Number(p.amount || 0), 0)
   const outstandingNum = Math.max(0, invoicedTotal - paidNum)
 
@@ -1426,8 +1475,8 @@ export default function DealDetailPage() {
                         <p className="text-[11px] text-text-muted">{formatDate(q.tanggal)} {q.expired_date && `• Berlaku s/d ${formatDate(q.expired_date)}`}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-text-primary">{formatRupiah(Number(q.total))}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono font-bold text-text-primary mr-1">{formatRupiah(Number(q.total))}</span>
                       <Badge variant="outline" className={cn('text-[9px] uppercase font-bold', q.status === 'accepted' ? 'text-emerald-700 border-emerald-300 bg-emerald-50' : q.status === 'rejected' ? 'text-rose-700 border-rose-300 bg-rose-50' : 'text-slate-700 border-slate-300 bg-slate-50')}>
                         {q.status}
                       </Badge>
@@ -1437,6 +1486,20 @@ export default function DealDetailPage() {
                           <Button size="sm" variant="ghost" className="h-6 text-[10px] px-1.5 text-rose-700" onClick={() => handleUpdateQuotationStatus(q.id, 'rejected')}>Reject</Button>
                         </>
                       )}
+                      {q.status === 'accepted' && (
+                        <Link href={`/brand/invoices/new?dealId=${id}&quotationId=${q.id}`}>
+                          <Button size="sm" variant="ghost" className="h-6 text-[10px] px-1.5 text-accent">+ Invoice</Button>
+                        </Link>
+                      )}
+                      <Link href={`/brand/quotations/new?editId=${q.id}`} title="Edit quotation">
+                        <button className="p-1 rounded hover:bg-subtle text-text-muted hover:text-accent transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
+                      </Link>
+                      <button onClick={() => handlePreviewQuotation(q)} disabled={generatingDoc} className="p-1 rounded hover:bg-subtle text-text-muted hover:text-accent transition-colors" title="Preview PDF">
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => handleDownloadQuotation(q)} disabled={generatingDoc} className="p-1 rounded hover:bg-subtle text-text-muted hover:text-accent transition-colors" title="Download PDF">
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -1448,9 +1511,11 @@ export default function DealDetailPage() {
           <div className="bg-white border border-border rounded-xl p-5 space-y-3 shadow-xs">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <h3 className="font-semibold text-sm text-text-primary uppercase tracking-wider">Invoices</h3>
-              <Button size="sm" onClick={() => { resetInvoiceForm(); setAddInvoiceOpen(true) }} className="bg-accent hover:bg-accent/90 h-8 text-xs font-semibold gap-1">
-                <Plus className="w-3.5 h-3.5" /> Buat Invoice
-              </Button>
+              <Link href={`/brand/invoices/new?dealId=${id}`}>
+                <Button size="sm" className="bg-accent hover:bg-accent/90 h-8 text-xs font-semibold gap-1">
+                  <Plus className="w-3.5 h-3.5" /> Buat Invoice
+                </Button>
+              </Link>
             </div>
             {invoices.length === 0 ? (
               <p className="py-6 text-center text-text-muted text-xs">Belum ada invoice untuk deal ini.</p>
@@ -1470,13 +1535,19 @@ export default function DealDetailPage() {
                             <p className="text-[11px] text-text-muted">{formatDate(inv.tanggal)} {inv.due_date && `• Jatuh tempo ${formatDate(inv.due_date)}`}</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-text-primary">{formatRupiah(Number(inv.total))}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-bold text-text-primary mr-1">{formatRupiah(Number(inv.total))}</span>
                           <Badge variant="outline" className={cn('text-[9px] uppercase font-bold', overdue ? 'text-rose-700 border-rose-300 bg-rose-50' : inv.status === 'paid' ? 'text-emerald-700 border-emerald-300 bg-emerald-50' : 'text-slate-700 border-slate-300 bg-slate-50')}>
                             {overdue ? 'overdue' : inv.status}
                           </Badge>
-                          <button onClick={() => openEditInvoice(inv)} className="p-1 rounded hover:bg-subtle text-text-muted hover:text-accent transition-colors" title="Edit invoice">
-                            <Pencil className="w-3.5 h-3.5" />
+                          <Link href={`/brand/invoices/new?editId=${inv.id}`} title="Edit invoice">
+                            <button className="p-1 rounded hover:bg-subtle text-text-muted hover:text-accent transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
+                          </Link>
+                          <button onClick={() => handlePreviewInvoice(inv)} disabled={generatingDoc} className="p-1 rounded hover:bg-subtle text-text-muted hover:text-accent transition-colors" title="Preview PDF">
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => handleDownloadInvoice(inv)} disabled={generatingDoc} className="p-1 rounded hover:bg-subtle text-text-muted hover:text-accent transition-colors" title="Download PDF">
+                            <Download className="w-3.5 h-3.5" />
                           </button>
                           <button onClick={() => setDeleteInvoiceTarget(inv)} className="p-1 rounded hover:bg-error/10 text-text-muted hover:text-error transition-colors" title="Hapus invoice">
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1806,81 +1877,6 @@ export default function DealDetailPage() {
         </SheetContent>
       </Sheet>
 
-      {/* Sheet: Add/Edit Invoice */}
-      <Sheet open={addInvoiceOpen} onOpenChange={(v) => { setAddInvoiceOpen(v); if (!v) resetInvoiceForm() }}>
-        <SheetContent side="right" className="w-full sm:w-[420px] overflow-y-auto p-0">
-          <SheetHeader className="px-6 py-4 border-b border-border">
-            <SheetTitle className="text-base font-bold">{invEditingId ? 'Edit Invoice' : 'Buat Invoice'}</SheetTitle>
-          </SheetHeader>
-          <form onSubmit={handleSaveInvoice} className="px-6 py-5 space-y-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Nominal Invoice (Rp) <span className="text-error">*</span></Label>
-              <Input type="number" value={invTotal} onChange={(e) => setInvTotal(e.target.value)} placeholder="12500000" className="h-9 text-xs font-mono" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Tipe Invoice</Label>
-                <Select value={invType} onValueChange={(v) => setInvType(v as any)}>
-                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="dp" className="text-xs">DP (Down Payment)</SelectItem>
-                    <SelectItem value="pelunasan" className="text-xs">Pelunasan</SelectItem>
-                    <SelectItem value="full" className="text-xs">Full Payment</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Status</Label>
-                <Select value={invStatus} onValueChange={(v) => setInvStatus(v as any)}>
-                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft" className="text-xs">Draft</SelectItem>
-                    <SelectItem value="sent" className="text-xs">Sent</SelectItem>
-                    <SelectItem value="paid" className="text-xs">Paid</SelectItem>
-                    <SelectItem value="cancelled" className="text-xs">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Tanggal Invoice</Label>
-                <Input type="date" value={invTanggal} onChange={(e) => setInvTanggal(e.target.value)} className="h-9 text-xs" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Jatuh Tempo</Label>
-                <Input type="date" value={invDueDate} onChange={(e) => setInvDueDate(e.target.value)} className="h-9 text-xs" />
-              </div>
-            </div>
-            {quotations.length > 0 && (
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Berdasarkan Quotation (Opsional)</Label>
-                <Select value={invQuotationId || '__none__'} onValueChange={(v) => setInvQuotationId(v === '__none__' ? '' : v)}>
-                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Tidak berdasarkan quotation" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__" className="text-xs">Tidak berdasarkan quotation</SelectItem>
-                    {quotations.map((q) => (
-                      <SelectItem key={q.id} value={q.id} className="text-xs">{q.quotation_number} ({q.status})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Catatan</Label>
-              <Textarea value={invNotes} onChange={(e) => setInvNotes(e.target.value)} rows={2} className="text-xs" />
-            </div>
-            <div className="pt-3 flex gap-2 border-t border-border">
-              <Button type="submit" className="flex-1 bg-accent hover:bg-accent/90 h-9 text-xs font-semibold" disabled={saving}>
-                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
-                {invEditingId ? 'Simpan Perubahan' : 'Buat Invoice'}
-              </Button>
-              <Button type="button" variant="outline" className="h-9 text-xs" onClick={() => { setAddInvoiceOpen(false); resetInvoiceForm() }}>Batal</Button>
-            </div>
-          </form>
-        </SheetContent>
-      </Sheet>
-
       {/* Dialog: Delete Invoice confirm */}
       <Dialog open={!!deleteInvoiceTarget} onOpenChange={(v) => { if (!v) setDeleteInvoiceTarget(null) }}>
         <DialogContent className="sm:max-w-[420px]">
@@ -2170,6 +2166,16 @@ export default function DealDetailPage() {
           is_endorsement: true,
         }}
       />
+
+      {/* Shared Quotation/Invoice PDF preview */}
+      <Dialog open={docPreviewOpen} onOpenChange={(v) => { setDocPreviewOpen(v); if (!v && docPreviewUrl) { URL.revokeObjectURL(docPreviewUrl); setDocPreviewUrl('') } }}>
+        <DialogContent className="sm:max-w-3xl h-[85vh] p-0">
+          <DialogHeader className="px-4 py-3 border-b border-border">
+            <DialogTitle className="text-sm font-semibold">{docPreviewTitle}</DialogTitle>
+          </DialogHeader>
+          {docPreviewUrl && <iframe src={docPreviewUrl} className="w-full h-full" title="Document PDF preview" />}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
