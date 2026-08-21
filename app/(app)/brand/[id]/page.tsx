@@ -86,6 +86,33 @@ export default function BrandDetailPage() {
     enabled: !!id,
   })
 
+  // Deliverable + linked-content progress per deal (Part F: "Deliverable
+  // progress" / "Content progress" columns), mirroring the same pattern
+  // already used on the Deal Detail page.
+  const { data: dealDeliverables = [] } = useQuery({
+    queryKey: ['brand-deal-deliverables', id],
+    queryFn: async () => {
+      if (deals.length === 0) return []
+      const supabase = createClient()
+      const dealIds = deals.map((d: any) => d.id)
+      const { data } = await supabase.from('deal_deliverables').select('id, deal_id, status').in('deal_id', dealIds)
+      return data ?? []
+    },
+    enabled: deals.length > 0,
+  })
+
+  const { data: dealContentJunctions = [] } = useQuery({
+    queryKey: ['brand-deal-content-junctions', id],
+    queryFn: async () => {
+      if (dealDeliverables.length === 0) return []
+      const supabase = createClient()
+      const delIds = dealDeliverables.map((d: any) => d.id)
+      const { data } = await supabase.from('content_deliverables').select('deliverable_id').in('deliverable_id', delIds)
+      return data ?? []
+    },
+    enabled: dealDeliverables.length > 0,
+  })
+
   const { data: payments = [] } = useQuery({
     queryKey: ['brand-payments', id],
     queryFn: async () => {
@@ -170,6 +197,17 @@ export default function BrandDetailPage() {
   const totalPaid = payments.filter((p: any) => p.status === 'paid').reduce((acc: number, p: any) => acc + Number(p.amount || 0), 0)
   const outstandingPayment = Math.max(0, totalDealValue - totalPaid)
   const activeDealsCount = deals.filter((d: any) => d.status !== 'completed' && d.status !== 'cancelled').length
+
+  // Per-deal deliverable/content progress for the Deals tab table.
+  const dealProgress = new Map<string, { deliverableTotal: number; deliverablesDone: number; contentCount: number }>(
+    deals.map((d: any) => {
+      const delsForDeal = dealDeliverables.filter((dd: any) => dd.deal_id === d.id)
+      const delIdsForDeal = new Set(delsForDeal.map((dd: any) => dd.id))
+      const linkedContentCount = dealContentJunctions.filter((j: any) => delIdsForDeal.has(j.deliverable_id)).length
+      const deliverablesDone = delsForDeal.filter((dd: any) => dd.status === 'completed' || dd.status === 'done').length
+      return [d.id, { deliverableTotal: delsForDeal.length, deliverablesDone, contentCount: linkedContentCount }]
+    })
+  )
 
   if (brandLoading) {
     return (
@@ -296,6 +334,8 @@ export default function BrandDetailPage() {
                 <tr>
                   <th className="px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">Judul Deal</th>
                   <th className="px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">Tipe</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider text-center">Deliverable</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider text-center">Konten</th>
                   <th className="px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider text-right">Nilai Total</th>
                   <th className="px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider text-center">Status</th>
                   <th className="w-12 px-3 py-3"></th>
@@ -304,12 +344,14 @@ export default function BrandDetailPage() {
               <tbody className="divide-y divide-border/60">
                 {deals.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-12 text-center text-text-muted text-xs">
+                    <td colSpan={7} className="py-12 text-center text-text-muted text-xs">
                       Belum ada deal untuk brand ini. Klik "+ Buat Deal" di atas.
                     </td>
                   </tr>
                 ) : (
-                  deals.map((d: any) => (
+                  deals.map((d: any) => {
+                    const progress = dealProgress.get(d.id) || { deliverableTotal: 0, deliverablesDone: 0, contentCount: 0 }
+                    return (
                     <tr key={d.id} onClick={() => router.push(`/brand/deals/${d.id}`)} className="hover:bg-subtle/60 cursor-pointer transition-colors group">
                       <td className="px-4 py-3.5">
                         <p className="font-semibold text-sm text-text-primary group-hover:text-accent transition-colors">{d.title || d.nama_campaign}</p>
@@ -317,6 +359,20 @@ export default function BrandDetailPage() {
                       </td>
                       <td className="px-4 py-3.5 text-xs text-text-secondary capitalize">
                         {d.collaboration_type || 'Campaign'}
+                      </td>
+                      <td className="px-4 py-3.5 text-center font-mono text-xs">
+                        {progress.deliverableTotal === 0 ? (
+                          <span className="text-text-muted">—</span>
+                        ) : (
+                          <span className="font-semibold text-text-primary">{progress.deliverablesDone} / {progress.deliverableTotal}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5 text-center font-mono text-xs">
+                        {progress.contentCount === 0 ? (
+                          <span className="text-text-muted">—</span>
+                        ) : (
+                          <span className="font-semibold text-accent">{progress.contentCount}</span>
+                        )}
                       </td>
                       <td className="px-4 py-3.5 text-right font-mono text-xs font-semibold text-emerald-700">
                         {formatRupiah(Number(d.total_value || d.nilai_total || 0))}
@@ -330,7 +386,8 @@ export default function BrandDetailPage() {
                         <ArrowRight className="w-4 h-4 text-text-muted group-hover:text-accent group-hover:translate-x-0.5 transition-all inline-block" />
                       </td>
                     </tr>
-                  ))
+                    )
+                  })
                 )}
               </tbody>
             </table>

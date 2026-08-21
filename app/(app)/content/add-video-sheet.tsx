@@ -26,9 +26,15 @@ interface Props {
   }
   workId?: string
   brandId?: string
+  // Context inheritance from Deal/Deliverable (Phase 3, Part D/E): when
+  // creating Content from inside a Deal or Deliverable, both are set so the
+  // new video automatically inherits brand + deal + deliverable without
+  // asking the user to re-select anything already known from context.
+  dealId?: string
+  deliverableId?: string
 }
 
-export function AddVideoSheet({ open, onOpenChange, defaultValues, workId, brandId }: Props) {
+export function AddVideoSheet({ open, onOpenChange, defaultValues, workId, brandId, dealId, deliverableId }: Props) {
   const router = useRouter()
   const { workspaceId } = useWorkspace()
   const queryClient = useQueryClient()
@@ -37,7 +43,7 @@ export function AddVideoSheet({ open, onOpenChange, defaultValues, workId, brand
   const [saving, setSaving] = useState(false)
 
   const effectiveBrandId = brandId || defaultValues?.brand_id
-  const effectiveIsEndorsement = Boolean(brandId || defaultValues?.is_endorsement)
+  const effectiveIsEndorsement = Boolean(brandId || defaultValues?.is_endorsement || dealId)
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -68,6 +74,7 @@ export function AddVideoSheet({ open, onOpenChange, defaultValues, workId, brand
         sort_order: nextSortOrder,
         is_endorsement: effectiveIsEndorsement,
         brand_id: effectiveBrandId || null,
+        deal_id: dealId || null,
         tema: defaultValues?.tema || null,
       }
 
@@ -92,10 +99,21 @@ export function AddVideoSheet({ open, onOpenChange, defaultValues, workId, brand
         if (workErr) console.error('Failed to link video to work:', workErr)
       }
 
+      // Context Inheritance: link to the Deliverable it was created from, so
+      // this Content counts against that Deliverable immediately — the
+      // entire point of creating from inside a Deliverable row.
+      if (deliverableId && newVideo?.id) {
+        const { error: delErr } = await supabase
+          .from('content_deliverables')
+          .insert({ content_id: newVideo.id, deliverable_id: deliverableId })
+        if (delErr) console.error('Failed to link video to deliverable:', delErr)
+      }
+
       toast.success(contentType === 'video' ? 'Konten video dibuat!' : 'Konten foto/carousel dibuat!')
       queryClient.invalidateQueries({ queryKey: ['videos'] })
       queryClient.invalidateQueries({ queryKey: ['work-items', workId] })
       queryClient.invalidateQueries({ queryKey: ['brand-videos', effectiveBrandId] })
+      queryClient.invalidateQueries({ queryKey: ['deal-content-junctions', dealId] })
 
       setJudul('')
       onOpenChange(false)

@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import {
-  ArrowLeft, Plus, Trash2, Check, ExternalLink, Loader2, FileText, Video, Upload, X, Handshake,
+  ArrowLeft, Plus, Trash2, Check, ExternalLink, Loader2, FileText, Video, Upload, X, Handshake, AlertTriangle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -1227,10 +1227,11 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
     queryKey: ['content-brand-junctions', video.id],
     queryFn: async () => {
       const supabase = createClient()
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('content_deliverables')
-        .select('*, deal_deliverables(*, deals(*, brands(*))))')
+        .select('*, deal_deliverables(*, deals(*, brands(*)))')
         .eq('content_id', video.id)
+      if (error) console.error('Failed to load content-deliverable junctions:', error)
       return data ?? []
     },
   })
@@ -1256,6 +1257,21 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
     queryFn: async () => {
       const supabase = createClient()
       const { data } = await supabase.from('brands').select('*').eq('id', video.brand_id).single()
+      return data
+    },
+  })
+
+  // Query direct deal if video.deal_id exists (Phase 3, Part G: Deal -> Brand
+  // is authoritative when a Deal exists, distinct from the legacy brand_id
+  // shortcut and from whichever deal a linked deliverable happens to belong
+  // to — none of these are reconciled by a DB constraint, so we surface any
+  // disagreement rather than silently picking one).
+  const { data: directDeal } = useQuery({
+    queryKey: ['direct-deal', video.deal_id],
+    enabled: !!video.deal_id,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase.from('deals').select('*, brands(*)').eq('id', video.deal_id).single()
       return data
     },
   })
@@ -1321,6 +1337,18 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
     }
   }
 
+  async function handleUnlinkDeliverable(junctionId: string) {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('content_deliverables').delete().eq('id', junctionId)
+      if (error) throw error
+      toast.success('Tautan deliverable dilepas')
+      queryClient.invalidateQueries({ queryKey: ['content-brand-junctions', video.id] })
+    } catch (err) {
+      toast.error('Gagal melepas tautan deliverable')
+    }
+  }
+
   async function handleUpdateApprovalStatus(e: React.FormEvent) {
     e.preventDefault()
     setUpdatingApproval(true)
@@ -1357,10 +1385,19 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
 
   const primaryJunction = linkedJunctions[0] as any
   const deliverable = primaryJunction?.deal_deliverables
-  const deal = deliverable?.deals
+  // Deal -> Brand is authoritative when a Deal exists directly on the
+  // video (Phase 3, Part G). Fall back to whichever deal a linked
+  // deliverable happens to belong to only if the video has no direct deal_id.
+  const deal = directDeal || deliverable?.deals
   const brand = deal?.brands || directBrand
 
   const isOrganic = !brand && linkedJunctions.length === 0
+
+  // Part G: brand_id and deal_id can disagree because nothing in the schema
+  // reconciles them. Surface it — never silently overwrite either value.
+  const brandDealMismatch = Boolean(
+    directBrand && directDeal && directDeal.brand_id && directBrand.id !== directDeal.brand_id
+  )
 
   const prodStatus = video.production_status || video.status || 'idea'
   const appStatus = video.approval_status || (isOrganic ? 'not_required' : 'not_submitted')
@@ -1397,6 +1434,19 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
 
   return (
     <div className="space-y-6">
+      {/* Part G: brand_id vs deal_id disagreement — surfaced, never auto-fixed */}
+      {brandDealMismatch && (
+        <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex items-start gap-3">
+          <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+          <div className="text-xs">
+            <p className="font-bold text-amber-900">Brand langsung dan Brand pada Deal berbeda</p>
+            <p className="text-amber-800 mt-0.5">
+              Konten ini terhubung langsung ke <strong>{directBrand?.name || directBrand?.nama_brand}</strong>, tapi Deal-nya milik <strong>{directDeal?.brands?.name || directDeal?.brands?.nama_brand}</strong>. Ini tidak diperbaiki otomatis — silakan tinjau lewat tombol "Hubungkan Deliverable Lain" di bawah.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Derived Operational Banner: READY TO PUBLISH */}
       {readyToPublish && (
         <div className="bg-emerald-500 text-white rounded-xl p-4 shadow-md flex items-center justify-between">
@@ -1480,25 +1530,45 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
 
         {/* Section 2: DELIVERABLE */}
         <div className="space-y-2 border-b border-border pb-4">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Section 2 — Deliverable</span>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs pt-1">
-            <div>
-              <span className="text-text-muted">Deliverable Output:</span>
-              <p className="font-bold text-sm text-accent mt-0.5">{deliverable?.name || deliverable?.title || 'Main Video Output'}</p>
-            </div>
-            <div>
-              <span className="text-text-muted">Target Deadline:</span>
-              <p className="font-semibold text-text-primary mt-0.5">{deliverable?.deadline ? formatDate(deliverable.deadline) : '—'}</p>
-            </div>
-            <div>
-              <span className="text-text-muted">Status Output:</span>
-              <div className="mt-0.5">
-                <Badge variant="outline" className="text-[10px] uppercase font-bold capitalize">
-                  {deliverable?.status || 'In Production'}
-                </Badge>
-              </div>
-            </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">
+              Section 2 — Deliverable {linkedJunctions.length > 1 && `(${linkedJunctions.length})`}
+            </span>
           </div>
+          {linkedJunctions.length === 0 ? (
+            <div className="pt-1 flex items-center justify-between text-xs bg-subtle/40 border border-border/70 rounded-lg p-3">
+              <span className="text-text-muted">Belum ada deliverable yang ditautkan.</span>
+              <Button size="sm" variant="ghost" onClick={() => setConnectOpen(true)} className="h-7 text-xs text-accent font-semibold">
+                + Hubungkan Deliverable
+              </Button>
+            </div>
+          ) : (
+            <div className="pt-1 space-y-2">
+              {linkedJunctions.map((j: any) => {
+                const del = j.deal_deliverables
+                return (
+                  <div key={j.id} className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs bg-subtle/30 border border-border/60 rounded-lg p-3 items-center">
+                    <div className="sm:col-span-2">
+                      <span className="text-text-muted">Deliverable Output:</span>
+                      <p className="font-bold text-sm text-accent mt-0.5">{del?.name || del?.title || 'Deliverable'}</p>
+                    </div>
+                    <div>
+                      <span className="text-text-muted">Target Deadline:</span>
+                      <p className="font-semibold text-text-primary mt-0.5">{del?.deadline ? formatDate(del.deadline) : '—'}</p>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <Badge variant="outline" className="text-[10px] uppercase font-bold capitalize">
+                        {del?.status || 'In Production'}
+                      </Badge>
+                      <button onClick={() => handleUnlinkDeliverable(j.id)} className="text-text-muted hover:text-error transition-colors p-1" title="Lepas tautan deliverable">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Section 3: APPROVAL UPDATE & LOG NOTES */}
@@ -1572,7 +1642,7 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
               </Button>
             )}
             <Button size="sm" variant="ghost" onClick={() => setConnectOpen(true)} className="text-xs text-accent font-semibold h-8">
-              Ganti / Hubungkan Deliverable
+              + Hubungkan Deliverable Lain
             </Button>
           </div>
         </div>

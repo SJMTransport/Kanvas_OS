@@ -1053,16 +1053,21 @@ export default function DealDetailPage() {
         </SheetContent>
       </Sheet>
 
-      {/* Sheet: Create Content pre-populated with Brand & Deal */}
+      {/* Sheet: Create Content pre-populated with Brand + Deal + Deliverable —
+          the user is never asked to re-select context already known from
+          where they clicked "+ Buat Konten". */}
       <AddVideoSheet
         open={createContentOpen}
         onOpenChange={(open) => {
           setCreateContentOpen(open)
           if (!open) {
+            setTargetDeliverableForCreate(null)
             queryClient.invalidateQueries({ queryKey: ['deal-content-junctions', id] })
           }
         }}
         brandId={deal.brand_id}
+        dealId={deal.id}
+        deliverableId={targetDeliverableForCreate ?? undefined}
         defaultValues={{
           brand_id: deal.brand_id,
           is_endorsement: true,
