@@ -42,13 +42,35 @@ const CATEGORY_GROUPS: { key: 'all' | 'content' | 'deal' | 'financial' | 'approv
   { key: 'approval', label: 'Approval' },
 ]
 
-export function CalendarView() {
+// Phase 5 refinement, Part F/G — the Content page's "Jadwal Konten" is a
+// SCOPED VIEW over the exact same useCalendarEvents engine, not a second
+// calendar. It only ever hides deal/invoice/payment categories at render
+// time; nothing about the data source changes.
+const CONTENT_SCOPE_CATEGORIES: CalendarEvent['category'][] = ['shooting', 'deadline', 'publishing', 'waiting_approval', 'revision']
+const CONTENT_SCOPE_FILTERS: { key: string; label: string }[] = [
+  { key: 'all', label: 'Semua' },
+  { key: 'shooting', label: 'Shooting' },
+  { key: 'deadline', label: 'Deadline' },
+  { key: 'publishing', label: 'Publishing' },
+  { key: 'waiting_approval', label: 'Approval' },
+  { key: 'revision', label: 'Revision' },
+]
+
+interface CalendarViewProps {
+  /** 'content' scopes both the data shown and the category filter to
+   * content-related activities only (Shooting/Deadline/Publishing/
+   * Approval/Revision) — used by the Content page's "Jadwal Konten" tab.
+   * Defaults to 'all', the full operational calendar. */
+  scope?: 'all' | 'content'
+}
+
+export function CalendarView({ scope = 'all' }: CalendarViewProps = {}) {
   const { workspaceId } = useWorkspace()
   const queryClient = useQueryClient()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const [viewMode, setViewMode] = useState<ViewMode>('month')
   const [activeDate, setActiveDate] = useState(new Date())
-  const [activeGroup, setActiveGroup] = useState<'all' | 'content' | 'deal' | 'financial' | 'approval'>('all')
+  const [activeGroup, setActiveGroup] = useState<string>('all')
   const [activePlatforms, setActivePlatforms] = useState<Platform[]>([...PLATFORMS])
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
@@ -68,10 +90,17 @@ export function CalendarView() {
   // Date range for query
   const { startDate, endDate } = getDateRange(viewMode, activeDate)
 
-  const { data: allEvents = [], isLoading } = useCalendarEvents(workspaceId, startDate, endDate)
+  const { data: rawEvents = [], isLoading } = useCalendarEvents(workspaceId, startDate, endDate)
+
+  // Content scope hides deal/invoice/payment categories entirely — applied
+  // once here, upstream of both the category filter and Daily Agenda, so
+  // neither can accidentally leak a non-content category back in.
+  const allEvents = scope === 'content'
+    ? rawEvents.filter((e) => CONTENT_SCOPE_CATEGORIES.includes(e.category))
+    : rawEvents
 
   const events = allEvents
-    .filter((e) => activeGroup === 'all' || CALENDAR_CATEGORY_GROUP[e.category] === activeGroup)
+    .filter((e) => activeGroup === 'all' || (scope === 'content' ? e.category === activeGroup : CALENDAR_CATEGORY_GROUP[e.category] === activeGroup))
     .filter((e) => e.category !== 'publishing' || activePlatforms.includes(e.raw.platform))
 
   function togglePlatform(p: Platform) {
@@ -249,7 +278,7 @@ export function CalendarView() {
 
       {/* Category filter */}
       <div className="bg-white border-b border-border px-4 py-2 flex items-center gap-1.5 flex-wrap shrink-0">
-        {CATEGORY_GROUPS.map((g) => (
+        {(scope === 'content' ? CONTENT_SCOPE_FILTERS : CATEGORY_GROUPS).map((g) => (
           <button
             key={g.key}
             onClick={() => setActiveGroup(g.key)}

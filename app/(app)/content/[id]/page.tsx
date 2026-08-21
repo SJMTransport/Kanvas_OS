@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge'
 import {
   ArrowLeft, Plus, Trash2, Check, ExternalLink, Loader2, FileText, Video, Upload, X, Handshake, AlertTriangle,
+  ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -25,11 +26,18 @@ import { formatNumber, formatDate } from '@/lib/utils/formatters'
 import {
   getApprovalAgingText,
   getApprovalSeverity,
-  isReadyToPublish,
   APPROVAL_STATUS_CONFIG,
   PRODUCTION_STATUS_CONFIG,
   PUBLISHING_STATUS_CONFIG,
 } from '@/lib/utils/workflow'
+import {
+  computeContentLifecycleStage,
+  isPublishingFullyDone,
+  LIFECYCLE_CONFIG,
+  LIFECYCLE_ORDER,
+} from '@/lib/operations/rules'
+import { computeFinancialStatus, isInvoiceOverdue, FINANCIAL_STATUS_CONFIG } from '@/lib/utils/financial'
+import { formatRupiah } from '@/lib/utils/formatters'
 import { ScriptBlocks, type ScriptBlock } from '@/components/content/ScriptBlocks'
 import { VideoWorkBadges } from '@/components/content/VideoWorkBadges'
 import { PlatformEmbed } from '@/components/content/PlatformEmbed'
@@ -1208,6 +1216,86 @@ function PerencanaanTab({ video }: { video: VideoWithSchedules }) {
   )
 }
 
+// Phase 5 refinement — the single "status utama" the user reads at a
+// glance, plus the lifecycle stepper. Brand/Deal/Payment lines are shown
+// only when that data actually exists — never an empty field.
+function ContentLifecycleHeader({
+  videoNo, judul, stage, brandName, dealTitle, paymentStatus, invoicedTotal, paidTotal,
+}: {
+  videoNo?: string | null
+  judul: string
+  stage: import('@/lib/operations/rules').ContentLifecycleStage
+  brandName?: string | null
+  dealTitle?: string | null
+  paymentStatus?: import('@/lib/utils/financial').FinancialStatus | null
+  invoicedTotal: number
+  paidTotal: number
+}) {
+  return (
+    <div className="bg-white border border-border rounded-xl p-5 shadow-sm space-y-4">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          {videoNo && <p className="text-xs font-mono text-text-muted">{videoNo}</p>}
+          <h2 className="font-heading font-bold text-lg text-text-primary">{judul}</h2>
+        </div>
+        <Badge variant="outline" className={cn('text-xs font-bold px-3 py-1', LIFECYCLE_CONFIG[stage].badgeClass)}>
+          {LIFECYCLE_CONFIG[stage].label}
+        </Badge>
+      </div>
+
+      {(brandName || dealTitle || paymentStatus) && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1 border-t border-border/60">
+          {brandName && (
+            <div className="pt-3">
+              <span className="text-text-muted">Brand</span>
+              <p className="font-semibold text-sm text-text-primary mt-0.5">{brandName}</p>
+            </div>
+          )}
+          {dealTitle && (
+            <div className="pt-3">
+              <span className="text-text-muted">Deal</span>
+              <p className="font-semibold text-sm text-text-primary mt-0.5">{dealTitle}</p>
+            </div>
+          )}
+          {paymentStatus && (
+            <div className="pt-3">
+              <span className="text-text-muted">Pembayaran</span>
+              <div className="mt-0.5">
+                <Badge variant="outline" className={cn('text-[10px] font-bold', FINANCIAL_STATUS_CONFIG[paymentStatus].badgeClass)}>
+                  {FINANCIAL_STATUS_CONFIG[paymentStatus].label}
+                </Badge>
+              </div>
+              {invoicedTotal > 0 && (
+                <p className="text-[11px] text-text-muted mt-1 font-mono">{formatRupiah(paidTotal)} / {formatRupiah(invoicedTotal)}</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-center gap-1 pt-1 overflow-x-auto">
+        {LIFECYCLE_ORDER.map((s, i) => {
+          const currentIdx = LIFECYCLE_ORDER.indexOf(stage)
+          const isDone = i < currentIdx
+          const isCurrent = s === stage
+          return (
+            <div key={s} className="flex items-center shrink-0">
+              <span className={cn(
+                'text-[10px] font-semibold px-2 py-1 rounded-full whitespace-nowrap',
+                isCurrent ? cn('ring-1 ring-offset-1', LIFECYCLE_CONFIG[s].badgeClass) :
+                isDone ? 'text-text-muted bg-subtle' : 'text-text-muted/50 bg-subtle/50'
+              )}>
+                {LIFECYCLE_CONFIG[s].label}
+              </span>
+              {i < LIFECYCLE_ORDER.length - 1 && <span className="w-3 h-px bg-border mx-0.5" />}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -1229,6 +1317,7 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
   const [updatingProduction, setUpdatingProduction] = useState(false)
   const [newPublishingStatus, setNewPublishingStatus] = useState(video.publishing_status || 'not_scheduled')
   const [updatingPublishing, setUpdatingPublishing] = useState(false)
+  const [workflowDetailOpen, setWorkflowDetailOpen] = useState(false)
 
   // Query linked deliverables for this video
   const { data: linkedJunctions = [] } = useQuery({
@@ -1281,6 +1370,39 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
       const supabase = createClient()
       const { data } = await supabase.from('deals').select('*, brands(*)').eq('id', video.deal_id).single()
       return data
+    },
+  })
+
+  // Phase 5 refinement — real publishing schedule rows for THIS video, the
+  // same shared signal Calendar/Action Center use to compute lifecycle
+  // (never trust videos.status='live' alone — see rules.ts).
+  const { data: scheduleRows = [] } = useQuery({
+    queryKey: ['content-schedule-statuses', video.id],
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data, error } = await supabase.from('video_platform_schedules').select('status').eq('video_id', video.id)
+      if (error) { console.error('Failed to load schedule statuses:', error); return [] }
+      return data ?? []
+    },
+  })
+  const scheduleStatuses = scheduleRows.map((s: any) => s.status)
+  const isFullyPublished = isPublishingFullyDone(scheduleStatuses)
+  const hasActiveSchedule = scheduleStatuses.length > 0
+
+  // Phase 5 refinement — Payment status is computed, never user-entered.
+  // Same centralized financial rule Deal Detail already uses (Phase 3.5).
+  const { data: dealFinancials } = useQuery({
+    queryKey: ['content-deal-financials', video.deal_id],
+    enabled: !!video.deal_id,
+    queryFn: async () => {
+      const supabase = createClient()
+      const [{ data: invoices, error: invErr }, { data: payments, error: payErr }] = await Promise.all([
+        supabase.from('invoices').select('id, total, due_date, status').eq('deal_id', video.deal_id),
+        supabase.from('deal_payments').select('amount, status').eq('deal_id', video.deal_id),
+      ])
+      if (invErr) console.error('Failed to load deal invoices for payment status:', invErr)
+      if (payErr) console.error('Failed to load deal payments for payment status:', payErr)
+      return { invoices: invoices ?? [], payments: payments ?? [] }
     },
   })
 
@@ -1482,37 +1604,72 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
   const appStatus = video.approval_status || (isOrganic ? 'not_required' : 'not_submitted')
   const pubStatus = video.publishing_status || (video.status === 'live' ? 'published' : video.status === 'scheduled' ? 'scheduled' : 'not_scheduled')
 
-  const readyToPublish = isReadyToPublish({
-    production_status: prodStatus,
-    status: video.status,
-    approval_status: appStatus,
-    publishing_status: pubStatus,
-  })
-
   const agingText = getApprovalAgingText(video.approval_waiting_since)
   const severity = getApprovalSeverity(video.approval_waiting_since)
 
+  // Phase 5 refinement — the single "where is this content" status the
+  // user actually looks at. Computed, never a field the user sets directly.
+  const lifecycleStage = computeContentLifecycleStage(
+    { status: video.status, production_status: prodStatus, approval_status: appStatus },
+    isFullyPublished,
+    hasActiveSchedule
+  )
+
+  // Payment status — computed from Invoice + deal_payments, never entered
+  // manually. Only meaningful when this content has a Deal at all.
+  const invoicesForDeal = dealFinancials?.invoices ?? []
+  const paymentsForDeal = dealFinancials?.payments ?? []
+  const invoicedTotal = invoicesForDeal.filter((i: any) => i.status !== 'cancelled').reduce((sum: number, i: any) => sum + Number(i.total || 0), 0)
+  const paidTotal = paymentsForDeal.filter((p: any) => p.status === 'paid').reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0)
+  const hasOverdueInvoice = invoicesForDeal.some((i: any) => i.status !== 'paid' && i.status !== 'cancelled' && isInvoiceOverdue(i, 0))
+  const paymentStatus = deal?.id
+    ? computeFinancialStatus({ dealValue: Number(deal?.total_value || 0), invoicedTotal, paidTotal, hasOverdueInvoice })
+    : null
+
   if (isOrganic) {
     return (
-      <div className="bg-white border border-border rounded-xl p-8 text-center space-y-4 shadow-sm">
-        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-500">
-          <Handshake className="w-6 h-6" />
+      <div className="space-y-6">
+        <ContentLifecycleHeader
+          videoNo={video.no_video}
+          judul={video.judul}
+          stage={lifecycleStage}
+          brandName={null}
+          dealTitle={null}
+          paymentStatus={null}
+          invoicedTotal={0}
+          paidTotal={0}
+        />
+        <div className="bg-white border border-border rounded-xl p-8 text-center space-y-4 shadow-sm">
+          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-500">
+            <Handshake className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <Badge variant="outline" className="text-xs font-semibold text-slate-600 bg-slate-50">Konten Organik</Badge>
+            <h3 className="font-heading font-bold text-base text-text-primary mt-2">Konten Belum Terhubung ke Brand</h3>
+            <p className="text-xs text-text-muted max-w-md mx-auto">Konten ini saat ini berstatus organik (non-brand). Kamu dapat menghubungkan konten ini ke deal & deliverable brand yang aktif.</p>
+          </div>
+          <Button onClick={() => setConnectOpen(true)} className="bg-accent hover:bg-accent/90 text-xs font-semibold gap-1.5 h-9 px-4">
+            <Plus className="w-4 h-4" />
+            <span>+ Hubungkan ke Brand</span>
+          </Button>
         </div>
-        <div className="space-y-1">
-          <Badge variant="outline" className="text-xs font-semibold text-slate-600 bg-slate-50">Konten Organik</Badge>
-          <h3 className="font-heading font-bold text-base text-text-primary mt-2">Konten Belum Terhubung ke Brand</h3>
-          <p className="text-xs text-text-muted max-w-md mx-auto">Konten ini saat ini berstatus organik (non-brand). Kamu dapat menghubungkan konten ini ke deal & deliverable brand yang aktif.</p>
-        </div>
-        <Button onClick={() => setConnectOpen(true)} className="bg-accent hover:bg-accent/90 text-xs font-semibold gap-1.5 h-9 px-4">
-          <Plus className="w-4 h-4" />
-          <span>+ Hubungkan ke Brand</span>
-        </Button>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
+      <ContentLifecycleHeader
+        videoNo={video.no_video}
+        judul={video.judul}
+        stage={lifecycleStage}
+        brandName={brand?.name || brand?.nama_brand || null}
+        dealTitle={deal?.title || deal?.nama_campaign || null}
+        paymentStatus={paymentStatus}
+        invoicedTotal={invoicedTotal}
+        paidTotal={paidTotal}
+      />
+
       {/* Part G: brand_id vs deal_id disagreement — surfaced, never auto-fixed */}
       {brandDealMismatch && (
         <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex items-start gap-3">
@@ -1532,13 +1689,13 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
         </div>
       )}
 
-      {/* Derived Operational Banner: READY TO PUBLISH */}
-      {readyToPublish && (
+      {/* Derived Operational Banner: READY TO PUBLISH — same signal as the header badge */}
+      {lifecycleStage === 'ready_to_publish' && (
         <div className="bg-emerald-500 text-white rounded-xl p-4 shadow-md flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Check className="w-5 h-5 bg-white text-emerald-600 rounded-full p-0.5" />
             <div>
-              <p className="font-bold text-sm">✓ Approved → Ready to Publish</p>
+              <p className="font-bold text-sm">✓ Approved → Siap Tayang</p>
               <p className="text-xs text-emerald-100">Produksi & persetujuan brand telah selesai! Konten siap dijadwalkan / ditayangkan.</p>
             </div>
           </div>
@@ -1546,8 +1703,17 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
         </div>
       )}
 
-      {/* 3-Dimensional Workflow Status Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Detail Workflow — collapsible supporting detail behind the main lifecycle status */}
+      <div className="bg-white border border-border rounded-xl shadow-xs overflow-hidden">
+        <button
+          onClick={() => setWorkflowDetailOpen((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-surface transition-colors"
+        >
+          <span className="text-xs font-bold text-text-primary">Detail Workflow</span>
+          {workflowDetailOpen ? <ChevronUp className="w-4 h-4 text-text-muted" /> : <ChevronDown className="w-4 h-4 text-text-muted" />}
+        </button>
+        {workflowDetailOpen && (
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 pt-0">
         {/* Dimension 1: Production Status */}
         <div className="bg-white border border-border rounded-xl p-4 space-y-2 shadow-xs">
           <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">1. Production Status</span>
@@ -1604,6 +1770,8 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
             </SelectContent>
           </Select>
         </div>
+      </div>
+        )}
       </div>
 
       {/* Collaboration & Deliverable Summary Card */}

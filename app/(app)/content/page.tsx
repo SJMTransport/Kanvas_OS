@@ -295,7 +295,7 @@ export default function ContentPage() {
   const viewOptions: TabOption<ViewMode>[] = [
     { value: 'table', label: 'Tabel' },
     { value: 'kanban', label: 'Kanban' },
-    { value: 'calendar', label: 'Kalender' },
+    { value: 'calendar', label: 'Jadwal Konten' },
     { value: 'performance', label: 'Performa' },
   ]
 
@@ -446,7 +446,7 @@ export default function ContentPage() {
             onCardClick={handleRowClick}
           />
         ) : viewMode === 'calendar' ? (
-          <CalendarView />
+          <CalendarView scope="content" />
         ) : (
           <PerformanceView searchQuery={search} embedded />
         )}

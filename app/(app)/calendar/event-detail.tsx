@@ -10,6 +10,7 @@ import { getPlatformBadge } from '@/lib/utils/platform'
 import { formatRupiah } from '@/lib/utils/formatters'
 import { STATUS_CONFIG } from '@/lib/utils/status'
 import { PRODUCTION_STATUS_CONFIG, APPROVAL_STATUS_CONFIG, PUBLISHING_STATUS_CONFIG } from '@/lib/utils/workflow'
+import { computeContentLifecycleStage, LIFECYCLE_CONFIG } from '@/lib/operations/rules'
 import { cn } from '@/lib/utils'
 import { CALENDAR_CATEGORY_CONFIG, type CalendarEvent } from './types'
 
@@ -98,6 +99,27 @@ function WorkflowSummary({ ctx }: { ctx?: CalendarEvent['ctx'] }) {
   )
 }
 
+// Approximates the same computeContentLifecycleStage() used in Content
+// Detail, using only what's already enriched onto the event's ctx —
+// publishing_status stands in for the real per-schedule completion check
+// here (Level 2 preview has no live schedule query), same central function,
+// no second lifecycle implementation.
+function LifecycleField({ ctx }: { ctx?: CalendarEvent['ctx'] }) {
+  if (!ctx) return null
+  const stage = computeContentLifecycleStage(
+    { production_status: ctx.productionStatus, approval_status: ctx.approvalStatus },
+    ctx.publishingStatus === 'published',
+    ctx.publishingStatus === 'scheduled'
+  )
+  return (
+    <Field label="Status Konten">
+      <Badge variant="outline" className={cn('text-xs font-bold', LIFECYCLE_CONFIG[stage].badgeClass)}>
+        {LIFECYCLE_CONFIG[stage].label}
+      </Badge>
+    </Field>
+  )
+}
+
 function BrandDealFields({ ctx }: { ctx?: CalendarEvent['ctx'] }) {
   if (!ctx || (!ctx.brandName && !ctx.dealTitle)) return null
   return (
@@ -144,8 +166,9 @@ function ContentDateDetail({ event }: { event: CalendarEvent }) {
       <Field label="Konten">{v.judul ?? event.title} {v.no_video && <span className="text-text-muted font-mono text-xs">({v.no_video})</span>}</Field>
       <BrandDealFields ctx={event.ctx} />
       <Field label="Tanggal">{format(new Date(event.date), 'd MMMM yyyy', { locale: localeId })}</Field>
+      <LifecycleField ctx={event.ctx} />
       {event.ctx && (event.ctx.productionStatus || event.ctx.approvalStatus || event.ctx.publishingStatus) && (
-        <Field label="Status Workflow"><WorkflowSummary ctx={event.ctx} /></Field>
+        <Field label="Detail Workflow"><WorkflowSummary ctx={event.ctx} /></Field>
       )}
       {event.severity === 'overdue' && (
         <div className="flex items-start gap-2 bg-rose-50 border border-rose-200 rounded-lg p-3 text-xs text-rose-800">
@@ -212,6 +235,7 @@ function ApprovalDetail({ event }: { event: CalendarEvent }) {
     <div className="space-y-4">
       <Field label="Konten">{v.judul ?? event.title} {v.no_video && <span className="text-text-muted font-mono text-xs">({v.no_video})</span>}</Field>
       <BrandDealFields ctx={event.ctx} />
+      <LifecycleField ctx={event.ctx} />
       <Field label="Production">{PRODUCTION_STATUS_CONFIG[v.production_status as keyof typeof PRODUCTION_STATUS_CONFIG]?.label ?? '—'}</Field>
       <Field label="Approval">
         <Badge variant="outline" className={cn(event.category === 'revision' ? 'text-rose-700 border-rose-300 bg-rose-50' : 'text-amber-700 border-amber-300 bg-amber-50')}>

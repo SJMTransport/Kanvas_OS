@@ -304,3 +304,72 @@ export function buildPaymentActionItems(payments: PaymentRow[]): ActionItem[] {
 export function sortActionItems(items: ActionItem[]): ActionItem[] {
   return [...items].sort((a, b) => a.priority - b.priority)
 }
+
+// ─── Phase 5 refinement — Content Lifecycle ────────────────────────────────
+// "User mengelola pekerjaan, Kanvas OS yang menghitung status." The
+// lifecycle is a DERIVED view over production_status/approval_status/
+// publishing_status + real publishing completion — never its own stored
+// field, never a second workflow implementation. It composes the exact
+// same signals already used elsewhere (production/approval/publishing
+// dimensions, isPublishingFullyDone) so there is exactly one notion of
+// "where is this content" across Content Detail, Calendar and Action Center.
+
+export type ContentLifecycleStage =
+  | 'idea' | 'scripting' | 'production' | 'editing'
+  | 'ready_to_publish' | 'scheduled' | 'live' | 'archived'
+
+export const LIFECYCLE_ORDER: ContentLifecycleStage[] = [
+  'idea', 'scripting', 'production', 'editing', 'ready_to_publish', 'scheduled', 'live', 'archived',
+]
+
+export const LIFECYCLE_CONFIG: Record<ContentLifecycleStage, { label: string; badgeClass: string }> = {
+  idea:             { label: 'Ide',          badgeClass: 'bg-slate-100 text-slate-700 border-slate-200' },
+  scripting:        { label: 'Scripting',    badgeClass: 'bg-blue-50 text-blue-700 border-blue-200' },
+  production:       { label: 'Produksi',     badgeClass: 'bg-amber-50 text-amber-700 border-amber-200' },
+  editing:          { label: 'Editing',      badgeClass: 'bg-orange-50 text-orange-700 border-orange-200' },
+  ready_to_publish: { label: 'Siap Tayang',  badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-300' },
+  scheduled:        { label: 'Terjadwal',    badgeClass: 'bg-teal-50 text-teal-800 border-teal-300' },
+  live:             { label: 'Live',         badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-400' },
+  archived:         { label: 'Arsip',        badgeClass: 'bg-slate-100 text-slate-500 border-slate-200' },
+}
+
+interface LifecycleInput {
+  status?: string | null
+  production_status?: string | null
+  approval_status?: string | null
+}
+
+// production_status is the canonical, writable dimension (Phase 5). Videos
+// that predate it fall back to the legacy 7-value `status` — same mapping
+// already implied by ContentBrandTab's existing prodStatus fallback.
+function normalizedProductionStage(v: LifecycleInput): 'idea' | 'scripting' | 'production' | 'editing' | 'ready' {
+  if (v.production_status) return v.production_status as any
+  const legacyMap: Record<string, 'idea' | 'scripting' | 'production' | 'editing' | 'ready'> = {
+    ide: 'idea', scripting: 'scripting', produksi: 'production', editing: 'editing',
+    scheduled: 'ready', live: 'ready', archived: 'ready',
+  }
+  return legacyMap[v.status || ''] || 'idea'
+}
+
+/**
+ * isFullyPublished must be computed the same way Calendar computes it
+ * (isPublishingFullyDone over real video_platform_schedules rows) — never
+ * derived from videos.status, since migration 030 promotes it to 'live' on
+ * a single platform posting. hasActiveSchedule is true once at least one
+ * platform schedule exists (regardless of whether it's posted yet).
+ */
+export function computeContentLifecycleStage(
+  v: LifecycleInput,
+  isFullyPublished: boolean,
+  hasActiveSchedule: boolean
+): ContentLifecycleStage {
+  if (v.status === 'archived') return 'archived'
+  if (isFullyPublished) return 'live'
+  if (hasActiveSchedule) return 'scheduled'
+
+  const stage = normalizedProductionStage(v)
+  const approvalOk = !v.approval_status || v.approval_status === 'approved' || v.approval_status === 'not_required'
+  if (stage === 'ready' && approvalOk) return 'ready_to_publish'
+  if (stage === 'ready') return 'editing' // production done but still waiting on approval
+  return stage
+}
