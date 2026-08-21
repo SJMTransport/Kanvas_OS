@@ -146,7 +146,13 @@ export default function BrandPage() {
     setSaving(true)
     try {
       const supabase = createClient()
-      // Insert brand
+      // Insert brand. Column names must match the actual schema (005_brand.sql
+      // + 032_brand_collaboration_system.sql) exactly — `brand_type` and
+      // `catatan` are NOT real columns on `brands` (that was the root cause
+      // of every brand creation failing; see git history for the bug this
+      // fixed). `type`/`name`/`industry` are the 032 additions; `nama_brand`/
+      // `industri`/`notes` are the original Indonesian-named columns kept
+      // for backward compatibility with older reads.
       const { data: newBrand, error } = await supabase
         .from('brands')
         .insert({
@@ -154,22 +160,27 @@ export default function BrandPage() {
           name: data.name.trim(),
           nama_brand: data.name.trim(),
           type: data.brand_type,
-          brand_type: data.brand_type,
           industry: data.industry?.trim() || null,
           industri: data.industry?.trim() || null,
           website: data.website?.trim() || null,
           notes: data.notes?.trim() || null,
-          catatan: data.notes?.trim() || null,
           status: 'aktif',
         })
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Brand insert failed:', error)
+        throw error
+      }
 
-      // Insert primary contact if provided
+      // Insert primary contact if provided. Failure here must not be
+      // silent — the brand row already exists at this point, so we tell
+      // the user their PIC specifically didn't save rather than reporting
+      // a blanket success.
+      let contactError: unknown = null
       if (newBrand?.id && data.pic_name?.trim()) {
-        await supabase.from('brand_contacts').insert({
+        const { error: contactErr } = await supabase.from('brand_contacts').insert({
           brand_id: newBrand.id,
           name: data.pic_name.trim(),
           role: data.pic_role?.trim() || 'PIC',
@@ -177,14 +188,23 @@ export default function BrandPage() {
           phone: data.pic_phone?.trim() || null,
           is_primary: true,
         })
+        if (contactErr) {
+          console.error('Brand contact insert failed:', contactErr)
+          contactError = contactErr
+        }
       }
 
-      toast.success('Brand berhasil ditambahkan!')
+      if (contactError) {
+        toast.warning('Brand dibuat, tapi kontak PIC gagal disimpan. Tambahkan lagi dari halaman detail brand.')
+      } else {
+        toast.success('Brand berhasil ditambahkan!')
+      }
       queryClient.invalidateQueries({ queryKey: ['brands-list'] })
       reset()
       setSheetOpen(false)
       if (newBrand?.id) router.push(`/brand/${newBrand.id}`)
     } catch (err) {
+      console.error('Brand creation failed:', err)
       toast.error(err instanceof Error ? err.message : 'Gagal membuat brand')
     } finally {
       setSaving(false)
