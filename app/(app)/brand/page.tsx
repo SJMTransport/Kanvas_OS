@@ -15,40 +15,41 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { Plus, Loader2, AlertCircle, Eye } from 'lucide-react'
+import { Plus, Loader2, Handshake, ExternalLink, ArrowRight, Building2, User, Phone, Mail } from 'lucide-react'
 import { PageContainer, PageHeader } from '@/components/layout/page-header'
 import { PageToolbar, SearchInput } from '@/components/layout/page-toolbar'
-import { formatDate } from '@/lib/utils/formatters'
-
-const PIPELINE_STATUSES = ['prospect', 'approach', 'negosiasi', 'deal', 'aktif', 'selesai'] as const
-type BrandStatus = typeof PIPELINE_STATUSES[number]
-
-const STATUS_LABELS: Record<BrandStatus, string> = {
-  prospect: 'Prospect', approach: 'Approach', negosiasi: 'Negosiasi',
-  deal: 'Deal', aktif: 'Aktif', selesai: 'Selesai',
-}
-
-const STATUS_COLORS: Record<BrandStatus, string> = {
-  prospect: 'border-t-gray-400', approach: 'border-t-blue-400', negosiasi: 'border-t-yellow-400',
-  deal: 'border-t-green-400', aktif: 'border-t-amber-500', selesai: 'border-t-purple-400',
-}
+import { formatRupiah } from '@/lib/utils/formatters'
+import type { BrandType } from '@/lib/types/brand'
 
 const schema = z.object({
-  nama_brand: z.string().min(1, 'Nama brand wajib diisi'),
-  industri: z.string().optional(),
+  name: z.string().min(1, 'Nama brand wajib diisi'),
+  brand_type: z.enum(['direct', 'agency', 'other']).default('direct'),
+  industry: z.string().optional(),
   website: z.string().optional(),
+  notes: z.string().optional(),
+  // Contact
   pic_name: z.string().optional(),
+  pic_role: z.string().optional(),
   pic_email: z.string().optional(),
-  pic_whatsapp: z.string().optional(),
-  sosmed_brand: z.string().optional(),
-  status: z.string().default('prospect'),
-  first_contact_date: z.string().optional(),
-  next_followup_date: z.string().optional(),
-  catatan: z.string().optional(),
+  pic_phone: z.string().optional(),
 })
 type FormData = z.infer<typeof schema>
+
+interface BrandRow {
+  id: string
+  name: string
+  brand_type: string
+  industry: string | null
+  website: string | null
+  status: string
+  created_at: string
+  active_deals_count: number
+  active_content_count: number
+  outstanding_payment: number
+}
 
 export default function BrandPage() {
   const { workspaceId } = useWorkspace()
@@ -56,233 +57,358 @@ export default function BrandPage() {
   const queryClient = useQueryClient()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [dragging, setDragging] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
 
   const { register, handleSubmit, control, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema) as any,
-    defaultValues: { status: 'prospect' },
+    defaultValues: { brand_type: 'direct' },
   })
 
-  const { data: brands, isLoading } = useQuery({
-    queryKey: ['brands', workspaceId],
+  const { data: brands = [], isLoading } = useQuery<BrandRow[]>({
+    queryKey: ['brands-list', workspaceId],
     queryFn: async () => {
       if (!workspaceId) return []
       const supabase = createClient()
-      const { data } = await supabase
+
+      // Fetch brands
+      const { data: rawBrands, error } = await supabase
         .from('brands')
-        .select('id, nama_brand, industri, pic_name, next_followup_date, status')
+        .select('*')
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false })
-      return (data ?? []) as { id: string; nama_brand: string; industri: string | null; pic_name: string | null; next_followup_date: string | null; status: string }[]
+
+      if (error) throw error
+      if (!rawBrands || rawBrands.length === 0) return []
+
+      // Fetch deals summaries
+      const { data: rawDeals } = await supabase
+        .from('deals')
+        .select('id, brand_id, status, nilai_total, total_value')
+        .eq('workspace_id', workspaceId)
+
+      // Fetch payments for outstanding calc
+      const dealIds = (rawDeals ?? []).map((d: any) => d.id)
+      let paymentsByDeal: Record<string, number> = {}
+      if (dealIds.length > 0) {
+        const { data: rawPayments } = await supabase
+          .from('deal_payments')
+          .select('deal_id, amount, status')
+          .in('deal_id', dealIds)
+          .eq('status', 'paid')
+
+        ;(rawPayments ?? []).forEach((p: any) => {
+          paymentsByDeal[p.deal_id] = (paymentsByDeal[p.deal_id] || 0) + Number(p.amount || 0)
+        })
+      }
+
+      // Fetch videos count
+      const { data: rawVideos } = await supabase
+        .from('videos')
+        .select('id, brand_id')
+        .eq('workspace_id', workspaceId)
+        .not('brand_id', 'is', null)
+
+      const videosByBrand: Record<string, number> = {}
+      ;(rawVideos ?? []).forEach((v: any) => {
+        if (v.brand_id) videosByBrand[v.brand_id] = (videosByBrand[v.brand_id] || 0) + 1
+      })
+
+      return rawBrands.map((b: any) => {
+        const brandDeals = (rawDeals ?? []).filter((d: any) => d.brand_id === b.id)
+        const activeDealsCount = brandDeals.filter((d: any) => d.status !== 'completed' && d.status !== 'cancelled' && d.status !== 'selesai').length
+        
+        let outstanding = 0
+        brandDeals.forEach((d: any) => {
+          const total = Number(d.total_value || d.nilai_total || 0)
+          const paid = paymentsByDeal[d.id] || 0
+          if (total > paid) outstanding += (total - paid)
+        })
+
+        return {
+          id: b.id,
+          name: b.name || b.nama_brand || 'Unnamed Brand',
+          brand_type: b.brand_type || b.type || 'direct',
+          industry: b.industry || b.industri || null,
+          website: b.website || null,
+          status: b.status || 'aktif',
+          created_at: b.created_at,
+          active_deals_count: activeDealsCount,
+          active_content_count: videosByBrand[b.id] || 0,
+          outstanding_payment: outstanding,
+        }
+      })
     },
     enabled: !!workspaceId,
   })
 
-  async function onSubmit(data: any) {
+  async function onSubmit(data: FormData) {
     if (!workspaceId) return
     setSaving(true)
     try {
       const supabase = createClient()
-      const { error } = await supabase.from('brands').insert({
-        workspace_id: workspaceId,
-        nama_brand: data.nama_brand,
-        industri: data.industri || null,
-        website: data.website || null,
-        pic_name: data.pic_name || null,
-        pic_email: data.pic_email || null,
-        pic_whatsapp: data.pic_whatsapp || null,
-        sosmed_brand: data.sosmed_brand || null,
-        status: data.status,
-        first_contact_date: data.first_contact_date || null,
-        next_followup_date: data.next_followup_date || null,
-        catatan: data.catatan || null,
-      })
+      // Insert brand
+      const { data: newBrand, error } = await supabase
+        .from('brands')
+        .insert({
+          workspace_id: workspaceId,
+          name: data.name.trim(),
+          nama_brand: data.name.trim(),
+          type: data.brand_type,
+          brand_type: data.brand_type,
+          industry: data.industry?.trim() || null,
+          industri: data.industry?.trim() || null,
+          website: data.website?.trim() || null,
+          notes: data.notes?.trim() || null,
+          catatan: data.notes?.trim() || null,
+          status: 'aktif',
+        })
+        .select()
+        .single()
+
       if (error) throw error
+
+      // Insert primary contact if provided
+      if (newBrand?.id && data.pic_name?.trim()) {
+        await supabase.from('brand_contacts').insert({
+          brand_id: newBrand.id,
+          name: data.pic_name.trim(),
+          role: data.pic_role?.trim() || 'PIC',
+          email: data.pic_email?.trim() || null,
+          phone: data.pic_phone?.trim() || null,
+          is_primary: true,
+        })
+      }
+
       toast.success('Brand berhasil ditambahkan!')
-      queryClient.invalidateQueries({ queryKey: ['brands'] })
+      queryClient.invalidateQueries({ queryKey: ['brands-list'] })
       reset()
       setSheetOpen(false)
+      if (newBrand?.id) router.push(`/brand/${newBrand.id}`)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Terjadi kesalahan')
+      toast.error(err instanceof Error ? err.message : 'Gagal membuat brand')
     } finally {
       setSaving(false)
     }
   }
 
-  async function handleDrop(brandId: string, newStatus: BrandStatus) {
-    const supabase = createClient()
-    const { error } = await supabase.from('brands').update({ status: newStatus }).eq('id', brandId)
-    if (error) toast.error('Gagal update status')
-    else queryClient.invalidateQueries({ queryKey: ['brands'] })
-    setDragging(null)
-  }
-
-  const [search, setSearch] = useState('')
-  const today = new Date().toISOString().split('T')[0]
-
-  const filteredBrands = (brands ?? []).filter((b) => {
+  const filteredBrands = brands.filter((b) => {
     if (!search.trim()) return true
     const q = search.toLowerCase()
-    return b.nama_brand.toLowerCase().includes(q) || (b.industri && b.industri.toLowerCase().includes(q)) || (b.pic_name && b.pic_name.toLowerCase().includes(q))
+    return b.name.toLowerCase().includes(q) || (b.industry && b.industry.toLowerCase().includes(q))
   })
 
   return (
     <PageContainer className="h-full flex flex-col space-y-4">
       <PageHeader
         title="Brand"
-        subtitle="Pipeline manajemen brand & klien"
+        subtitle="Manajemen kolaborasi, deal, & deliverable brand"
         className="mb-0"
       />
 
       <PageToolbar
-        left={<SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari brand..." />}
-        right={<Button size="sm" onClick={() => setSheetOpen(true)}><Plus className="w-4 h-4 mr-1" /> Brand Baru</Button>}
+        left={<SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari nama brand, industri..." />}
+        right={
+          <Button size="sm" onClick={() => setSheetOpen(true)} className="bg-accent hover:bg-accent/90 gap-1.5 font-semibold">
+            <Plus className="w-4 h-4" />
+            <span>Tambah Brand</span>
+          </Button>
+        }
       />
 
-      <div className="flex-1 overflow-x-auto p-4">
-        {isLoading ? (
-          <div className="flex gap-4">
-            {PIPELINE_STATUSES.map((s) => (
-              <div key={s} className="w-64 shrink-0 space-y-2">
-                <Skeleton className="h-6 w-24" />
-                <Skeleton className="h-28 w-full rounded-xl" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex gap-4 min-w-max">
-            {PIPELINE_STATUSES.map((status) => {
-              const columnBrands = filteredBrands.filter((b) => b.status === status)
-              return (
-                <div
-                  key={status}
-                  className="w-64 shrink-0 flex flex-col gap-2 bg-surface-secondary rounded-2xl border border-border/80 p-2 shadow-subtle"
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
-                    e.preventDefault()
-                    const id = e.dataTransfer.getData('brandId')
-                    if (id) handleDrop(id, status)
-                  }}
-                >
-                  <div className="flex items-center justify-between px-2 pt-1 pb-2 border-b border-border/50">
-                    <span className="text-xs font-semibold text-text-secondary tracking-wide">{STATUS_LABELS[status]}</span>
-                    <span className="text-xs font-bold text-text-muted bg-white border border-border/60 rounded-full w-5 h-5 flex items-center justify-center">{columnBrands.length}</span>
-                  </div>
-                  <div className="min-h-[120px] space-y-2.5">
-                    {columnBrands.map((brand) => {
-                      const isOverdue = brand.next_followup_date && brand.next_followup_date < today
-                      return (
-                        <div
-                          key={brand.id}
-                          draggable
-                          onDragStart={(e) => { e.dataTransfer.setData('brandId', brand.id); setDragging(brand.id) }}
-                          onDragEnd={() => setDragging(null)}
-                          className={cn(
-                            'bg-white border rounded-xl p-3.5 cursor-grab active:cursor-grabbing shadow-card hover:shadow-subtle transition-all border-t-4',
-                            STATUS_COLORS[status],
-                            isOverdue && 'ring-1 ring-error',
-                            dragging === brand.id && 'opacity-50',
-                          )}
-                        >
-                          <p className="font-bold text-sm text-text-primary">{brand.nama_brand}</p>
-                          {brand.industri && <p className="text-xs text-text-muted mt-0.5">{brand.industri}</p>}
-                          {brand.pic_name && <p className="text-xs text-text-secondary mt-1">PIC: {brand.pic_name}</p>}
-                          {brand.next_followup_date && (
-                            <div className={cn('flex items-center gap-1 mt-1.5', isOverdue ? 'text-error' : 'text-text-muted')}>
-                              {isOverdue && <AlertCircle className="w-3 h-3" />}
-                              <span className="text-[10px]">{isOverdue ? 'Overdue: ' : 'Follow-up: '}{formatDate(brand.next_followup_date)}</span>
-                            </div>
-                          )}
-                          <button
-                            onClick={() => router.push(`/brand/${brand.id}`)}
-                            className="mt-2 w-full flex items-center justify-center gap-1 text-[10px] text-text-muted hover:text-accent transition-colors border border-border rounded-lg py-1"
-                          >
-                            <Eye className="w-3 h-3" /> Lihat Detail
-                          </button>
+      {/* Main Brands Table */}
+      <div className="flex-1 bg-white border border-border rounded-xl shadow-xs overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-auto">
+          <table className="w-full text-left border-collapse min-w-[720px]">
+            <thead className="sticky top-0 bg-subtle/70 border-b border-border z-10">
+              <tr>
+                <th className="px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">Nama Brand</th>
+                <th className="px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">Tipe</th>
+                <th className="px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">Industri</th>
+                <th className="px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider text-center">Active Deals</th>
+                <th className="px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider text-center">Konten Terkait</th>
+                <th className="px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider text-right">Outstanding Payment</th>
+                <th className="px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider text-center">Status</th>
+                <th className="w-12 px-3 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60">
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}>
+                    <td colSpan={8} className="px-4 py-3"><Skeleton className="h-5 w-full" /></td>
+                  </tr>
+                ))
+              ) : filteredBrands.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-16 text-center text-text-muted">
+                    <Building2 className="w-10 h-10 mx-auto mb-2 text-border" />
+                    <p className="text-sm font-semibold">Belum Ada Brand Terdaftar</p>
+                    <p className="text-xs text-text-muted mt-1">Klik "+ Tambah Brand" untuk mendaftarkan brand/klien baru.</p>
+                  </td>
+                </tr>
+              ) : (
+                filteredBrands.map((brand) => (
+                  <tr
+                    key={brand.id}
+                    onClick={() => router.push(`/brand/${brand.id}`)}
+                    className="hover:bg-subtle/60 cursor-pointer transition-colors group"
+                  >
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-teal-50 border border-teal-200/60 flex items-center justify-center text-accent font-bold text-xs uppercase shrink-0">
+                          {brand.name.substring(0, 2)}
                         </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
+                        <div>
+                          <p className="font-semibold text-sm text-text-primary group-hover:text-accent transition-colors">
+                            {brand.name}
+                          </p>
+                          {brand.website && (
+                            <a
+                              href={brand.website.startsWith('http') ? brand.website : `https://${brand.website}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-[11px] text-text-muted hover:text-accent flex items-center gap-1 mt-0.5 truncate max-w-[200px]"
+                            >
+                              <span>{brand.website.replace(/^https?:\/\//, '')}</span>
+                              <ExternalLink className="w-2.5 h-2.5" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3.5 text-xs text-text-secondary capitalize">
+                      <Badge variant="outline" className="text-[10px] font-normal capitalize">
+                        {brand.brand_type === 'direct' ? 'Direct Brand' : brand.brand_type === 'agency' ? 'Agency' : 'Other'}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3.5 text-xs text-text-secondary">
+                      {brand.industry || <span className="text-text-muted italic">—</span>}
+                    </td>
+                    <td className="px-4 py-3.5 text-center">
+                      <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', brand.active_deals_count > 0 ? 'bg-emerald-50 text-emerald-700 font-mono' : 'text-text-muted')}>
+                        {brand.active_deals_count} Deal
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-center">
+                      <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', brand.active_content_count > 0 ? 'bg-blue-50 text-blue-700 font-mono' : 'text-text-muted')}>
+                        {brand.active_content_count} Konten
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-right font-mono text-xs font-semibold">
+                      {brand.outstanding_payment > 0 ? (
+                        <span className="text-amber-600">{formatRupiah(brand.outstanding_payment)}</span>
+                      ) : (
+                        <span className="text-text-muted">Rp0</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5 text-center">
+                      <Badge
+                        variant="secondary"
+                        className={cn(
+                          'text-[10px] uppercase font-bold tracking-wider',
+                          brand.status === 'aktif' || brand.status === 'active' || brand.status === 'deal'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-slate-100 text-slate-700'
+                        )}
+                      >
+                        {brand.status}
+                      </Badge>
+                    </td>
+                    <td className="px-3 py-3.5 text-right">
+                      <ArrowRight className="w-4 h-4 text-text-muted group-hover:text-accent group-hover:translate-x-0.5 transition-all inline-block" />
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
+      {/* Sheet Registration Form */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right" className="w-full sm:w-[480px] overflow-y-auto p-0">
+        <SheetContent side="right" className="w-full sm:w-[500px] overflow-y-auto p-0">
           <SheetHeader className="px-6 py-4 border-b border-border">
-            <SheetTitle>Brand Baru</SheetTitle>
+            <SheetTitle className="text-base font-bold">Registrasi Brand Baru</SheetTitle>
           </SheetHeader>
-          <form onSubmit={handleSubmit(onSubmit)} className="px-6 py-4 space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="px-6 py-5 space-y-4">
             <div className="space-y-1.5">
-              <Label>Nama Brand <span className="text-error">*</span></Label>
-              <Input {...register('nama_brand')} placeholder="Nama brand atau klien" />
-              {errors.nama_brand && <p className="text-xs text-error">{errors.nama_brand.message}</p>}
+              <Label className="text-xs font-semibold">Nama Brand / Client <span className="text-error">*</span></Label>
+              <Input {...register('name')} placeholder="misal Shell Lubricants, Samsung, SANY" className="h-9 text-xs" />
+              {errors.name && <p className="text-xs text-error">{errors.name.message}</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Industri</Label>
-                <Input {...register('industri')} placeholder="F&B, Fashion, dll" />
+                <Label className="text-xs font-semibold">Tipe Brand</Label>
+                <Controller
+                  name="brand_type"
+                  control={control}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="direct" className="text-xs">Direct Brand</SelectItem>
+                        <SelectItem value="agency" className="text-xs">Agency</SelectItem>
+                        <SelectItem value="other" className="text-xs">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
               <div className="space-y-1.5">
-                <Label>Status</Label>
-                <Controller name="status" control={control} render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {PIPELINE_STATUSES.map((s) => (
-                        <SelectItem key={s} value={s}>{STATUS_LABELS[s]}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )} />
+                <Label className="text-xs font-semibold">Industri</Label>
+                <Input {...register('industry')} placeholder="misal F&B, Oil & Gas, Tech" className="h-9 text-xs" />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <Label>Website</Label>
-              <Input {...register('website')} placeholder="https://brand.com" />
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">PIC (Person in Charge)</p>
-              <div className="space-y-2">
-                <Input {...register('pic_name')} placeholder="Nama kontak" />
-                <Input {...register('pic_email')} placeholder="Email" type="email" />
-                <Input {...register('pic_whatsapp')} placeholder="Nomor WhatsApp" />
-              </div>
+              <Label className="text-xs font-semibold">Website</Label>
+              <Input {...register('website')} placeholder="https://brand.com" className="h-9 text-xs" />
             </div>
 
             <div className="space-y-1.5">
-              <Label>Sosmed Brand</Label>
-              <Input {...register('sosmed_brand')} placeholder="@handle atau URL" />
+              <Label className="text-xs font-semibold">Catatan / Overview Brand</Label>
+              <Textarea {...register('notes')} placeholder="Overview singkat mengenai brand atau arahan khusus..." rows={2} className="text-xs" />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>First Contact</Label>
-                <Input type="date" {...register('first_contact_date')} />
+            {/* Optional Primary Contact Section */}
+            <div className="border-t border-border pt-4 mt-2 space-y-3">
+              <p className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-accent" />
+                <span>Kontak Utama (PIC Brand)</span>
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-text-muted">Nama PIC</Label>
+                  <Input {...register('pic_name')} placeholder="misal Budi Santoso" className="h-8 text-xs" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-text-muted">Jabatan / Role</Label>
+                  <Input {...register('pic_role')} placeholder="misal Brand Manager" className="h-8 text-xs" />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label>Next Follow-up</Label>
-                <Input type="date" {...register('next_followup_date')} />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-text-muted">Email</Label>
+                  <Input type="email" {...register('pic_email')} placeholder="budi@brand.com" className="h-8 text-xs" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-text-muted">No. Phone / WA</Label>
+                  <Input {...register('pic_phone')} placeholder="08123456789" className="h-8 text-xs" />
+                </div>
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Catatan</Label>
-              <Textarea {...register('catatan')} placeholder="Catatan awal..." rows={3} />
-            </div>
-
-            <div className="pt-2 pb-6 flex gap-2">
-              <Button type="submit" className="flex-1" disabled={saving}>
-                {saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                Simpan Brand
+            <div className="pt-4 flex gap-2 border-t border-border">
+              <Button type="submit" className="flex-1 bg-accent hover:bg-accent/90 h-9 text-xs font-semibold" disabled={saving}>
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+                Simpan Brand Baru
               </Button>
-              <Button type="button" variant="secondary" onClick={() => setSheetOpen(false)}>Batal</Button>
+              <Button type="button" variant="outline" className="h-9 text-xs" onClick={() => setSheetOpen(false)}>
+                Batal
+              </Button>
             </div>
           </form>
         </SheetContent>

@@ -12,14 +12,16 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Badge } from '@/components/ui/badge'
 import {
-  ArrowLeft, Plus, Trash2, Check, ExternalLink, Loader2, FileText, Video, Upload, X,
+  ArrowLeft, Plus, Trash2, Check, ExternalLink, Loader2, FileText, Video, Upload, X, Handshake,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { getStatusBadgeClass, STATUS_CONFIG } from '@/lib/utils/status'
 import { getPlatformDot, getPlatformBadge } from '@/lib/utils/platform'
-import { formatNumber } from '@/lib/utils/formatters'
+import { formatNumber, formatDate } from '@/lib/utils/formatters'
 import { ScriptBlocks, type ScriptBlock } from '@/components/content/ScriptBlocks'
 import { VideoWorkBadges } from '@/components/content/VideoWorkBadges'
 import { PlatformEmbed } from '@/components/content/PlatformEmbed'
@@ -1198,6 +1200,272 @@ function PerencanaanTab({ video }: { video: VideoWithSchedules }) {
   )
 }
 
+function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
+  const router = useRouter()
+  const queryClient = useQueryClient()
+  const [connectOpen, setConnectOpen] = useState(false)
+  const [selectedBrandId, setSelectedBrandId] = useState('')
+  const [selectedDealId, setSelectedDealId] = useState('')
+  const [selectedDeliverableId, setSelectedDeliverableId] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  // Query linked deliverables for this video
+  const { data: linkedJunctions = [] } = useQuery({
+    queryKey: ['content-brand-junctions', video.id],
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('content_deliverables')
+        .select('*, deal_deliverables(*, deals(*, brands(*))))')
+        .eq('content_id', video.id)
+      return data ?? []
+    },
+  })
+
+  // Query direct brand if video.brand_id exists
+  const { data: directBrand } = useQuery({
+    queryKey: ['direct-brand', video.brand_id],
+    enabled: !!video.brand_id,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase.from('brands').select('*').eq('id', video.brand_id).single()
+      return data
+    },
+  })
+
+  // Query available brands for connect dialog
+  const { data: allBrands = [] } = useQuery({
+    queryKey: ['all-brands-select', video.workspace_id],
+    enabled: connectOpen && !!video.workspace_id,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase.from('brands').select('id, name, nama_brand').eq('workspace_id', video.workspace_id)
+      return data ?? []
+    },
+  })
+
+  const { data: brandDeals = [] } = useQuery({
+    queryKey: ['brand-deals-select', selectedBrandId],
+    enabled: connectOpen && !!selectedBrandId,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase.from('deals').select('id, title, nama_campaign').eq('brand_id', selectedBrandId)
+      return data ?? []
+    },
+  })
+
+  const { data: dealDeliverables = [] } = useQuery({
+    queryKey: ['deal-deliverables-select', selectedDealId],
+    enabled: connectOpen && !!selectedDealId,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase.from('deal_deliverables').select('id, name, title').eq('deal_id', selectedDealId)
+      return data ?? []
+    },
+  })
+
+  async function handleConnect(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedBrandId) return
+    setSaving(true)
+    try {
+      const supabase = createClient()
+      // Update video.brand_id & deal_id
+      await supabase.from('videos').update({
+        brand_id: selectedBrandId,
+        deal_id: selectedDealId || null,
+        is_endorsement: true,
+      }).eq('id', video.id)
+
+      if (selectedDeliverableId) {
+        await supabase.from('content_deliverables').insert({
+          content_id: video.id,
+          deliverable_id: selectedDeliverableId,
+        })
+      }
+
+      toast.success('Konten berhasil dihubungkan ke Brand!')
+      queryClient.invalidateQueries({ queryKey: ['content-brand-junctions', video.id] })
+      queryClient.invalidateQueries({ queryKey: ['video-detail', video.id] })
+      setConnectOpen(false)
+    } catch (err) {
+      toast.error('Gagal menghubungkan brand')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const primaryJunction = linkedJunctions[0] as any
+  const deliverable = primaryJunction?.deal_deliverables
+  const deal = deliverable?.deals
+  const brand = deal?.brands || directBrand
+
+  const isOrganic = !brand && linkedJunctions.length === 0
+
+  if (isOrganic) {
+    return (
+      <div className="bg-white border border-border rounded-xl p-8 text-center space-y-4 shadow-sm">
+        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-500">
+          <Handshake className="w-6 h-6" />
+        </div>
+        <div className="space-y-1">
+          <Badge variant="outline" className="text-xs font-semibold text-slate-600 bg-slate-50">Konten Organik</Badge>
+          <h3 className="font-heading font-bold text-base text-text-primary mt-2">Konten Belum Terhubung ke Brand</h3>
+          <p className="text-xs text-text-muted max-w-md mx-auto">Konten ini saat ini berstatus organik (non-brand). Kamu dapat menghubungkan konten ini ke deal & deliverable brand yang aktif.</p>
+        </div>
+        <Button onClick={() => setConnectOpen(true)} className="bg-accent hover:bg-accent/90 text-xs font-semibold gap-1.5 h-9 px-4">
+          <Plus className="w-4 h-4" />
+          <span>+ Hubungkan ke Brand</span>
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Collaboration & Deliverable Summary */}
+      <div className="bg-white border border-border rounded-xl p-6 shadow-sm space-y-6">
+        {/* Section 1: COLLABORATION */}
+        <div className="space-y-2 border-b border-border pb-4">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Section 1 — Collaboration</span>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs pt-1">
+            <div>
+              <span className="text-text-muted">Brand:</span>
+              <p className="font-bold text-sm text-text-primary mt-0.5">{brand?.name || brand?.nama_brand || 'Brand'}</p>
+            </div>
+            <div>
+              <span className="text-text-muted">Deal / Campaign:</span>
+              <p className="font-bold text-sm text-text-primary mt-0.5">{deal?.title || deal?.nama_campaign || '—'}</p>
+            </div>
+            <div>
+              <span className="text-text-muted">Status Deal:</span>
+              <div className="mt-0.5">
+                <Badge variant="secondary" className="text-[10px] uppercase font-bold bg-emerald-100 text-emerald-800">
+                  {deal?.status || 'Confirmed'}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 2: DELIVERABLE */}
+        <div className="space-y-2 border-b border-border pb-4">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Section 2 — Deliverable</span>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs pt-1">
+            <div>
+              <span className="text-text-muted">Deliverable Output:</span>
+              <p className="font-bold text-sm text-accent mt-0.5">{deliverable?.name || deliverable?.title || 'Main Video Output'}</p>
+            </div>
+            <div>
+              <span className="text-text-muted">Target Deadline:</span>
+              <p className="font-semibold text-text-primary mt-0.5">{deliverable?.deadline ? formatDate(deliverable.deadline) : '—'}</p>
+            </div>
+            <div>
+              <span className="text-text-muted">Status Output:</span>
+              <div className="mt-0.5">
+                <Badge variant="outline" className="text-[10px] uppercase font-bold capitalize">
+                  {deliverable?.status || 'In Production'}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 3: BRIEF SUMMARY */}
+        <div className="space-y-2 border-b border-border pb-4">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Section 3 — Brief Summary</span>
+          <div className="bg-subtle/40 rounded-lg p-3 space-y-2 text-xs">
+            <div>
+              <span className="font-bold text-text-primary">Campaign Objective:</span>
+              <p className="text-text-secondary mt-0.5">{deal?.notes || 'Promosi campaign & awareness produk brand.'}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 4: QUICK ACTIONS */}
+        <div className="space-y-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Section 4 — Quick Actions</span>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            {brand?.id && (
+              <Button size="sm" variant="outline" onClick={() => router.push(`/brand/${brand.id}`)} className="text-xs font-semibold h-8 gap-1.5">
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Open Brand</span>
+              </Button>
+            )}
+            {deal?.id && (
+              <Button size="sm" variant="outline" onClick={() => router.push(`/brand/deals/${deal.id}`)} className="text-xs font-semibold h-8 gap-1.5">
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Open Deal</span>
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" onClick={() => setConnectOpen(true)} className="text-xs text-accent font-semibold h-8">
+              Ganti / Hubungkan Deliverable
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Connect Dialog */}
+      <Dialog open={connectOpen} onOpenChange={setConnectOpen}>
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold">Hubungkan Konten ke Brand & Deal</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleConnect} className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Pilih Brand <span className="text-error">*</span></Label>
+              <Select value={selectedBrandId} onValueChange={(val) => { setSelectedBrandId(val); setSelectedDealId(''); setSelectedDeliverableId('') }}>
+                <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Pilih brand..." /></SelectTrigger>
+                <SelectContent>
+                  {allBrands.map((b: any) => (
+                    <SelectItem key={b.id} value={b.id} className="text-xs">{b.name || b.nama_brand}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedBrandId && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Pilih Deal / Campaign (Opsional)</Label>
+                <Select value={selectedDealId} onValueChange={(val) => { setSelectedDealId(val); setSelectedDeliverableId('') }}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Pilih deal..." /></SelectTrigger>
+                  <SelectContent>
+                    {brandDeals.map((d: any) => (
+                      <SelectItem key={d.id} value={d.id} className="text-xs">{d.title || d.nama_campaign}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {selectedDealId && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Pilih Deliverable Output (Opsional)</Label>
+                <Select value={selectedDeliverableId} onValueChange={setSelectedDeliverableId}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Pilih deliverable..." /></SelectTrigger>
+                  <SelectContent>
+                    {dealDeliverables.map((del: any) => (
+                      <SelectItem key={del.id} value={del.id} className="text-xs">{del.name || del.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-border">
+              <Button type="button" variant="outline" size="sm" onClick={() => setConnectOpen(false)}>Batal</Button>
+              <Button type="submit" size="sm" className="bg-accent hover:bg-accent/90 font-semibold" disabled={saving || !selectedBrandId}>
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+                Hubungkan Brand
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
 // ─── Main Content Detail Page ──────────────────────────────────────────────────
 
 export default function ContentDetailPage() {
@@ -1380,6 +1648,7 @@ export default function ContentDetailPage() {
       <Tabs defaultValue="perencanaan" className="w-full">
         <TabsList className="w-full justify-start border-b border-border rounded-none bg-transparent p-0 space-x-6 h-auto mb-6 overflow-x-auto">
           <TabsTrigger value="perencanaan" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent data-[state=active]:shadow-none rounded-none px-1 py-2.5 font-semibold text-text-muted data-[state=active]:text-accent">Perencanaan</TabsTrigger>
+          <TabsTrigger value="brand" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent data-[state=active]:shadow-none rounded-none px-1 py-2.5 font-semibold text-text-muted data-[state=active]:text-accent">Brand</TabsTrigger>
           <TabsTrigger value="script" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent data-[state=active]:shadow-none rounded-none px-1 py-2.5 font-semibold text-text-muted data-[state=active]:text-accent">Script</TabsTrigger>
           <TabsTrigger value="distribusi" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent data-[state=active]:shadow-none rounded-none px-1 py-2.5 font-semibold text-text-muted data-[state=active]:text-accent">Distribusi</TabsTrigger>
           <TabsTrigger value="checklist" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent data-[state=active]:shadow-none rounded-none px-1 py-2.5 font-semibold text-text-muted data-[state=active]:text-accent">Checklist</TabsTrigger>
@@ -1388,6 +1657,10 @@ export default function ContentDetailPage() {
 
         <TabsContent value="perencanaan" className="outline-none">
           <PerencanaanTab video={video} />
+        </TabsContent>
+
+        <TabsContent value="brand" className="outline-none">
+          <ContentBrandTab video={video} />
         </TabsContent>
 
         <TabsContent value="script" className="outline-none">

@@ -67,6 +67,7 @@ export interface Video {
   deadline_posting: string | null
   is_endorsement: boolean
   brand_id: string | null
+  deal_id?: string | null
   is_video_request: boolean
   google_drive_link: string | null
   caption_default: string | null
@@ -283,3 +284,5 @@ export interface Invoice {
   created_at: string
   updated_at: string
 }
+
+export * from './brand'

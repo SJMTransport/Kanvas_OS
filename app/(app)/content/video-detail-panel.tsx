@@ -684,6 +684,7 @@ export function VideoDetailPanel({ video, onClose }: Props) {
       <Tabs defaultValue="info" className="flex-1 flex flex-col overflow-hidden">
         <TabsList className="mx-4 mt-3 shrink-0 w-auto justify-start overflow-x-auto rounded-lg">
           <TabsTrigger value="info" className="text-xs">Info</TabsTrigger>
+          <TabsTrigger value="brand" className="text-xs">Brand</TabsTrigger>
           <TabsTrigger value="jadwal" className="text-xs">Jadwal</TabsTrigger>
           <TabsTrigger value="script" className="text-xs">Script</TabsTrigger>
           <TabsTrigger value="checklist" className="text-xs">Checklist</TabsTrigger>
@@ -692,6 +693,22 @@ export function VideoDetailPanel({ video, onClose }: Props) {
 
         <div className="flex-1 overflow-y-auto mt-0">
           <TabsContent value="info" className="mt-0"><InfoTab video={video} /></TabsContent>
+          <TabsContent value="brand" className="mt-0 p-4">
+            <div className="space-y-3 text-xs">
+              <p className="font-semibold text-text-primary">Status Endorsement / Brand:</p>
+              {video.brand_id ? (
+                <div className="p-3 bg-teal-50 border border-teal-200 rounded-lg space-y-1">
+                  <p className="font-bold text-accent">Terhubung ke Brand Collaboration</p>
+                  <p className="text-text-secondary text-[11px]">Buka detail video untuk melihat info Deal & Deliverable lengkap.</p>
+                </div>
+              ) : (
+                <div className="p-3 bg-subtle border border-border rounded-lg space-y-1">
+                  <p className="font-semibold text-text-muted">Konten Organik (Non-Brand)</p>
+                  <p className="text-text-muted text-[11px]">Buka detail video untuk menghubungkan ke Brand.</p>
+                </div>
+              )}
+            </div>
+          </TabsContent>
           <TabsContent value="jadwal" className="mt-0"><ScheduleTab video={video} /></TabsContent>
           <TabsContent value="script" className="mt-0"><ScriptTab video={video} /></TabsContent>
           <TabsContent value="checklist" className="mt-0"><ChecklistTab video={video} /></TabsContent>
