@@ -153,14 +153,15 @@ function NoVideoCell({ video, index, page, pageSize, save }: {
   }
 
   return (
-    <button onClick={(e) => { e.stopPropagation(); setEditing(true) }} className="group/num flex items-center gap-1 text-left" title="Klik untuk ubah penomoran / buat cabang (misal 15.1, 15.2)">
-      <span className={cn(
-        "font-mono transition-colors",
-        defaultDisplay === 'VID-000' ? "text-text-muted/60" : "font-semibold text-teal-800 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200/60 group-hover/num:border-teal-400"
-      )}>
+    <button
+      onClick={(e) => { e.stopPropagation(); setEditing(true) }}
+      className="group/num flex items-center gap-1.5 text-left whitespace-nowrap shrink-0"
+      title="Klik untuk ubah penomoran / buat cabang (misal 15.1, 15.2)"
+    >
+      <span className="font-mono text-xs font-semibold text-slate-800 dark:text-slate-200 tracking-tight whitespace-nowrap shrink-0">
         {defaultDisplay}
       </span>
-      <Pencil className="w-3 h-3 text-text-muted/0 group-hover/num:text-text-muted/50 transition-colors" />
+      <Pencil className="w-3 h-3 text-text-muted/0 group-hover/num:text-text-muted/50 transition-colors shrink-0" />
     </button>
   )
 }
@@ -599,7 +600,7 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex-1 overflow-auto min-h-0">
         <table className="w-full border-collapse min-w-[840px]">
-          <thead className="sticky top-0 bg-white border-b border-border z-10">
+          <thead className="sticky top-0 bg-white border-b border-border z-20 shadow-xs">
             <tr>
               <th className="w-10 px-2 text-center" onClick={(e) => e.stopPropagation()}>
                 <input
@@ -610,7 +611,7 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
                   title="Pilih semua di halaman ini"
                 />
               </th>
-              <Th col="no_video" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-28">No. Video</Th>
+              <Th col="no_video" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-32 whitespace-nowrap">No. Video</Th>
               <Th col="judul" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Judul</Th>
               <Th sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-40">Tema <HeaderFilter label="Tema" spec={columnFilters?.tema} /></Th>
               <Th col="pilar_konten" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-32">Pilar <HeaderFilter label="Pilar" spec={columnFilters?.pilar} /></Th>

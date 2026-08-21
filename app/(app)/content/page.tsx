@@ -384,7 +384,7 @@ export default function ContentPage() {
       )}
 
       {/* Content area based on active viewMode */}
-      <div className="flex-1 overflow-auto relative min-h-0">
+      <div className={cn("flex-1 relative min-h-0 flex flex-col", viewMode === 'table' ? "overflow-hidden" : "overflow-auto")}>
         {viewMode === 'table' ? (
           <TableView
             videos={videosQuery.data ?? []}
