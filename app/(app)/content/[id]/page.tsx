@@ -40,6 +40,7 @@ import { formatRupiah } from '@/lib/utils/formatters'
 import { ScriptBlocks, type ScriptBlock } from '@/components/content/ScriptBlocks'
 import { ContentIdentity } from '@/components/content/ContentIdentity'
 import { LifecycleIndicator } from '@/components/content/LifecycleIndicator'
+import { ContentLifecycleControl } from '@/components/content/ContentLifecycleControl'
 import { VideoWorkBadges } from '@/components/content/VideoWorkBadges'
 import { PlatformEmbed } from '@/components/content/PlatformEmbed'
 import type { Platform } from '@/lib/types'
@@ -1256,11 +1257,11 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
   const [approvalNote, setApprovalNote] = useState('')
   const [updatingApproval, setUpdatingApproval] = useState(false)
 
-  // Production / Publishing status — Phase 5, Part B: same reasoning as
-  // Approval but with no history table (none exists for these dimensions,
-  // and Part O forbids inventing a second status/history table).
-  const [newProductionStatus, setNewProductionStatus] = useState(video.production_status || 'idea')
-  const [updatingProduction, setUpdatingProduction] = useState(false)
+  // Publishing status — Phase 5, Part B: same reasoning as Approval but
+  // with no history table (none exists for this dimension, and Part O
+  // forbids inventing a second status/history table). Production status
+  // is edited exclusively via the header's ContentLifecycleControl
+  // (Phase 03E) — no second write surface for that field here.
   const [newPublishingStatus, setNewPublishingStatus] = useState(video.publishing_status || 'not_scheduled')
   const [updatingPublishing, setUpdatingPublishing] = useState(false)
   const [workflowDetailOpen, setWorkflowDetailOpen] = useState(false)
@@ -1480,26 +1481,6 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
     }
   }
 
-  async function handleUpdateProductionStatus(next: string) {
-    setNewProductionStatus(next)
-    setUpdatingProduction(true)
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.from('videos').update({ production_status: next }).eq('id', video.id)
-      if (error) {
-        console.error('Failed to update production_status:', error)
-        throw error
-      }
-      toast.success('Production status diperbarui')
-      queryClient.invalidateQueries({ queryKey: ['video-detail', video.id] })
-    } catch (err) {
-      toast.error('Gagal mengupdate production status')
-      setNewProductionStatus(video.production_status || 'idea')
-    } finally {
-      setUpdatingProduction(false)
-    }
-  }
-
   async function handleUpdatePublishingStatus(next: string) {
     setNewPublishingStatus(next)
     setUpdatingPublishing(true)
@@ -1660,7 +1641,9 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
         </button>
         {workflowDetailOpen && (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 pt-0">
-        {/* Dimension 1: Production Status */}
+        {/* Dimension 1: Production Status — read-only here; the single
+            editable control lives in the always-visible header
+            (ContentLifecycleControl) so it's reachable from any tab. */}
         <div className="bg-white border border-border rounded-xl p-4 space-y-2 shadow-xs">
           <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">1. Production Status</span>
           <div className="flex items-center justify-between pt-1">
@@ -1668,16 +1651,7 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
               {PRODUCTION_STATUS_CONFIG[prodStatus]?.label || prodStatus}
             </Badge>
           </div>
-          <Select value={newProductionStatus} onValueChange={handleUpdateProductionStatus} disabled={updatingProduction}>
-            <SelectTrigger className="h-8 text-xs bg-white"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="idea" className="text-xs">Idea</SelectItem>
-              <SelectItem value="scripting" className="text-xs">Scripting</SelectItem>
-              <SelectItem value="production" className="text-xs">Production</SelectItem>
-              <SelectItem value="editing" className="text-xs">Editing</SelectItem>
-              <SelectItem value="ready" className="text-xs">Ready</SelectItem>
-            </SelectContent>
-          </Select>
+          <p className="text-[10px] text-text-muted">Ubah lewat kontrol status di bagian atas halaman.</p>
         </div>
 
         {/* Dimension 2: Approval Status */}
@@ -1934,6 +1908,7 @@ export default function ContentDetailPage() {
   const queryClient = useQueryClient()
 
   const [activePlatform, setActivePlatform] = useState<Platform>('tiktok')
+  const [activeDetailTab, setActiveDetailTab] = useState('perencanaan')
   const [exporting, setExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState(0)
 
@@ -2070,8 +2045,14 @@ export default function ContentDetailPage() {
             )}
             <VideoWorkBadges videoId={video.id} />
           </div>
-          <div className="pt-2 max-w-2xl">
+          <div className="pt-2 max-w-2xl space-y-2">
             <LifecycleIndicator stage={lifecycleStage} />
+            <ContentLifecycleControl
+              videoId={video.id}
+              productionStatus={video.production_status}
+              onGoToBrandTab={() => setActiveDetailTab('brand')}
+              onGoToDistributionTab={() => setActiveDetailTab('distribusi')}
+            />
           </div>
         </div>
 
@@ -2096,7 +2077,7 @@ export default function ContentDetailPage() {
         )}
       </div>
 
-      <Tabs defaultValue="perencanaan" className="w-full">
+      <Tabs value={activeDetailTab} onValueChange={setActiveDetailTab} className="w-full">
         <TabsList className="w-full justify-start border-b border-border rounded-none bg-transparent p-0 space-x-6 h-auto mb-6 overflow-x-auto">
           <TabsTrigger value="perencanaan" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent data-[state=active]:shadow-none rounded-none px-1 py-2.5 font-semibold text-text-muted data-[state=active]:text-accent">Perencanaan</TabsTrigger>
           <TabsTrigger value="brand" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent data-[state=active]:shadow-none rounded-none px-1 py-2.5 font-semibold text-text-muted data-[state=active]:text-accent">Brand</TabsTrigger>
