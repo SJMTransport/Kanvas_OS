@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
@@ -209,6 +209,27 @@ export default function DealDetailPage() {
       return (data ?? []) as DealSchedule[]
     },
     enabled: !!id,
+  })
+
+  const shootingScheduleIds = useMemo(
+    () => schedules.filter((s) => s.type === 'shooting').map((s) => s.id),
+    [schedules]
+  )
+  const { data: shootingSessionsByScheduleId = {} } = useQuery<Record<string, { id: string }>>({
+    queryKey: ['deal-schedule-shooting-links', shootingScheduleIds],
+    enabled: shootingScheduleIds.length > 0,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('shooting_sessions')
+        .select('id, deal_schedule_id')
+        .in('deal_schedule_id', shootingScheduleIds)
+      const map: Record<string, { id: string }> = {}
+      for (const row of data ?? []) {
+        if (row.deal_schedule_id) map[row.deal_schedule_id] = { id: row.id }
+      }
+      return map
+    },
   })
 
   const { data: billing } = useQuery({
@@ -1421,20 +1442,41 @@ export default function DealDetailPage() {
               {schedules.length === 0 ? (
                 <p className="py-8 text-center text-text-muted text-xs">Belum ada milestone jadwal. Klik "+ Tambah Milestone" di atas.</p>
               ) : (
-                schedules.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between p-3 bg-subtle/40 border border-border/70 rounded-lg text-xs">
-                    <div className="flex items-center gap-3">
-                      <Calendar className="w-4 h-4 text-accent" />
-                      <div>
-                        <p className="font-bold text-text-primary">{s.title}</p>
-                        <p className="text-[11px] text-text-muted capitalize">{s.type} • {formatDate(s.date)}</p>
+                schedules.map((s) => {
+                  const linkedSession = s.type === 'shooting' ? shootingSessionsByScheduleId[s.id] : undefined
+                  return (
+                    <div key={s.id} className="flex items-center justify-between p-3 bg-subtle/40 border border-border/70 rounded-lg text-xs">
+                      <div className="flex items-center gap-3">
+                        <Calendar className="w-4 h-4 text-accent" />
+                        <div>
+                          <p className="font-bold text-text-primary">{s.title}</p>
+                          <p className="text-[11px] text-text-muted capitalize">{s.type} • {formatDate(s.date)}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {s.type === 'shooting' && (
+                          linkedSession ? (
+                            <Badge variant="outline" className="text-[10px] font-semibold text-accent border-accent/40">
+                              Terhubung ke Sesi Shooting
+                            </Badge>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-[11px] text-accent"
+                              onClick={() => router.push(`/brand/shooting?dealScheduleId=${s.id}`)}
+                            >
+                              Buat Sesi Shooting →
+                            </Button>
+                          )
+                        )}
+                        <Badge variant={s.status === 'completed' ? 'default' : 'outline'} className="text-[10px] uppercase font-bold">
+                          {s.status}
+                        </Badge>
                       </div>
                     </div>
-                    <Badge variant={s.status === 'completed' ? 'default' : 'outline'} className="text-[10px] uppercase font-bold">
-                      {s.status}
-                    </Badge>
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
           </div>

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useMemo, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
@@ -19,6 +19,7 @@ import { format, parseISO, isToday, isFuture } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
 import { Plus, Clock, MapPin, Video, Pencil, Trash2, Loader2, AlertTriangle, Search } from 'lucide-react'
 import { ContentIdentity } from '@/components/content/ContentIdentity'
+import { formatDate } from '@/lib/utils/formatters'
 import { cn } from '@/lib/utils'
 
 // Phase: Shooting Session. A session is a real-world production time slot;
@@ -36,6 +37,15 @@ interface ShootingSession {
   end_time: string | null
   location: string | null
   notes: string | null
+  deal_schedule_id: string | null
+}
+
+interface ShootingMilestone {
+  id: string
+  deal_id: string
+  title: string
+  date: string
+  deals?: { title: string | null; nama_campaign: string | null; brands?: { name: string | null; nama_brand: string | null } | null } | null
 }
 
 interface SessionVideo {
@@ -51,6 +61,7 @@ interface SessionVideo {
 export default function ShootingSchedulePage() {
   const { workspaceId } = useWorkspace()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const queryClient = useQueryClient()
 
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -65,6 +76,13 @@ export default function ShootingSchedulePage() {
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<ShootingSession | null>(null)
   const [deleting, setDeleting] = useState(false)
+  // Optional link to an existing SOW/Deal "Shooting" milestone — a Shooting
+  // Session and the SOW's planned shooting date must not silently become
+  // two unrelated dates for the same production activity. Selecting a deal
+  // here only narrows which milestone/content to offer; nothing is written
+  // until Save.
+  const [selectedDealId, setSelectedDealId] = useState<string>('')
+  const [linkedScheduleId, setLinkedScheduleId] = useState<string>('') // '' = manual date
 
   const { data: sessions = [], isLoading: sessionsLoading } = useQuery<ShootingSession[]>({
     queryKey: ['shooting-sessions', workspaceId],
@@ -99,6 +117,45 @@ export default function ShootingSchedulePage() {
     },
   })
 
+  // Existing SOW "Shooting" milestones (deal_schedules where type='shooting'),
+  // workspace-scoped via the deal relation — the same rows shown on the Deal
+  // detail page's Schedule tab. Never duplicated; only referenced.
+  const { data: shootingMilestones = [] } = useQuery<ShootingMilestone[]>({
+    queryKey: ['shooting-milestones', workspaceId],
+    enabled: !!workspaceId,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('deal_schedules')
+        .select('id, deal_id, title, date, deals!inner(workspace_id, title, nama_campaign, brands(name, nama_brand))')
+        .eq('type', 'shooting')
+        .eq('deals.workspace_id', workspaceId)
+        .order('date', { ascending: true })
+      if (error) { console.error('Failed to load SOW shooting milestones:', error); return [] }
+      return (data ?? []) as any
+    },
+  })
+
+  const { data: deals = [] } = useQuery({
+    queryKey: ['deals-for-shooting-picker', workspaceId],
+    enabled: !!workspaceId,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('deals')
+        .select('id, title, nama_campaign, brands(name, nama_brand)')
+        .eq('workspace_id', workspaceId)
+        .order('created_at', { ascending: false })
+      if (error) { console.error('Failed to load deals for shooting picker:', error); return [] }
+      return (data ?? []) as any[]
+    },
+  })
+
+  const milestonesForSelectedDeal = useMemo(
+    () => shootingMilestones.filter((m) => m.deal_id === selectedDealId),
+    [shootingMilestones, selectedDealId]
+  )
+
   const videosBySession = useMemo(() => {
     const map: Record<string, SessionVideo[]> = {}
     for (const v of allVideos) {
@@ -107,11 +164,13 @@ export default function ShootingSchedulePage() {
     return map
   }, [allVideos])
 
-  const filteredPickerVideos = allVideos.filter((v) => {
-    if (!contentSearch.trim()) return true
-    const q = contentSearch.toLowerCase()
-    return v.judul?.toLowerCase().includes(q) || v.no_video?.toLowerCase().includes(q)
-  })
+  const filteredPickerVideos = allVideos
+    .filter((v) => (selectedDealId ? v.deal_id === selectedDealId : true))
+    .filter((v) => {
+      if (!contentSearch.trim()) return true
+      const q = contentSearch.toLowerCase()
+      return v.judul?.toLowerCase().includes(q) || v.no_video?.toLowerCase().includes(q)
+    })
 
   function openCreate() {
     setEditingSession(null)
@@ -122,6 +181,8 @@ export default function ShootingSchedulePage() {
     setNotes('')
     setSelectedContentIds(new Set())
     setContentSearch('')
+    setSelectedDealId('')
+    setLinkedScheduleId('')
     setSheetOpen(true)
   }
 
@@ -134,8 +195,34 @@ export default function ShootingSchedulePage() {
     setNotes(s.notes || '')
     setSelectedContentIds(new Set((videosBySession[s.id] ?? []).map((v) => v.id)))
     setContentSearch('')
+    const linkedMilestone = s.deal_schedule_id ? shootingMilestones.find((m) => m.id === s.deal_schedule_id) : undefined
+    setSelectedDealId(linkedMilestone?.deal_id || '')
+    setLinkedScheduleId(s.deal_schedule_id || '')
     setSheetOpen(true)
   }
+
+  function selectMilestoneSource(scheduleId: string) {
+    setLinkedScheduleId(scheduleId)
+    if (scheduleId) {
+      const m = shootingMilestones.find((mm) => mm.id === scheduleId)
+      if (m) setSessionDate(m.date)
+    }
+  }
+
+  // Arriving from a Deal's Schedule tab ("Buat Sesi Shooting →") — prefill
+  // the create sheet from that specific existing milestone, once milestones
+  // have loaded.
+  useEffect(() => {
+    const dealScheduleId = searchParams.get('dealScheduleId')
+    if (!dealScheduleId || sheetOpen || shootingMilestones.length === 0) return
+    const m = shootingMilestones.find((mm) => mm.id === dealScheduleId)
+    if (!m) return
+    openCreate()
+    setSelectedDealId(m.deal_id)
+    setLinkedScheduleId(m.id)
+    setSessionDate(m.date)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, shootingMilestones])
 
   function toggleContent(id: string) {
     setSelectedContentIds((prev) => {
@@ -159,6 +246,7 @@ export default function ShootingSchedulePage() {
         end_time: endTime || null,
         location: location.trim() || null,
         notes: notes.trim() || null,
+        deal_schedule_id: linkedScheduleId || null,
       }
 
       let sessionId = editingSession?.id
@@ -198,6 +286,7 @@ export default function ShootingSchedulePage() {
       queryClient.invalidateQueries({ queryKey: ['shooting-videos'], refetchType: 'all' })
       queryClient.invalidateQueries({ queryKey: ['calendar-events'], refetchType: 'all' })
       queryClient.invalidateQueries({ queryKey: ['videos'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['deal-schedule-shooting-links'], refetchType: 'all' })
       setSheetOpen(false)
     } catch (err) {
       console.error('Failed to save shooting session:', err)
@@ -219,6 +308,7 @@ export default function ShootingSchedulePage() {
       toast.success('Sesi shooting dihapus. Content terkait tidak dihapus.')
       queryClient.invalidateQueries({ queryKey: ['shooting-sessions'], refetchType: 'all' })
       queryClient.invalidateQueries({ queryKey: ['shooting-videos'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['deal-schedule-shooting-links'], refetchType: 'all' })
       setDeleteTarget(null)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Gagal menghapus sesi')
@@ -233,6 +323,7 @@ export default function ShootingSchedulePage() {
   function SessionCard({ s }: { s: ShootingSession }) {
     const linked = videosBySession[s.id] ?? []
     const brandName = linked[0]?.deals?.brands?.name || linked[0]?.deals?.brands?.nama_brand
+    const sowMilestone = s.deal_schedule_id ? shootingMilestones.find((m) => m.id === s.deal_schedule_id) : undefined
     return (
       <div className="bg-white border border-border rounded-xl p-4 space-y-2.5">
         <div className="flex items-start justify-between">
@@ -255,6 +346,11 @@ export default function ShootingSchedulePage() {
             <button onClick={() => setDeleteTarget(s)} className="p-1.5 rounded hover:bg-error/10 text-text-muted hover:text-error" title="Hapus sesi"><Trash2 className="w-3.5 h-3.5" /></button>
           </div>
         </div>
+        {sowMilestone && (
+          <p className="text-[11px] text-accent font-medium flex items-center gap-1">
+            ⛓ Terhubung ke SOW Milestone: {sowMilestone.title}
+          </p>
+        )}
         {s.notes && <p className="text-xs text-text-secondary italic">{s.notes}</p>}
         <div className="pt-2 border-t border-border/60 space-y-1">
           <p className="text-[10px] font-bold uppercase text-text-muted tracking-wide">{linked.length} Content</p>
@@ -326,10 +422,61 @@ export default function ShootingSchedulePage() {
             <SheetTitle className="text-base font-bold">{editingSession ? 'Edit Sesi Shooting' : 'Buat Sesi Shooting'}</SheetTitle>
           </SheetHeader>
           <form onSubmit={handleSave} className="px-6 py-5 space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Deal (opsional)</Label>
+              <select
+                value={selectedDealId}
+                onChange={(e) => { setSelectedDealId(e.target.value); setLinkedScheduleId('') }}
+                className="w-full h-9 text-xs border border-border rounded-md px-2 bg-white"
+              >
+                <option value="">— Tidak terkait Deal tertentu —</option>
+                {deals.map((d: any) => {
+                  const brandName = d.brands?.name || d.brands?.nama_brand
+                  const dealTitle = d.title || d.nama_campaign || 'Deal'
+                  return (
+                    <option key={d.id} value={d.id}>
+                      {brandName ? `${brandName} — ${dealTitle}` : dealTitle}
+                    </option>
+                  )
+                })}
+              </select>
+              <p className="text-[10px] text-text-muted">Memilih Deal akan menyaring pilihan Content di bawah ke Content milik Deal tersebut.</p>
+            </div>
+
+            {selectedDealId && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Sumber Tanggal</Label>
+                <select
+                  value={linkedScheduleId}
+                  onChange={(e) => selectMilestoneSource(e.target.value)}
+                  className="w-full h-9 text-xs border border-border rounded-md px-2 bg-white"
+                >
+                  <option value="">Tanggal manual</option>
+                  {milestonesForSelectedDeal.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      Existing SOW Shooting — {formatDate(m.date)}
+                    </option>
+                  ))}
+                </select>
+                {linkedScheduleId && (
+                  <p className="text-[10px] text-accent">
+                    Tanggal sesi ini mengikuti tanggal SOW Milestone terkait — ubah tanggalnya lewat tab Schedule di Deal jika perlu.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5 col-span-1">
                 <Label className="text-xs font-semibold">Tanggal <span className="text-error">*</span></Label>
-                <Input type="date" value={sessionDate} onChange={(e) => setSessionDate(e.target.value)} className="h-9 text-xs" required />
+                <Input
+                  type="date"
+                  value={sessionDate}
+                  onChange={(e) => setSessionDate(e.target.value)}
+                  className="h-9 text-xs"
+                  required
+                  disabled={!!linkedScheduleId}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Mulai</Label>
