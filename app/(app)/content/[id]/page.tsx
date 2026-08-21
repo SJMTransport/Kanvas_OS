@@ -177,16 +177,13 @@ function InfoTab({ form, setForm, temas, setTemas, workspaceId, isFoto }: { form
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label className="text-xs text-text-muted">No. Video</Label>
-          <div className="flex items-center h-9 rounded-md border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
-            <span className="pl-3 pr-1 text-xs text-text-muted font-mono select-none">VID-</span>
-            <Input
-              type="text"
-              value={form.no_video}
-              onChange={(e) => set('no_video', e.target.value.replace(/\D/g, ''))}
-              placeholder="001"
-              className="border-0 shadow-none focus-visible:ring-0 pl-1 text-xs font-mono h-8"
-            />
-          </div>
+          <Input
+            type="text"
+            value={form.no_video}
+            onChange={(e) => set('no_video', e.target.value)}
+            placeholder="misal 15.1, 860, VID-001"
+            className="text-xs font-mono h-9 bg-white"
+          />
         </div>
         {!isFoto && (
           <div className="space-y-1.5">
@@ -1122,9 +1119,8 @@ function PerencanaanTab({ video }: { video: VideoWithSchedules }) {
   const [saving, setSaving] = useState(false)
   const [temas, setTemas] = useState<string[]>(video.temas ?? (video.tema ? [video.tema] : []))
   const [form, setForm] = useState({
-    no_video: video.no_video ? video.no_video.replace(/^VID-/, '') : '',
+    no_video: video.no_video ?? '',
     judul: video.judul ?? '',
-    status: video.status ?? '',
     format: video.format ?? '',
     tanggal_shooting: video.tanggal_shooting ?? '',
     deadline_posting: video.deadline_posting ?? '',
@@ -1135,13 +1131,28 @@ function PerencanaanTab({ video }: { video: VideoWithSchedules }) {
     pilar_konten: video.pilar_konten ?? '',
   })
 
+  useEffect(() => {
+    setForm({
+      no_video: video.no_video ?? '',
+      judul: video.judul ?? '',
+      format: video.format ?? '',
+      tanggal_shooting: video.tanggal_shooting ?? '',
+      deadline_posting: video.deadline_posting ?? '',
+      storage_bahan: video.storage_bahan ?? '',
+      storage_video: video.storage_video ?? '',
+      google_drive_link: video.google_drive_link ?? '',
+      caption_default: video.caption_default ?? '',
+      pilar_konten: video.pilar_konten ?? '',
+    })
+    setTemas(video.temas ?? (video.tema ? [video.tema] : []))
+  }, [video])
+
   async function handleSave() {
     setSaving(true)
     const supabase = createClient()
     const payload: Record<string, unknown> = {
-      no_video: form.no_video ? `VID-${form.no_video.padStart(3, '0')}` : null,
+      no_video: form.no_video ? form.no_video.trim() : null,
       judul: form.judul || null,
-      status: form.status || null,
       format: form.format || null,
       temas,
       tema: temas[0] ?? null,
