@@ -134,6 +134,7 @@ export interface DealDeliverable {
   quantity: number
   unit?: string | null
   value?: number | null
+  shooting_date?: string | null
   deadline?: string | null
   status: DeliverableStatus
   notes?: string | null

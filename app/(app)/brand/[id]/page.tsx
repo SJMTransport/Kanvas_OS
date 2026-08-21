@@ -23,6 +23,7 @@ import {
 import { formatDate, formatRupiah } from '@/lib/utils/formatters'
 import { cn } from '@/lib/utils'
 import type { BrandContact } from '@/lib/types/brand'
+import { useBrandSchedule } from '@/lib/hooks/useBrandSchedule'
 
 export default function BrandDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -134,6 +135,8 @@ export default function BrandDetailPage() {
     },
     enabled: dealDeliverables.length > 0,
   })
+
+  const { data: brandSchedule = [] } = useBrandSchedule(id || null)
 
   const { data: payments = [] } = useQuery({
     queryKey: ['brand-payments', id],
@@ -451,6 +454,7 @@ export default function BrandDetailPage() {
           <TabsTrigger value="content" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent rounded-none px-1 py-2.5 font-semibold text-xs text-text-muted data-[state=active]:text-accent">Konten Terkait ({brandVideos.length})</TabsTrigger>
           <TabsTrigger value="contacts" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent rounded-none px-1 py-2.5 font-semibold text-xs text-text-muted data-[state=active]:text-accent">Contacts ({contacts.length})</TabsTrigger>
           <TabsTrigger value="payments" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent rounded-none px-1 py-2.5 font-semibold text-xs text-text-muted data-[state=active]:text-accent">Payments</TabsTrigger>
+          <TabsTrigger value="jadwal" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent rounded-none px-1 py-2.5 font-semibold text-xs text-text-muted data-[state=active]:text-accent">Jadwal ({brandSchedule.length})</TabsTrigger>
         </TabsList>
 
         {/* TAB: OVERVIEW */}
@@ -686,6 +690,33 @@ export default function BrandDetailPage() {
                 )}
               </tbody>
             </table>
+          </div>
+        </TabsContent>
+
+        {/* TAB: JADWAL — read-only aggregation. Every item points back to
+            its original Deliverable / Milestone / Shooting Session / Content
+            record; nothing here is stored as a separate schedule row. */}
+        <TabsContent value="jadwal" className="space-y-4 outline-none">
+          <div className="bg-white border border-border rounded-xl p-5 space-y-3">
+            <h3 className="font-semibold text-sm text-text-primary border-b border-border pb-3">Jadwal Produksi & Publikasi</h3>
+            {brandSchedule.length === 0 ? (
+              <p className="py-8 text-center text-text-muted text-xs">Belum ada jadwal — Tanggal Shooting/Deadline Deliverable, Milestone SOW, Sesi Shooting, dan tanggal publikasi akan muncul di sini.</p>
+            ) : (
+              <div className="divide-y divide-border/60">
+                {brandSchedule.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => item.href && router.push(item.href)}
+                    disabled={!item.href}
+                    className="w-full flex items-center gap-3 py-2.5 text-left hover:bg-subtle/60 rounded-lg px-2 -mx-2 disabled:hover:bg-transparent"
+                  >
+                    <span className="text-[11px] font-mono font-semibold text-text-muted w-20 shrink-0">{formatDate(item.date)}</span>
+                    <span className="text-base shrink-0">{item.icon}</span>
+                    <span className="text-xs font-medium text-text-primary flex-1 min-w-0 truncate">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>

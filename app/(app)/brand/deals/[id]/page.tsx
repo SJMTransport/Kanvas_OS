@@ -53,6 +53,7 @@ export default function DealDetailPage() {
   const [delPlatform, setDelPlatform] = useState('tiktok')
   const [delQty, setDelQty] = useState('1')
   const [delUnit, setDelUnit] = useState('content')
+  const [delShootingDate, setDelShootingDate] = useState('')
   const [delDeadline, setDelDeadline] = useState('')
   const [delDesc, setDelDesc] = useState('')
   const [delStatus, setDelStatus] = useState('planned')
@@ -351,6 +352,7 @@ export default function DealDetailPage() {
     setDelPlatform('tiktok')
     setDelQty('1')
     setDelUnit('content')
+    setDelShootingDate('')
     setDelDeadline('')
     setDelDesc('')
     setDelStatus('planned')
@@ -362,6 +364,7 @@ export default function DealDetailPage() {
     setDelPlatform(del.platform || 'tiktok')
     setDelQty(String(del.quantity ?? 1))
     setDelUnit(del.unit || 'content')
+    setDelShootingDate((del as any).shooting_date || '')
     setDelDeadline(del.deadline || '')
     setDelDesc(del.description || '')
     setDelStatus(del.status || 'planned')
@@ -382,6 +385,7 @@ export default function DealDetailPage() {
           platform: delPlatform,
           quantity: Number(delQty) || 1,
           unit: delUnit,
+          shooting_date: delShootingDate || null,
           deadline: delDeadline || null,
           description: delDesc || null,
           status: delStatus,
@@ -412,6 +416,7 @@ export default function DealDetailPage() {
           platform: delPlatform,
           quantity: Number(delQty) || 1,
           unit: delUnit,
+          shooting_date: delShootingDate || null,
           deadline: delDeadline || null,
           description: delDesc || null,
           status: 'planned',
@@ -1757,9 +1762,15 @@ export default function DealDetailPage() {
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Deadline Output</Label>
-              <Input type="date" value={delDeadline} onChange={(e) => setDelDeadline(e.target.value)} className="h-9 text-xs" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Tanggal Shooting</Label>
+                <Input type="date" value={delShootingDate} onChange={(e) => setDelShootingDate(e.target.value)} className="h-9 text-xs" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Deadline Output</Label>
+                <Input type="date" value={delDeadline} onChange={(e) => setDelDeadline(e.target.value)} className="h-9 text-xs" />
+              </div>
             </div>
 
             <div className="space-y-1.5">
