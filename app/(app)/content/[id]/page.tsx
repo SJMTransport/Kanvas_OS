@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
 import { useRouter, useParams } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -1170,7 +1171,34 @@ function PerencanaanTab({ video }: { video: VideoWithSchedules }) {
 
   const isFoto = (video as any).content_type === 'foto'
 
+  // Read-only — the Shooting Session itself is managed from
+  // /brand/shooting, which is the single write path for the
+  // videos.shooting_session_id link. This only displays it.
+  const { data: shootingSession } = useQuery({
+    queryKey: ['content-shooting-session', (video as any).shooting_session_id],
+    enabled: !!(video as any).shooting_session_id,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase.from('shooting_sessions').select('*').eq('id', (video as any).shooting_session_id).single()
+      return data
+    },
+  })
+
   return (
+    <div className="space-y-4">
+      {shootingSession && (
+        <div className="bg-white border border-border rounded-xl p-4 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-text-muted">Sesi Shooting</p>
+            <p className="text-sm font-semibold text-text-primary mt-0.5">
+              {formatDate(shootingSession.session_date)}
+              {shootingSession.start_time && ` · ${shootingSession.start_time.slice(0, 5)}${shootingSession.end_time ? `–${shootingSession.end_time.slice(0, 5)}` : ''}`}
+            </p>
+            {shootingSession.location && <p className="text-xs text-text-muted mt-0.5">{shootingSession.location}</p>}
+          </div>
+          <Link href="/brand/shooting" className="text-xs text-accent font-medium hover:underline shrink-0">Kelola Jadwal →</Link>
+        </div>
+      )}
     <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
         <div>
@@ -1186,6 +1214,7 @@ function PerencanaanTab({ video }: { video: VideoWithSchedules }) {
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
         {saving ? 'Menyimpan...' : 'Simpan Perencanaan & Aset'}
       </Button>
+    </div>
     </div>
   )
 }
