@@ -92,6 +92,8 @@ interface Props {
   onPageSizeChange?: (size: number) => void
   activePlatformFilter?: Platform[] | null
   columnFilters?: ColumnFilters
+  bulkSelectMode?: boolean
+  onToggleBulkSelectMode?: (val: boolean) => void
 }
 
 function SortIcon({ col, sortBy, sortDir }: { col: string; sortBy: string; sortDir: string }) {
@@ -362,13 +364,14 @@ function CaptionCopyCell({ caption }: { caption: string | null | undefined }) {
   )
 }
 
-function SortableRow({ video, index, page, pageSize, isSelected, onToggleSelect, onRowClick, onDelete, onFieldSave, temaOptions, activePlatformFilter }: {
+function SortableRow({ video, index, page, pageSize, isSelected, onToggleSelect, bulkSelectMode, onRowClick, onDelete, onFieldSave, temaOptions, activePlatformFilter }: {
   video: VideoWithSchedules
   index: number
   page: number
   pageSize: number
   isSelected: boolean
   onToggleSelect: (id: string) => void
+  bulkSelectMode?: boolean
   onRowClick: (v: VideoWithSchedules) => void
   onDelete: (v: VideoWithSchedules) => void
   onFieldSave: SaveFn
@@ -389,12 +392,14 @@ function SortableRow({ video, index, page, pageSize, isSelected, onToggleSelect,
     >
       <td className="px-2 py-3.5 w-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-1.5">
-          <input
-            type="checkbox"
-            checked={isSelected}
-            onChange={() => onToggleSelect(video.id)}
-            className="w-3.5 h-3.5 rounded border-border text-accent focus:ring-accent accent-[#4C9998] cursor-pointer"
-          />
+          {bulkSelectMode && (
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={() => onToggleSelect(video.id)}
+              className="w-3.5 h-3.5 rounded border-border text-accent focus:ring-accent accent-[#4C9998] cursor-pointer"
+            />
+          )}
           <button
             {...attributes}
             {...listeners}
@@ -495,7 +500,7 @@ function SortableRow({ video, index, page, pageSize, isSelected, onToggleSelect,
   )
 }
 
-export function TableView({ videos: initialVideos, loading, sortBy, sortDir, page, onSort, onPageChange, onRowClick, total, pageSize, onPageSizeChange, activePlatformFilter, columnFilters }: Props) {
+export function TableView({ videos: initialVideos, loading, sortBy, sortDir, page, onSort, onPageChange, onRowClick, total, pageSize, onPageSizeChange, activePlatformFilter, columnFilters, bulkSelectMode, onToggleBulkSelectMode }: Props) {
   const totalPages = Math.ceil(total / pageSize)
   const [localVideos, setLocalVideos] = useState<VideoWithSchedules[] | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -602,14 +607,16 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
         <table className="w-full border-collapse min-w-[840px]">
           <thead className="sticky top-0 bg-white border-b border-border z-20 shadow-xs">
             <tr>
-              <th className="w-10 px-2 text-center" onClick={(e) => e.stopPropagation()}>
-                <input
-                  type="checkbox"
-                  checked={isAllSelected}
-                  onChange={toggleSelectAll}
-                  className="w-3.5 h-3.5 rounded border-border text-accent focus:ring-accent accent-[#4C9998] cursor-pointer"
-                  title="Pilih semua di halaman ini"
-                />
+              <th className={cn("px-2 text-center", bulkSelectMode ? "w-10" : "w-6")} onClick={(e) => e.stopPropagation()}>
+                {bulkSelectMode && (
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                    className="w-3.5 h-3.5 rounded border-border text-accent focus:ring-accent accent-[#4C9998] cursor-pointer"
+                    title="Pilih semua di halaman ini"
+                  />
+                )}
               </th>
               <Th col="no_video" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className="w-32 whitespace-nowrap">No. Video</Th>
               <Th col="judul" sortBy={sortBy} sortDir={sortDir} onSort={onSort}>Judul</Th>
@@ -643,6 +650,7 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
                         pageSize={pageSize}
                         isSelected={selectedIds.includes(v.id)}
                         onToggleSelect={toggleSelect}
+                        bulkSelectMode={bulkSelectMode}
                         onRowClick={onRowClick}
                         onDelete={handleDelete}
                         onFieldSave={handleFieldSave}
@@ -686,23 +694,27 @@ export function TableView({ videos: initialVideos, loading, sortBy, sortDir, pag
       )}
 
       {/* Floating Action Bar for Selected Rows */}
-      {selectedIds.length > 0 && (
+      {(selectedIds.length > 0 || bulkSelectMode) && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white rounded-full px-5 py-2.5 shadow-2xl flex items-center gap-4 border border-slate-700 animate-in fade-in slide-in-from-bottom-3">
           <span className="text-xs font-semibold text-slate-200">{selectedIds.length} konten dipilih</span>
-          <div className="h-4 w-px bg-slate-700" />
+          {selectedIds.length > 0 && (
+            <>
+              <div className="h-4 w-px bg-slate-700" />
+              <button
+                onClick={handleDeleteSelected}
+                disabled={deletingSelected}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1 bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-semibold rounded-full transition-all shadow-sm cursor-pointer"
+              >
+                {deletingSelected ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                <span>Hapus {selectedIds.length} Terpilih</span>
+              </button>
+            </>
+          )}
           <button
-            onClick={handleDeleteSelected}
-            disabled={deletingSelected}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1 bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-semibold rounded-full transition-all shadow-sm cursor-pointer"
-          >
-            {deletingSelected ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-            <span>Hapus {selectedIds.length} Terpilih</span>
-          </button>
-          <button
-            onClick={() => setSelectedIds([])}
+            onClick={() => { setSelectedIds([]); onToggleBulkSelectMode?.(false) }}
             className="text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
           >
-            Batal
+            Selesai / Batal
           </button>
         </div>
       )}

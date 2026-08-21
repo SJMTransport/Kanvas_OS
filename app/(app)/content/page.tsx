@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { Upload, Plus, ListOrdered, Loader2, MoreHorizontal, Trash2, AlertTriangle } from 'lucide-react'
+import { Upload, Plus, ListOrdered, Loader2, MoreHorizontal, Trash2, AlertTriangle, CheckSquare } from 'lucide-react'
 import { PageContainer, PageHeader } from '@/components/layout/page-header'
 import { PageToolbar, SearchInput } from '@/components/layout/page-toolbar'
 import { SegmentedTabs, type TabOption } from '@/components/ui/segmented-tabs'
@@ -63,6 +63,7 @@ export default function ContentPage() {
   const [numberingSaving, setNumberingSaving] = useState(false)
   const [deleteAllOpen, setDeleteAllOpen] = useState(false)
   const [deletingAll, setDeletingAll] = useState(false)
+  const [bulkSelectMode, setBulkSelectMode] = useState(false)
 
   async function handleDeleteAll() {
     if (!workspaceId) return
@@ -319,10 +320,16 @@ export default function ContentPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">
                 {viewMode === 'table' && (
-                  <DropdownMenuItem onClick={handleNumbering} disabled={numberingSaving || !workspaceId} className="gap-2 text-xs">
-                    {numberingSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ListOrdered className="w-3.5 h-3.5" />}
-                    <span>Auto-Numbering</span>
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem onClick={handleNumbering} disabled={numberingSaving || !workspaceId} className="gap-2 text-xs">
+                      {numberingSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ListOrdered className="w-3.5 h-3.5" />}
+                      <span>Auto-Numbering</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setBulkSelectMode((prev) => !prev)} className="gap-2 text-xs cursor-pointer">
+                      <CheckSquare className="w-3.5 h-3.5" />
+                      <span>{bulkSelectMode ? 'Sembunyikan Centang' : 'Pilih Banyak (Centang)'}</span>
+                    </DropdownMenuItem>
+                  </>
                 )}
                 <DropdownMenuItem onClick={() => setImportOpen(true)} className="gap-2 text-xs">
                   <Upload className="w-3.5 h-3.5" />
@@ -398,6 +405,8 @@ export default function ContentPage() {
             total={total}
             pageSize={pageSize}
             onPageSizeChange={(newSize) => { setPageSize(newSize); setPage(0) }}
+            bulkSelectMode={bulkSelectMode}
+            onToggleBulkSelectMode={setBulkSelectMode}
             activePlatformFilter={platformFilter === 'all' ? null : platformFilter}
             columnFilters={{
               status: {
