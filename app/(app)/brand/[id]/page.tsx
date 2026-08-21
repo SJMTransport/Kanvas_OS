@@ -13,10 +13,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import { 
-  ArrowLeft, Plus, Loader2, Handshake, Video, DollarSign, Layers, 
-  User, Phone, Mail, CheckCircle2, ArrowRight, ExternalLink, Calendar
+import {
+  ArrowLeft, Plus, Loader2, Handshake, Video, DollarSign, Layers,
+  User, Phone, Mail, CheckCircle2, ArrowRight, ExternalLink, Calendar,
+  Pencil, Trash2, AlertTriangle,
 } from 'lucide-react'
 import { formatDate, formatRupiah } from '@/lib/utils/formatters'
 import { cn } from '@/lib/utils'
@@ -30,6 +32,26 @@ export default function BrandDetailPage() {
   const [createDealOpen, setCreateDealOpen] = useState(false)
   const [createContactOpen, setCreateContactOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  // Brand edit/delete
+  const [editBrandOpen, setEditBrandOpen] = useState(false)
+  const [editBrandName, setEditBrandName] = useState('')
+  const [editBrandType, setEditBrandType] = useState('direct')
+  const [editBrandIndustry, setEditBrandIndustry] = useState('')
+  const [editBrandWebsite, setEditBrandWebsite] = useState('')
+  const [editBrandNotes, setEditBrandNotes] = useState('')
+  const [savingBrandEdit, setSavingBrandEdit] = useState(false)
+  const [deleteBrandOpen, setDeleteBrandOpen] = useState(false)
+  const [deletingBrand, setDeletingBrand] = useState(false)
+
+  // Contact edit/delete
+  const [editContactId, setEditContactId] = useState<string | null>(null)
+  const [editContactName, setEditContactName] = useState('')
+  const [editContactRole, setEditContactRole] = useState('')
+  const [editContactEmail, setEditContactEmail] = useState('')
+  const [editContactPhone, setEditContactPhone] = useState('')
+  const [savingContactEdit, setSavingContactEdit] = useState(false)
+  const [deleteContactTarget, setDeleteContactTarget] = useState<{ id: string; name: string } | null>(null)
 
   // Deal Form
   const [dealTitle, setDealTitle] = useState('')
@@ -197,6 +219,138 @@ export default function BrandDetailPage() {
     }
   }
 
+  function openEditBrand() {
+    if (!brand) return
+    setEditBrandName(brand.name || brand.nama_brand || '')
+    setEditBrandType(brand.type || brand.brand_type || 'direct')
+    setEditBrandIndustry(brand.industry || brand.industri || '')
+    setEditBrandWebsite(brand.website || '')
+    setEditBrandNotes(brand.notes || brand.catatan || '')
+    setEditBrandOpen(true)
+  }
+
+  async function handleSaveBrandEdit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editBrandName.trim()) return
+    setSavingBrandEdit(true)
+    try {
+      const supabase = createClient()
+      // Both the Indonesian legacy columns and the newer English ones are
+      // kept in sync on write — other screens in the app still read
+      // nama_brand/industri as a fallback (see brand/page.tsx), so editing
+      // only the new columns would silently desync them.
+      const { data, error } = await supabase
+        .from('brands')
+        .update({
+          name: editBrandName.trim(),
+          nama_brand: editBrandName.trim(),
+          type: editBrandType,
+          industry: editBrandIndustry.trim() || null,
+          industri: editBrandIndustry.trim() || null,
+          website: editBrandWebsite.trim() || null,
+          notes: editBrandNotes.trim() || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select('id')
+      if (error) throw error
+      if (!data || data.length === 0) {
+        toast.error('Gagal menyimpan: kamu tidak memiliki izin untuk mengubah brand ini.')
+        return
+      }
+      toast.success('Data brand berhasil diperbarui!')
+      queryClient.invalidateQueries({ queryKey: ['brand-detail', id] })
+      queryClient.invalidateQueries({ queryKey: ['brands-list'] })
+      setEditBrandOpen(false)
+    } catch (err) {
+      console.error('Failed to update brand:', err)
+      toast.error(err instanceof Error ? err.message : 'Gagal memperbarui brand')
+    } finally {
+      setSavingBrandEdit(false)
+    }
+  }
+
+  // Brand deletion is blocked (not silently cascaded) whenever real
+  // commercial records still depend on it — deals/quotations/invoices all
+  // CASCADE-delete from brands at the DB level, so an unconditional delete
+  // here would silently wipe a brand's entire deal/financial history.
+  const brandDeleteBlockers: string[] = []
+  if (deals.length > 0) brandDeleteBlockers.push(`${deals.length} Deal`)
+  if (brandVideos.length > 0) brandDeleteBlockers.push(`${brandVideos.length} Konten terkait`)
+
+  async function handleDeleteBrand() {
+    if (brandDeleteBlockers.length > 0) return
+    setDeletingBrand(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('brands').delete().eq('id', id)
+      if (error) throw error
+      toast.success('Brand berhasil dihapus.')
+      queryClient.invalidateQueries({ queryKey: ['brands-list'] })
+      router.push('/brand')
+    } catch (err) {
+      console.error('Failed to delete brand:', err)
+      toast.error(err instanceof Error ? err.message : 'Gagal menghapus brand')
+    } finally {
+      setDeletingBrand(false)
+    }
+  }
+
+  function openEditContact(c: BrandContact) {
+    setEditContactId(c.id)
+    setEditContactName(c.name || '')
+    setEditContactRole(c.role || '')
+    setEditContactEmail(c.email || '')
+    setEditContactPhone(c.phone || '')
+  }
+
+  async function handleSaveContactEdit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editContactId || !editContactName.trim()) return
+    setSavingContactEdit(true)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('brand_contacts')
+        .update({
+          name: editContactName.trim(),
+          role: editContactRole.trim() || null,
+          email: editContactEmail.trim() || null,
+          phone: editContactPhone.trim() || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', editContactId)
+        .select('id')
+      if (error) throw error
+      if (!data || data.length === 0) {
+        toast.error('Gagal menyimpan: kamu tidak memiliki izin untuk mengubah kontak ini.')
+        return
+      }
+      toast.success('Kontak berhasil diperbarui!')
+      queryClient.invalidateQueries({ queryKey: ['brand-contacts', id] })
+      setEditContactId(null)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal memperbarui kontak')
+    } finally {
+      setSavingContactEdit(false)
+    }
+  }
+
+  async function handleDeleteContact() {
+    if (!deleteContactTarget) return
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('brand_contacts').delete().eq('id', deleteContactTarget.id)
+      if (error) throw error
+      toast.success('Kontak dihapus.')
+      queryClient.invalidateQueries({ queryKey: ['brand-contacts', id] })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal menghapus kontak')
+    } finally {
+      setDeleteContactTarget(null)
+    }
+  }
+
   // Financial aggregates
   const totalDealValue = deals.reduce((acc: number, d: any) => acc + Number(d.total_value || d.nilai_total || 0), 0)
   const totalPaid = payments.filter((p: any) => p.status === 'paid').reduce((acc: number, p: any) => acc + Number(p.amount || 0), 0)
@@ -252,10 +406,19 @@ export default function BrandDetailPage() {
           </div>
         </div>
 
-        <Button size="sm" onClick={() => setCreateDealOpen(true)} className="bg-accent hover:bg-accent/90 gap-1.5 font-semibold text-xs h-9">
-          <Plus className="w-4 h-4" />
-          <span>+ Buat Deal / Collaboration</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={openEditBrand} className="gap-1.5 font-semibold text-xs h-9">
+            <Pencil className="w-3.5 h-3.5" />
+            <span>Edit Brand</span>
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setDeleteBrandOpen(true)} className="gap-1.5 font-semibold text-xs h-9 text-error border-error/30 hover:bg-error/5">
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
+          <Button size="sm" onClick={() => setCreateDealOpen(true)} className="bg-accent hover:bg-accent/90 gap-1.5 font-semibold text-xs h-9">
+            <Plus className="w-4 h-4" />
+            <span>+ Buat Deal / Collaboration</span>
+          </Button>
+        </div>
       </div>
 
       {/* Operational Summary Cards */}
@@ -458,7 +621,7 @@ export default function BrandDetailPage() {
               </div>
             ) : (
               contacts.map((c) => (
-                <div key={c.id} className="bg-white border border-border rounded-xl p-4 space-y-2 relative">
+                <div key={c.id} className="bg-white border border-border rounded-xl p-4 space-y-2 relative group">
                   {c.is_primary && (
                     <Badge className="absolute top-3 right-3 text-[9px] bg-teal-100 text-teal-800 font-bold uppercase">Primary PIC</Badge>
                   )}
@@ -467,6 +630,14 @@ export default function BrandDetailPage() {
                   <div className="space-y-1 pt-1 text-xs text-text-secondary border-t border-border/50">
                     {c.email && <div className="flex items-center gap-1.5"><Mail className="w-3 h-3 text-text-muted" /><span>{c.email}</span></div>}
                     {c.phone && <div className="flex items-center gap-1.5"><Phone className="w-3 h-3 text-text-muted" /><span>{c.phone}</span></div>}
+                  </div>
+                  <div className="flex items-center gap-1 pt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => openEditContact(c)} className="p-1 rounded hover:bg-subtle text-text-muted hover:text-accent" title="Edit kontak">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => setDeleteContactTarget({ id: c.id, name: c.name })} className="p-1 rounded hover:bg-error/10 text-text-muted hover:text-error" title="Hapus kontak">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
               ))
@@ -615,6 +786,143 @@ export default function BrandDetailPage() {
           </form>
         </SheetContent>
       </Sheet>
+
+      {/* Edit Brand */}
+      <Sheet open={editBrandOpen} onOpenChange={setEditBrandOpen}>
+        <SheetContent side="right" className="w-full sm:w-[500px] overflow-y-auto p-0">
+          <SheetHeader className="px-6 py-4 border-b border-border">
+            <SheetTitle className="text-base font-bold">Edit Brand</SheetTitle>
+          </SheetHeader>
+          <form onSubmit={handleSaveBrandEdit} className="px-6 py-5 space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Nama Brand / Client <span className="text-error">*</span></Label>
+              <Input value={editBrandName} onChange={(e) => setEditBrandName(e.target.value)} className="h-9 text-xs" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Tipe Brand</Label>
+                <Select value={editBrandType} onValueChange={setEditBrandType}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="direct" className="text-xs">Direct Brand</SelectItem>
+                    <SelectItem value="agency" className="text-xs">Agency</SelectItem>
+                    <SelectItem value="other" className="text-xs">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Industri</Label>
+                <Input value={editBrandIndustry} onChange={(e) => setEditBrandIndustry(e.target.value)} className="h-9 text-xs" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Website</Label>
+              <Input value={editBrandWebsite} onChange={(e) => setEditBrandWebsite(e.target.value)} className="h-9 text-xs" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Catatan / Overview Brand</Label>
+              <Textarea value={editBrandNotes} onChange={(e) => setEditBrandNotes(e.target.value)} rows={3} className="text-xs" />
+            </div>
+            <div className="pt-4 flex gap-2 border-t border-border">
+              <Button type="submit" className="flex-1 bg-accent hover:bg-accent/90 h-9 text-xs font-semibold" disabled={savingBrandEdit}>
+                {savingBrandEdit ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+                Simpan Perubahan
+              </Button>
+              <Button type="button" variant="outline" className="h-9 text-xs" onClick={() => setEditBrandOpen(false)}>Batal</Button>
+            </div>
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      {/* Delete Brand — blocked while real dependent records exist, per the
+          CASCADE relationships in the schema (deals/quotations/invoices all
+          CASCADE-delete from brands) */}
+      <Dialog open={deleteBrandOpen} onOpenChange={setDeleteBrandOpen}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center mb-2">
+              <AlertTriangle className="w-5 h-5 text-error" />
+            </div>
+            <DialogTitle className="text-base text-text-primary">Hapus Brand "{brandName}"?</DialogTitle>
+            {brandDeleteBlockers.length > 0 ? (
+              <DialogDescription className="text-xs text-text-secondary leading-relaxed pt-1">
+                Brand ini masih memiliki <strong>{brandDeleteBlockers.join(' dan ')}</strong> yang terhubung. Menghapus brand akan ikut menghapus seluruh data Deal/Quotation/Invoice terkait secara permanen. Hapus atau pindahkan data tersebut terlebih dahulu sebelum menghapus brand ini.
+              </DialogDescription>
+            ) : (
+              <DialogDescription className="text-xs text-text-secondary leading-relaxed pt-1">
+                Brand ini tidak memiliki Deal atau Konten terkait. Tindakan ini akan menghapus data brand secara permanen dan tidak dapat dibatalkan.
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="mt-4 flex gap-2 justify-end">
+            <Button variant="outline" size="sm" onClick={() => setDeleteBrandOpen(false)} disabled={deletingBrand}>Batal</Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteBrand}
+              disabled={deletingBrand || brandDeleteBlockers.length > 0}
+              className="gap-1.5 bg-error hover:bg-error/90 text-white font-semibold"
+            >
+              {deletingBrand ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+              Ya, Hapus Brand
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Contact */}
+      <Dialog open={!!editContactId} onOpenChange={(open) => !open && setEditContactId(null)}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle className="text-base text-text-primary">Edit Kontak</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSaveContactEdit} className="space-y-3 pt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-text-muted">Nama</Label>
+                <Input value={editContactName} onChange={(e) => setEditContactName(e.target.value)} className="h-8 text-xs" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-text-muted">Jabatan / Role</Label>
+                <Input value={editContactRole} onChange={(e) => setEditContactRole(e.target.value)} className="h-8 text-xs" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-text-muted">Email</Label>
+                <Input type="email" value={editContactEmail} onChange={(e) => setEditContactEmail(e.target.value)} className="h-8 text-xs" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-text-muted">No. Phone / WA</Label>
+                <Input value={editContactPhone} onChange={(e) => setEditContactPhone(e.target.value)} className="h-8 text-xs" />
+              </div>
+            </div>
+            <div className="pt-2 flex gap-2 justify-end">
+              <Button type="button" variant="outline" size="sm" onClick={() => setEditContactId(null)}>Batal</Button>
+              <Button type="submit" size="sm" className="bg-accent hover:bg-accent/90 font-semibold" disabled={savingContactEdit}>
+                {savingContactEdit ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+                Simpan
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Contact */}
+      <Dialog open={!!deleteContactTarget} onOpenChange={(open) => !open && setDeleteContactTarget(null)}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="text-base text-text-primary">Hapus kontak "{deleteContactTarget?.name}"?</DialogTitle>
+            <DialogDescription className="text-xs text-text-secondary pt-1">Tindakan ini tidak dapat dibatalkan.</DialogDescription>
+          </DialogHeader>
+          <div className="mt-2 flex gap-2 justify-end">
+            <Button variant="outline" size="sm" onClick={() => setDeleteContactTarget(null)}>Batal</Button>
+            <Button variant="destructive" size="sm" onClick={handleDeleteContact} className="bg-error hover:bg-error/90 text-white font-semibold">
+              Ya, Hapus
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

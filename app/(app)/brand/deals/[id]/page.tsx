@@ -75,6 +75,7 @@ export default function DealDetailPage() {
 
   // Invoice — create/edit lives on /brand/invoices/new; only delete stays here.
   const [deleteInvoiceTarget, setDeleteInvoiceTarget] = useState<Invoice | null>(null)
+  const [deleteQuotationTarget, setDeleteQuotationTarget] = useState<{ id: string; quotation_number: string; total: number } | null>(null)
 
   // Inline PDF preview for Quotation/Invoice rows (Edit still goes to the
   // dedicated page — full line-item editing needs more room than a row).
@@ -606,6 +607,24 @@ export default function DealDetailPage() {
     } catch (err) {
       console.error('Failed to update quotation status:', err)
       toast.error('Gagal mengupdate status quotation')
+    }
+  }
+
+  async function handleDeleteQuotation() {
+    if (!deleteQuotationTarget) return
+    setSaving(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('quotations').delete().eq('id', deleteQuotationTarget.id)
+      if (error) throw error
+      toast.success('Quotation dihapus.')
+      queryClient.invalidateQueries({ queryKey: ['deal-quotations', id] })
+      setDeleteQuotationTarget(null)
+    } catch (err) {
+      console.error('Failed to delete quotation:', err)
+      toast.error(err instanceof Error ? err.message : 'Gagal menghapus quotation')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -1500,6 +1519,9 @@ export default function DealDetailPage() {
                       <button onClick={() => handleDownloadQuotation(q)} disabled={generatingDoc} className="p-1 rounded hover:bg-subtle text-text-muted hover:text-accent transition-colors" title="Download PDF">
                         <Download className="w-3.5 h-3.5" />
                       </button>
+                      <button onClick={() => setDeleteQuotationTarget({ id: q.id, quotation_number: q.quotation_number, total: Number(q.total) })} className="p-1 rounded hover:bg-error/10 text-text-muted hover:text-error transition-colors" title="Hapus quotation">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -1891,6 +1913,25 @@ export default function DealDetailPage() {
             <Button type="button" variant="destructive" size="sm" onClick={handleDeleteInvoice} disabled={saving}>
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
               Hapus Invoice
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Delete Quotation confirm */}
+      <Dialog open={!!deleteQuotationTarget} onOpenChange={(v) => { if (!v) setDeleteQuotationTarget(null) }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-error" /> Hapus Quotation?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-text-secondary pt-2">
+            Quotation <strong className="text-text-primary">{deleteQuotationTarget?.quotation_number}</strong> ({deleteQuotationTarget ? formatRupiah(deleteQuotationTarget.total) : ''}) akan dihapus permanen. Invoice yang sudah dibuat dari quotation ini akan tetap ada namun kehilangan tautannya.
+          </p>
+          <div className="flex justify-end gap-2 pt-3 border-t border-border">
+            <Button type="button" variant="outline" size="sm" onClick={() => setDeleteQuotationTarget(null)}>Batal</Button>
+            <Button type="button" variant="destructive" size="sm" onClick={handleDeleteQuotation} disabled={saving}>
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+              Hapus Quotation
             </Button>
           </div>
         </DialogContent>
