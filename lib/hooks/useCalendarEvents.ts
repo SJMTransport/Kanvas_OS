@@ -103,6 +103,40 @@ export function useCalendarEvents(workspaceId: string | null, startDate: string,
         }, [] as any[]),
       ])
 
+      // Deadline visibility rule — a Deadline is only a real action item if
+      // the content's publishing obligations are NOT all done. The legacy
+      // `videos.status` cannot answer this: migration 030 auto-promotes a
+      // video to 'live' the moment ANY single platform schedule gets a
+      // url_post, so a 2-platform video with only TikTok posted already
+      // reads as 'live' even though Instagram is still outstanding. The
+      // only authoritative source for "is EVERY publishing obligation
+      // done" is video_platform_schedules.status per row — a video's
+      // publishing is complete only if it has at least one schedule and
+      // every one of them is 'posted'.
+      const deadlineVideoIds = videosInRange
+        .filter((v: any) => v.deadline_posting && v.deadline_posting >= startDate && v.deadline_posting <= endDate)
+        .map((v: any) => v.id)
+
+      const scheduleStatusesByVideo = await safeQuery('deadline completion check', async () => {
+        if (deadlineVideoIds.length === 0) return {} as Record<string, string[]>
+        const { data, error } = await supabase
+          .from('video_platform_schedules')
+          .select('video_id, status')
+          .in('video_id', deadlineVideoIds)
+        if (error) throw error
+        const map: Record<string, string[]> = {}
+        for (const row of data ?? []) {
+          (map[row.video_id] ??= []).push(row.status)
+        }
+        return map
+      }, {} as Record<string, string[]>)
+
+      function isPublishingFullyDone(videoId: string): boolean {
+        const statuses = scheduleStatusesByVideo[videoId]
+        if (!statuses || statuses.length === 0) return false
+        return statuses.every((s) => s === 'posted')
+      }
+
       // Builds the shared Level-1/Level-2 context for a videos row — brand,
       // deal, first linked deliverable, and the 3 workflow dimensions.
       function videoCtx(v: any) {
@@ -159,7 +193,7 @@ export function useCalendarEvents(workspaceId: string | null, startDate: string,
             ctx,
           })
         }
-        if (v.deadline_posting && v.deadline_posting >= startDate && v.deadline_posting <= endDate) {
+        if (v.deadline_posting && v.deadline_posting >= startDate && v.deadline_posting <= endDate && !isPublishingFullyDone(v.id)) {
           const dateObj = new Date(v.deadline_posting)
           const isDone = ['live', 'archived'].includes(v.status)
           events.push({
