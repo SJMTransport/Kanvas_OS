@@ -203,6 +203,7 @@ export function CalendarView({ scope = 'all' }: CalendarViewProps = {}) {
       // those too, forcing an immediate refetch regardless of mount state.
       queryClient.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' })
       queryClient.invalidateQueries({ queryKey: ['action-center'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['schedule-events'], refetchType: 'all' })
     }
   }
 

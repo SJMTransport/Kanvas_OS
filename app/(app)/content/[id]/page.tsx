@@ -372,6 +372,13 @@ function DistributionTab({
     queryClient.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' })
     queryClient.invalidateQueries({ queryKey: ['calendar-events'], refetchType: 'all' })
     queryClient.invalidateQueries({ queryKey: ['action-center'], refetchType: 'all' })
+    // Shared Schedule Engine (Brand Jadwal / Dashboard's "Jadwal Bulan
+    // Ini") reads video_platform_schedules independently of the Content
+    // Calendar above — this function predates that engine and was never
+    // extended to it, so a deleted/added/edited publish date correctly
+    // updated the old Content Calendar but left the new shared calendar
+    // showing stale data until a manual refresh.
+    queryClient.invalidateQueries({ queryKey: ['schedule-events'], refetchType: 'all' })
   }
   const { workspaceId } = useWorkspace()
   const [adding, setAdding] = useState<Platform | null>(null)

@@ -94,6 +94,7 @@ export function QuickAdd({ defaultDate, onSuccess, onCancel }: Props) {
       queryClient.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' })
       queryClient.invalidateQueries({ queryKey: ['calendar-events'], refetchType: 'all' })
       queryClient.invalidateQueries({ queryKey: ['action-center'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['schedule-events'], refetchType: 'all' })
       toast.success('Jadwal berhasil ditambahkan!')
       onSuccess()
     } catch (err) {
