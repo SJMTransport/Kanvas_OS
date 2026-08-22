@@ -51,7 +51,11 @@ export default function ContentPage() {
   )
   const [monthCurrent, setMonthCurrent] = useState(initialMonthParam === 'current')
   const [platformFilter, setPlatformFilter] = useState<Platform[] | 'all'>('all')
-  const [sortBy, setSortBy] = useState('sort_order')
+  // Default to numeric No. Video order (VID-1, VID-2, ...) rather than
+  // sort_order — that field is Kanban's user-draggable card order, which
+  // has no inherent relationship to video numbering (confirmed in an
+  // earlier audit) and made the Table's default view look arbitrary.
+  const [sortBy, setSortBy] = useState('no_video')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE)
