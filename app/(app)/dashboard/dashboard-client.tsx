@@ -19,6 +19,7 @@ import { PageContainer, PageHeader } from '@/components/layout/page-header'
 import { ActionCenter } from '@/components/dashboard/action-center'
 import { ContentIdentity } from '@/components/content/ContentIdentity'
 import type { ActionItem } from '@/lib/operations/rules'
+import type { ScheduleEvent } from '@/lib/hooks/useScheduleEvents'
 import { cn } from '@/lib/utils'
 
 const STATUS_MAP: Record<string, string> = {
@@ -66,6 +67,9 @@ interface Props {
   pilarVideos?: string[]
   actionItems?: ActionItem[]
   actionItemsLoading?: boolean
+  scheduleEvents?: ScheduleEvent[]
+  scheduleEventsLoading?: boolean
+  scheduleEventsError?: boolean
 }
 
 function safeDate(value: string | null | undefined): Date | null {
@@ -116,7 +120,7 @@ function getGreetingEmoji() {
   return '🌙'
 }
 
-export function DashboardClient({ userName, role, todaySchedules, pipeline, followups, overdueInvoices, recentVideos, pilarVideos = [], actionItems = [], actionItemsLoading }: Props) {
+export function DashboardClient({ userName, role, todaySchedules, pipeline, followups, overdueInvoices, recentVideos, pilarVideos = [], actionItems = [], actionItemsLoading, scheduleEvents = [], scheduleEventsLoading, scheduleEventsError }: Props) {
   const router = useRouter()
   const firstName = (userName || 'Kreator').split(' ')[0]
 
@@ -202,6 +206,64 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
           </div>
         )}
       </div>
+
+      {/* Section 2.5 — Jadwal Minggu Ini (shared Schedule Engine — Phase 1).
+          Deliberately excludes 'posting' events sourced from platform
+          schedules, since those are already the cards above; this section
+          surfaces what that widget can't: Shooting, Deadline, Milestone,
+          and planned (Deliverable-level) Posting targets. Same source
+          tables as Brand Schedule, read via useWorkspaceScheduleEvents —
+          not a second dataset. */}
+      {(() => {
+        const upcoming = scheduleEvents.filter((e) => !(e.event_type === 'posting' && e.source_type === 'platform_schedule'))
+        if (scheduleEventsLoading || scheduleEventsError || upcoming.length > 0) {
+          return (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-heading font-semibold text-text-primary flex items-center gap-2">
+                  <CalendarCheck className="w-4 h-4 text-accent" />
+                  Jadwal Minggu Ini
+                </h2>
+                <Link href="/brand/jadwal" className="text-xs text-accent hover:underline flex items-center gap-0.5">
+                  Jadwal Brand <ChevronRight className="w-3 h-3" />
+                </Link>
+              </div>
+              {scheduleEventsLoading ? (
+                <div className="bg-surface rounded-xl border border-border p-4 space-y-2">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="h-4 bg-subtle rounded animate-pulse" />
+                  ))}
+                </div>
+              ) : scheduleEventsError ? (
+                <div className="flex flex-col items-center justify-center py-8 bg-surface rounded-xl border border-border">
+                  <AlertCircle className="w-8 h-8 text-error mb-2" />
+                  <p className="text-sm text-text-muted">Gagal memuat jadwal minggu ini.</p>
+                </div>
+              ) : (
+                <div className="bg-white border border-border rounded-xl divide-y divide-border/60">
+                  {upcoming.slice(0, 8).map((e) => (
+                    <Link
+                      key={e.id}
+                      href={e.href}
+                      className="flex items-center gap-3 px-4 py-2.5 hover:bg-subtle/60 transition-colors"
+                    >
+                      <span className="text-[11px] font-mono font-semibold text-text-muted w-16 shrink-0">
+                        {format(new Date(e.date), 'd MMM', { locale: localeId })}
+                      </span>
+                      <span className="text-base shrink-0">{e.icon}</span>
+                      <span className="text-xs font-medium text-text-primary flex-1 min-w-0 truncate">{e.label}</span>
+                      {e.brandName && (
+                        <span className="text-[10px] text-text-muted shrink-0">{e.brandName}</span>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        }
+        return null
+      })()}
 
       {/* Section 3 — Pipeline Snapshot */}
       <div>

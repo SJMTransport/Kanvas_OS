@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
 import { useActionCenter } from '@/lib/hooks/useActionCenter'
+import { useWorkspaceScheduleEvents } from '@/lib/hooks/useScheduleEvents'
 import { DashboardClient } from './dashboard-client'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
@@ -12,6 +13,16 @@ import { AlertTriangle } from 'lucide-react'
 export default function DashboardPage() {
   const { workspaceId, role } = useWorkspace()
   const { data: actionItems = [], isLoading: actionItemsLoading } = useActionCenter(workspaceId)
+
+  // Shared Schedule Engine (Phase 1) — same aggregation Brand Schedule
+  // uses (lib/hooks/useScheduleEvents.ts), scoped to a 7-day window so the
+  // dashboard can show upcoming Shooting/Deadline/Milestone/planned-Posting
+  // items without duplicating the "Jadwal Hari Ini" posting-schedule query
+  // below (that one stays as-is — see todaySchedules).
+  const todayStr = new Date().toISOString().split('T')[0]
+  const weekEndStr = new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  const { data: scheduleEvents = [], isLoading: scheduleEventsLoading, isError: scheduleEventsError } =
+    useWorkspaceScheduleEvents(workspaceId, todayStr, weekEndStr)
 
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['dashboard', workspaceId],
@@ -112,6 +123,9 @@ export default function DashboardPage() {
       pilarVideos={data.pilarVideos}
       actionItems={actionItems}
       actionItemsLoading={actionItemsLoading}
+      scheduleEvents={scheduleEvents}
+      scheduleEventsLoading={scheduleEventsLoading}
+      scheduleEventsError={scheduleEventsError}
     />
   )
 }

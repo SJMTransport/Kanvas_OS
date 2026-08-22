@@ -25,7 +25,7 @@ export default function BrandJadwalPage() {
   const groupedByBrand = useMemo(() => {
     const groups: Record<string, { brandName: string; items: typeof items }> = {}
     for (const item of items) {
-      const key = item.brandId || 'unknown'
+      const key = item.brand_id || 'unknown'
       if (!groups[key]) groups[key] = { brandName: item.brandName || 'Tanpa Brand', items: [] }
       groups[key].items.push(item)
     }

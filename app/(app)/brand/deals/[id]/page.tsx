@@ -434,7 +434,8 @@ export default function DealDetailPage() {
 
       queryClient.invalidateQueries({ queryKey: ['deal-deliverables', id] })
       queryClient.invalidateQueries({ queryKey: ['deal-sow', id] })
-      queryClient.invalidateQueries({ queryKey: ['brand-schedule'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['schedule-events'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' })
       setAddDeliverableOpen(false)
       resetDeliverableForm()
     } catch (err) {
@@ -455,7 +456,8 @@ export default function DealDetailPage() {
       toast.success('Deliverable dihapus.')
       queryClient.invalidateQueries({ queryKey: ['deal-deliverables', id] })
       queryClient.invalidateQueries({ queryKey: ['deal-content-junctions', id] })
-      queryClient.invalidateQueries({ queryKey: ['brand-schedule'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['schedule-events'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' })
       setDeleteDeliverableTarget(null)
     } catch (err) {
       console.error('Failed to delete deliverable:', err)
@@ -807,7 +809,8 @@ export default function DealDetailPage() {
       if (error) throw error
       toast.success('Jadwal milestone ditambahkan!')
       queryClient.invalidateQueries({ queryKey: ['deal-schedules', id] })
-      queryClient.invalidateQueries({ queryKey: ['brand-schedule'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['schedule-events'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' })
       setAddScheduleOpen(false)
       setSchedTitle('')
     } catch (err) {
