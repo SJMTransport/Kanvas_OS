@@ -303,12 +303,19 @@ async function fetchScheduleEvents(scope: FetchScope): Promise<ScheduleEvent[]> 
     }
   }
 
-  const videoIds = (videos ?? []).map((v: any) => v.id)
-  if (videoIds.length > 0) {
+  // Joined via videos!inner(...) and scoped the same way as the videos
+  // query above — NOT `.in('video_id', videoIds)`, which for a workspace
+  // with hundreds of videos builds a URL far past normal length limits
+  // and fails outright (silently, since every source here only logs and
+  // degrades). This mirrors the safe join pattern already used by
+  // lib/hooks/useCalendarEvents.ts for the same table.
+  {
     let schedulesQuery = supabase
       .from('video_platform_schedules')
-      .select('id, tanggal_tayang, platform, video_id')
-      .in('video_id', videoIds)
+      .select('id, tanggal_tayang, platform, video_id, videos!inner(workspace_id, brand_id)')
+    schedulesQuery = scopedToOneBrand
+      ? schedulesQuery.eq('videos.brand_id', scope.brandId as string)
+      : schedulesQuery.eq('videos.workspace_id', scope.workspaceId as string)
     if (scope.startDate) schedulesQuery = schedulesQuery.gte('tanggal_tayang', scope.startDate)
     if (scope.endDate) schedulesQuery = schedulesQuery.lte('tanggal_tayang', scope.endDate)
     const { data: schedules, error: schedulesError } = await schedulesQuery
