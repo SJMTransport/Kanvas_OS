@@ -342,13 +342,28 @@ interface LifecycleInput {
 // production_status is the canonical, writable dimension (Phase 5). Videos
 // that predate it fall back to the legacy 7-value `status` — same mapping
 // already implied by ContentBrandTab's existing prodStatus fallback.
+//
+// Migration 033 added production_status with `DEFAULT 'idea'`, which
+// Postgres backfilled onto every pre-existing row — not NULL. So a video
+// that was genuinely already scheduled/live/archived under the legacy
+// `status` column (real, historical fact) got a production_status of
+// 'idea' it never earned, and `if (v.production_status)` treated that
+// stale default as if someone had deliberately set it back to Idea,
+// masking real progress. Only trust production_status = 'idea' when the
+// legacy status doesn't already say otherwise; any OTHER explicit
+// production_status value (scripting/production/editing/ready) still
+// always wins, per the original priority fix — this only closes the one
+// case where the column's own backfill default lies about history.
 function normalizedProductionStage(v: LifecycleInput): 'idea' | 'scripting' | 'production' | 'editing' | 'ready' {
-  if (v.production_status) return v.production_status as any
   const legacyMap: Record<string, 'idea' | 'scripting' | 'production' | 'editing' | 'ready'> = {
     ide: 'idea', scripting: 'scripting', produksi: 'production', editing: 'editing',
     scheduled: 'ready', live: 'ready', archived: 'ready',
   }
-  return legacyMap[v.status || ''] || 'idea'
+  const legacyStage = legacyMap[v.status || ''] || 'idea'
+  if (v.production_status && !(v.production_status === 'idea' && legacyStage !== 'idea')) {
+    return v.production_status as any
+  }
+  return legacyStage
 }
 
 /**
