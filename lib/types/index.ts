@@ -216,7 +216,21 @@ export interface BrandFollowup {
   catatan: string
   next_action: string | null
   next_date: string | null
+  opportunity_id: string | null
   created_at: string
+}
+
+export type OpportunityStage = 'baru' | 'dihubungi' | 'follow_up' | 'proposal' | 'menunggu_respons' | 'berhasil' | 'tidak_jadi'
+
+export interface BrandOpportunity {
+  id: string
+  brand_id: string
+  name: string
+  stage: OpportunityStage
+  estimated_value: number | null
+  notes: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface QuotationItem {

@@ -24,6 +24,7 @@ import { PageToolbar, SearchInput } from '@/components/layout/page-toolbar'
 import { ContentIdentity } from '@/components/content/ContentIdentity'
 import { formatRupiah, formatDate } from '@/lib/utils/formatters'
 import type { BrandType } from '@/lib/types/brand'
+import type { OpportunityStage } from '@/lib/types'
 
 // Brand.status values that represent "not yet an active client relationship"
 // (per the CHECK constraint in supabase/migrations/005_brand.sql). Reused
@@ -33,6 +34,16 @@ import type { BrandType } from '@/lib/types/brand'
 const PROSPECT_STATUSES = new Set(['prospect', 'approach', 'negosiasi', 'cold'])
 
 type BrandStatusFilter = 'active' | 'prospect' | 'completed'
+
+const OPPORTUNITY_STAGE_LABEL: Record<OpportunityStage, string> = {
+  baru: 'Baru',
+  dihubungi: 'Dihubungi',
+  follow_up: 'Follow-up',
+  proposal: 'Proposal',
+  menunggu_respons: 'Menunggu Respons',
+  berhasil: 'Berhasil',
+  tidak_jadi: 'Tidak Jadi',
+}
 
 const schema = z.object({
   name: z.string().min(1, 'Nama brand wajib diisi'),
@@ -59,6 +70,7 @@ interface BrandRow {
   active_deals_count: number
   active_content_count: number
   outstanding_payment: number
+  next_followup_date: string | null
 }
 
 export default function BrandPage() {
@@ -147,6 +159,7 @@ export default function BrandPage() {
           active_deals_count: activeDealsCount,
           active_content_count: videosByBrand[b.id] || 0,
           outstanding_payment: outstanding,
+          next_followup_date: b.next_followup_date || null,
         }
       })
     },
@@ -179,6 +192,51 @@ export default function BrandPage() {
   const completedBrands = brands.filter((b) => b.status === 'selesai')
   const prospectBrands = brands.filter((b) => PROSPECT_STATUSES.has(b.status))
   const activeBrands = brands.filter((b) => !PROSPECT_STATUSES.has(b.status) && b.status !== 'selesai')
+  const prospectBrandIds = prospectBrands.map((b) => b.id)
+
+  // Prospek table needs: latest Opportunity + primary Contact per brand.
+  // Both reuse existing tables (brand_opportunities, brand_contacts) —
+  // no new data source, only queried when the Prospek filter is active.
+  const { data: prospectOpportunities = [] } = useQuery({
+    queryKey: ['prospect-opportunities', prospectBrandIds],
+    enabled: statusFilter === 'prospect' && prospectBrandIds.length > 0,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('brand_opportunities')
+        .select('id, brand_id, name, stage, updated_at')
+        .in('brand_id', prospectBrandIds)
+        .order('updated_at', { ascending: false })
+      if (error) { console.error('Failed to load prospect opportunities:', error); return [] }
+      return data ?? []
+    },
+  })
+
+  const { data: prospectContacts = [] } = useQuery({
+    queryKey: ['prospect-contacts', prospectBrandIds],
+    enabled: statusFilter === 'prospect' && prospectBrandIds.length > 0,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('brand_contacts')
+        .select('id, brand_id, name, is_primary')
+        .in('brand_id', prospectBrandIds)
+        .order('is_primary', { ascending: false })
+      if (error) { console.error('Failed to load prospect contacts:', error); return [] }
+      return data ?? []
+    },
+  })
+
+  // First match per brand = latest Opportunity (already ordered by
+  // updated_at desc above) / primary-first Contact.
+  const latestOpportunityByBrand: Record<string, { name: string; stage: OpportunityStage }> = {}
+  for (const o of prospectOpportunities) {
+    if (!latestOpportunityByBrand[o.brand_id]) latestOpportunityByBrand[o.brand_id] = { name: o.name, stage: o.stage }
+  }
+  const primaryContactByBrand: Record<string, string> = {}
+  for (const c of prospectContacts) {
+    if (!primaryContactByBrand[c.brand_id]) primaryContactByBrand[c.brand_id] = c.name
+  }
 
   async function onSubmit(data: FormData) {
     if (!workspaceId) return
@@ -384,6 +442,82 @@ export default function BrandPage() {
             </table>
           </div>
         </div>
+      ) : statusFilter === 'prospect' ? (
+      /* Prospek Table — prospecting-relevant columns only (Opportunity,
+         Contact, Stage, Next Follow-up). Deliberately does NOT show
+         Active Deals / Outstanding Payment / Total Content — those are
+         Active-brand concerns per the audit's Prospek scope. */
+      <div className="flex-1 bg-white border border-border rounded-xl shadow-xs overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-auto">
+          <table className="w-full text-left border-collapse min-w-[720px]">
+            <thead className="sticky top-0 bg-subtle/70 border-b border-border z-10">
+              <tr>
+                <th className="px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">Brand</th>
+                <th className="px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">Opportunity</th>
+                <th className="px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">Contact</th>
+                <th className="px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">Stage</th>
+                <th className="px-4 py-3 text-xs font-semibold text-text-muted uppercase tracking-wider">Next Follow-up</th>
+                <th className="w-12 px-3 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60">
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}><td colSpan={6} className="px-4 py-3"><Skeleton className="h-5 w-full" /></td></tr>
+                ))
+              ) : filteredBrands.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-16 text-center text-text-muted">
+                    <User className="w-10 h-10 mx-auto mb-2 text-border" />
+                    <p className="text-sm font-semibold">Belum Ada Prospek</p>
+                    <p className="text-xs text-text-muted mt-1">Ubah status Brand menjadi Prospek, atau daftarkan Brand baru.</p>
+                  </td>
+                </tr>
+              ) : (
+                filteredBrands.map((brand) => {
+                  const opp = latestOpportunityByBrand[brand.id]
+                  const contactName = primaryContactByBrand[brand.id]
+                  return (
+                    <tr
+                      key={brand.id}
+                      onClick={() => router.push(`/brand/${brand.id}`)}
+                      className="hover:bg-subtle/60 cursor-pointer transition-colors group"
+                    >
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-teal-50 border border-teal-200/60 flex items-center justify-center text-accent font-bold text-xs uppercase shrink-0">
+                            {brand.name.substring(0, 2)}
+                          </div>
+                          <p className="font-semibold text-sm text-text-primary group-hover:text-accent transition-colors">{brand.name}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5 text-xs text-text-secondary">
+                        {opp ? opp.name : <span className="text-text-muted italic">Belum ada</span>}
+                      </td>
+                      <td className="px-4 py-3.5 text-xs text-text-secondary">
+                        {contactName || <span className="text-text-muted italic">—</span>}
+                      </td>
+                      <td className="px-4 py-3.5 text-xs">
+                        {opp ? (
+                          <Badge variant="outline" className="text-[10px] font-semibold">{OPPORTUNITY_STAGE_LABEL[opp.stage]}</Badge>
+                        ) : (
+                          <span className="text-text-muted italic text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5 text-xs text-text-secondary">
+                        {brand.next_followup_date ? formatDate(brand.next_followup_date) : <span className="text-text-muted italic">—</span>}
+                      </td>
+                      <td className="px-3 py-3.5 text-right">
+                        <ArrowRight className="w-4 h-4 text-text-muted group-hover:text-accent group-hover:translate-x-0.5 transition-all inline-block" />
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
       ) : (
       /* Main Brands Table */
       <div className="flex-1 bg-white border border-border rounded-xl shadow-xs overflow-hidden flex flex-col">

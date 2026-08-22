@@ -24,6 +24,7 @@ import {
 import { formatDate, formatRupiah } from '@/lib/utils/formatters'
 import { cn } from '@/lib/utils'
 import type { BrandContact } from '@/lib/types/brand'
+import type { BrandOpportunity, BrandFollowup, OpportunityStage } from '@/lib/types'
 import { useBrandSchedule } from '@/lib/hooks/useBrandSchedule'
 import { Breadcrumb } from '@/components/shared/Breadcrumb'
 
@@ -87,6 +88,28 @@ export default function BrandDetailPage() {
       const supabase = createClient()
       const { data } = await supabase.from('brand_contacts').select('*').eq('brand_id', id).order('is_primary', { ascending: false })
       return (data ?? []) as BrandContact[]
+    },
+    enabled: !!id,
+  })
+
+  const { data: opportunities = [] } = useQuery<BrandOpportunity[]>({
+    queryKey: ['brand-opportunities', id],
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data, error } = await supabase.from('brand_opportunities').select('*').eq('brand_id', id).order('updated_at', { ascending: false })
+      if (error) { console.error('Failed to load opportunities:', error); return [] }
+      return (data ?? []) as BrandOpportunity[]
+    },
+    enabled: !!id,
+  })
+
+  const { data: followups = [] } = useQuery<BrandFollowup[]>({
+    queryKey: ['brand-followups', id],
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data, error } = await supabase.from('brand_followups').select('*').eq('brand_id', id).order('tanggal', { ascending: false })
+      if (error) { console.error('Failed to load follow-ups:', error); return [] }
+      return (data ?? []) as BrandFollowup[]
     },
     enabled: !!id,
   })
@@ -262,6 +285,144 @@ export default function BrandDetailPage() {
       toast.error(err instanceof Error ? err.message : 'Gagal mengubah status brand')
     } finally {
       setChangingBrandStatus(false)
+    }
+  }
+
+  // ── Prospect: Opportunity CRUD (brand_opportunities, reused as-is —
+  // no new table beyond what migration 040 added) ──────────────────────
+  const OPPORTUNITY_STAGE_OPTIONS: { value: OpportunityStage; label: string }[] = [
+    { value: 'baru', label: 'Baru' },
+    { value: 'dihubungi', label: 'Dihubungi' },
+    { value: 'follow_up', label: 'Follow-up' },
+    { value: 'proposal', label: 'Proposal' },
+    { value: 'menunggu_respons', label: 'Menunggu Respons' },
+    { value: 'berhasil', label: 'Berhasil' },
+    { value: 'tidak_jadi', label: 'Tidak Jadi' },
+  ]
+  const [oppSheetOpen, setOppSheetOpen] = useState(false)
+  const [oppEditingId, setOppEditingId] = useState<string | null>(null)
+  const [oppName, setOppName] = useState('')
+  const [oppStage, setOppStage] = useState<OpportunityStage>('baru')
+  const [oppEstValue, setOppEstValue] = useState('')
+  const [oppNotes, setOppNotes] = useState('')
+  const [savingOpp, setSavingOpp] = useState(false)
+  const [deleteOppTarget, setDeleteOppTarget] = useState<BrandOpportunity | null>(null)
+
+  function openAddOpportunity() {
+    setOppEditingId(null)
+    setOppName('')
+    setOppStage('baru')
+    setOppEstValue('')
+    setOppNotes('')
+    setOppSheetOpen(true)
+  }
+
+  function openEditOpportunity(o: BrandOpportunity) {
+    setOppEditingId(o.id)
+    setOppName(o.name)
+    setOppStage(o.stage)
+    setOppEstValue(o.estimated_value != null ? String(o.estimated_value) : '')
+    setOppNotes(o.notes || '')
+    setOppSheetOpen(true)
+  }
+
+  async function handleSaveOpportunity(e: React.FormEvent) {
+    e.preventDefault()
+    if (!oppName.trim()) return
+    setSavingOpp(true)
+    try {
+      const supabase = createClient()
+      const payload = {
+        name: oppName.trim(),
+        stage: oppStage,
+        estimated_value: oppEstValue.trim() ? Number(oppEstValue) : null,
+        notes: oppNotes.trim() || null,
+      }
+      if (oppEditingId) {
+        const { data, error } = await supabase.from('brand_opportunities').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', oppEditingId).select('id')
+        if (error) throw error
+        if (!data || data.length === 0) { toast.error('Gagal menyimpan: tidak memiliki izin.'); return }
+        toast.success('Opportunity diperbarui!')
+      } else {
+        const { error } = await supabase.from('brand_opportunities').insert({ ...payload, brand_id: id })
+        if (error) throw error
+        toast.success('Opportunity ditambahkan!')
+      }
+      queryClient.invalidateQueries({ queryKey: ['brand-opportunities', id] })
+      queryClient.invalidateQueries({ queryKey: ['prospect-opportunities'] })
+      setOppSheetOpen(false)
+    } catch (err) {
+      console.error('Failed to save opportunity:', err)
+      toast.error(err instanceof Error ? err.message : 'Gagal menyimpan opportunity')
+    } finally {
+      setSavingOpp(false)
+    }
+  }
+
+  async function handleDeleteOpportunity() {
+    if (!deleteOppTarget) return
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('brand_opportunities').delete().eq('id', deleteOppTarget.id)
+      if (error) throw error
+      toast.success('Opportunity dihapus.')
+      queryClient.invalidateQueries({ queryKey: ['brand-opportunities', id] })
+      queryClient.invalidateQueries({ queryKey: ['prospect-opportunities'] })
+      setDeleteOppTarget(null)
+    } catch (err) {
+      console.error('Failed to delete opportunity:', err)
+      toast.error(err instanceof Error ? err.message : 'Gagal menghapus opportunity')
+    }
+  }
+
+  // ── Prospect: Follow-up (brand_followups, reused as-is) ───────────────
+  const [fuTanggal, setFuTanggal] = useState(() => new Date().toISOString().split('T')[0])
+  const [fuCatatan, setFuCatatan] = useState('')
+  const [fuNextAction, setFuNextAction] = useState('')
+  const [fuNextDate, setFuNextDate] = useState('')
+  const [fuOpportunityId, setFuOpportunityId] = useState<string>('')
+  const [savingFollowup, setSavingFollowup] = useState(false)
+
+  async function handleAddFollowup(e: React.FormEvent) {
+    e.preventDefault()
+    if (!fuCatatan.trim()) return
+    setSavingFollowup(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('brand_followups').insert({
+        brand_id: id,
+        tanggal: fuTanggal,
+        catatan: fuCatatan.trim(),
+        next_action: fuNextAction.trim() || null,
+        next_date: fuNextDate || null,
+        opportunity_id: fuOpportunityId || null,
+      })
+      if (error) throw error
+
+      // brand_followups is the history/action record; brands.next_followup_date
+      // / last_followup_date already exist and are the ones the Dashboard
+      // "needs follow-up" widget reads (app/(app)/dashboard/page.tsx) — this
+      // is a minimal, safe sync of that EXISTING pointer, not a new date
+      // source. Never touched if the widget's field isn't affected.
+      await supabase.from('brands').update({
+        last_followup_date: fuTanggal,
+        next_followup_date: fuNextDate || null,
+      }).eq('id', id)
+
+      toast.success('Follow-up dicatat!')
+      queryClient.invalidateQueries({ queryKey: ['brand-followups', id] })
+      queryClient.invalidateQueries({ queryKey: ['brand-detail', id] })
+      queryClient.invalidateQueries({ queryKey: ['brands-list'], refetchType: 'all' })
+      setFuTanggal(new Date().toISOString().split('T')[0])
+      setFuCatatan('')
+      setFuNextAction('')
+      setFuNextDate('')
+      setFuOpportunityId('')
+    } catch (err) {
+      console.error('Failed to save follow-up:', err)
+      toast.error(err instanceof Error ? err.message : 'Gagal mencatat follow-up')
+    } finally {
+      setSavingFollowup(false)
     }
   }
 
@@ -510,6 +671,9 @@ export default function BrandDetailPage() {
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="w-full justify-start border-b border-border rounded-none bg-transparent p-0 space-x-6 h-auto mb-6">
           <TabsTrigger value="overview" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent rounded-none px-1 py-2.5 font-semibold text-xs text-text-muted data-[state=active]:text-accent">Overview</TabsTrigger>
+          {currentStatusBucket === 'prospect' && (
+            <TabsTrigger value="prospek" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent rounded-none px-1 py-2.5 font-semibold text-xs text-text-muted data-[state=active]:text-accent">Prospek ({opportunities.length})</TabsTrigger>
+          )}
           <TabsTrigger value="deals" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent rounded-none px-1 py-2.5 font-semibold text-xs text-text-muted data-[state=active]:text-accent">Deals ({deals.length})</TabsTrigger>
           <TabsTrigger value="content" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent rounded-none px-1 py-2.5 font-semibold text-xs text-text-muted data-[state=active]:text-accent">Konten Terkait ({brandVideos.length})</TabsTrigger>
           <TabsTrigger value="contacts" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent rounded-none px-1 py-2.5 font-semibold text-xs text-text-muted data-[state=active]:text-accent">Contacts ({contacts.length})</TabsTrigger>
@@ -550,6 +714,129 @@ export default function BrandDetailPage() {
             </div>
           </div>
         </TabsContent>
+
+        {/* TAB: PROSPEK — only rendered while the Brand's status bucket is
+            'prospect'. Opportunity/Follow-up both reuse existing tables
+            (brand_opportunities, brand_followups) — see migration 040.
+            Deals/Content/Payments/Jadwal tabs stay available regardless,
+            so any existing history on this Brand is never hidden. */}
+        {currentStatusBucket === 'prospect' && (
+          <TabsContent value="prospek" className="space-y-6 outline-none">
+            <div className="bg-teal-50/60 border border-accent/30 rounded-xl p-4 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-text-primary">Brand ini masih berstatus Prospek</p>
+                <p className="text-xs text-text-muted mt-0.5">Ubah ke Aktif saat sudah mendapatkan pekerjaan/kolaborasi nyata.</p>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => handleChangeBrandStatus('aktif', 'Aktif')}
+                disabled={changingBrandStatus}
+                className="bg-accent hover:bg-accent/90 gap-1.5 font-semibold text-xs shrink-0"
+              >
+                {changingBrandStatus ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                Ubah ke Aktif
+              </Button>
+            </div>
+
+            <div className="bg-white border border-border rounded-xl p-5 space-y-3">
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <h3 className="font-semibold text-sm text-text-primary">Opportunities</h3>
+                <Button size="sm" onClick={openAddOpportunity} className="bg-accent hover:bg-accent/90 h-8 text-xs font-semibold gap-1">
+                  <Plus className="w-3.5 h-3.5" /> Tambah Opportunity
+                </Button>
+              </div>
+              {opportunities.length === 0 ? (
+                <p className="py-8 text-center text-text-muted text-xs">Belum ada opportunity. Klik "+ Tambah Opportunity" untuk mencatat peluang kerja sama.</p>
+              ) : (
+                <div className="space-y-2">
+                  {opportunities.map((o) => (
+                    <div key={o.id} className="flex items-start justify-between p-3 bg-subtle/40 border border-border/70 rounded-lg text-xs group">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-text-primary">{o.name}</p>
+                          <Badge variant="outline" className="text-[10px] font-semibold">{OPPORTUNITY_STAGE_OPTIONS.find((s) => s.value === o.stage)?.label}</Badge>
+                        </div>
+                        {o.estimated_value != null && (
+                          <p className="text-text-secondary font-mono">{formatRupiah(Number(o.estimated_value))}</p>
+                        )}
+                        {o.notes && <p className="text-text-muted italic">{o.notes}</p>}
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        <button onClick={() => openEditOpportunity(o)} className="p-1.5 rounded hover:bg-subtle text-text-muted hover:text-accent" title="Edit"><Pencil className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => setDeleteOppTarget(o)} className="p-1.5 rounded hover:bg-error/10 text-text-muted hover:text-error" title="Hapus"><Trash2 className="w-3.5 h-3.5" /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white border border-border rounded-xl p-5 space-y-4">
+              <h3 className="font-semibold text-sm text-text-primary border-b border-border pb-3">Follow-up</h3>
+              <form onSubmit={handleAddFollowup} className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Tanggal Komunikasi</Label>
+                    <Input type="date" value={fuTanggal} onChange={(e) => setFuTanggal(e.target.value)} className="h-9 text-xs" required />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Next Follow-up</Label>
+                    <Input type="date" value={fuNextDate} onChange={(e) => setFuNextDate(e.target.value)} className="h-9 text-xs" />
+                  </div>
+                </div>
+                {opportunities.length > 0 && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Opportunity (opsional)</Label>
+                    <Select value={fuOpportunityId || '__none__'} onValueChange={(v) => setFuOpportunityId(v === '__none__' ? '' : v)}>
+                      <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__" className="text-xs">— Tidak terkait Opportunity —</SelectItem>
+                        {opportunities.map((o) => (
+                          <SelectItem key={o.id} value={o.id} className="text-xs">{o.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Catatan <span className="text-error">*</span></Label>
+                  <Textarea value={fuCatatan} onChange={(e) => setFuCatatan(e.target.value)} placeholder="Hasil komunikasi hari ini..." rows={2} className="text-xs" required />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Next Action</Label>
+                  <Input value={fuNextAction} onChange={(e) => setFuNextAction(e.target.value)} placeholder="misal Kirim proposal, Telepon kembali" className="h-9 text-xs" />
+                </div>
+                <Button type="submit" size="sm" disabled={savingFollowup} className="bg-accent hover:bg-accent/90 h-8 text-xs font-semibold gap-1.5">
+                  {savingFollowup ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                  Catat Follow-up
+                </Button>
+              </form>
+
+              <div className="border-t border-border pt-3 space-y-2">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-text-muted">Riwayat Follow-up</p>
+                {followups.length === 0 ? (
+                  <p className="text-xs text-text-muted italic">Belum ada riwayat follow-up.</p>
+                ) : (
+                  followups.map((f) => {
+                    const opp = opportunities.find((o) => o.id === f.opportunity_id)
+                    return (
+                      <div key={f.id} className="flex items-start gap-3 py-2 border-b border-border/50 last:border-0 text-xs">
+                        <span className="font-mono font-semibold text-text-muted w-20 shrink-0">{formatDate(f.tanggal)}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-text-primary">{f.catatan}</p>
+                          <div className="flex items-center gap-2 mt-0.5 text-[10px] text-text-muted">
+                            {opp && <span className="font-semibold text-accent">{opp.name}</span>}
+                            {f.next_action && <span>Next: {f.next_action}{f.next_date && ` (${formatDate(f.next_date)})`}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+          </TabsContent>
+        )}
 
         {/* TAB: DEALS */}
         <TabsContent value="deals" className="space-y-4 outline-none">
@@ -1009,6 +1296,63 @@ export default function BrandDetailPage() {
           <div className="mt-2 flex gap-2 justify-end">
             <Button variant="outline" size="sm" onClick={() => setDeleteContactTarget(null)}>Batal</Button>
             <Button variant="destructive" size="sm" onClick={handleDeleteContact} className="bg-error hover:bg-error/90 text-white font-semibold">
+              Ya, Hapus
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sheet: Add/Edit Opportunity */}
+      <Sheet open={oppSheetOpen} onOpenChange={setOppSheetOpen}>
+        <SheetContent side="right" className="w-full sm:w-[420px] overflow-y-auto p-0">
+          <SheetHeader className="px-6 py-4 border-b border-border">
+            <SheetTitle className="text-base font-bold">{oppEditingId ? 'Edit Opportunity' : 'Tambah Opportunity'}</SheetTitle>
+          </SheetHeader>
+          <form onSubmit={handleSaveOpportunity} className="px-6 py-5 space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Nama Opportunity <span className="text-error">*</span></Label>
+              <Input value={oppName} onChange={(e) => setOppName(e.target.value)} placeholder="misal Campaign Ramadan 2026" className="h-9 text-xs" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Stage <span className="text-error">*</span></Label>
+              <Select value={oppStage} onValueChange={(v) => setOppStage(v as OpportunityStage)}>
+                <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {OPPORTUNITY_STAGE_OPTIONS.map((s) => (
+                    <SelectItem key={s.value} value={s.value} className="text-xs">{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Estimated Value</Label>
+              <Input type="number" value={oppEstValue} onChange={(e) => setOppEstValue(e.target.value)} placeholder="0" className="h-9 text-xs font-mono" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Notes</Label>
+              <Textarea value={oppNotes} onChange={(e) => setOppNotes(e.target.value)} rows={3} className="text-xs" />
+            </div>
+            <div className="pt-3 flex gap-2 border-t border-border">
+              <Button type="submit" className="flex-1 bg-accent hover:bg-accent/90 h-9 text-xs font-semibold" disabled={savingOpp}>
+                {savingOpp ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+                {oppEditingId ? 'Simpan Perubahan' : 'Tambah Opportunity'}
+              </Button>
+              <Button type="button" variant="outline" className="h-9 text-xs" onClick={() => setOppSheetOpen(false)}>Batal</Button>
+            </div>
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      {/* Dialog: Delete Opportunity */}
+      <Dialog open={!!deleteOppTarget} onOpenChange={(open) => !open && setDeleteOppTarget(null)}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="text-base text-text-primary">Hapus opportunity "{deleteOppTarget?.name}"?</DialogTitle>
+            <DialogDescription className="text-xs text-text-secondary pt-1">Follow-up yang terkait tidak akan dihapus, hanya kehilangan kaitannya ke opportunity ini.</DialogDescription>
+          </DialogHeader>
+          <div className="mt-2 flex gap-2 justify-end">
+            <Button variant="outline" size="sm" onClick={() => setDeleteOppTarget(null)}>Batal</Button>
+            <Button variant="destructive" size="sm" onClick={handleDeleteOpportunity} className="bg-error hover:bg-error/90 text-white font-semibold">
               Ya, Hapus
             </Button>
           </div>
