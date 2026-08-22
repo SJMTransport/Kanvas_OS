@@ -300,7 +300,7 @@ export default function BrandPage() {
         }
         right={
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => router.push('/brand/shooting')} className="gap-1.5 font-semibold">
+            <Button size="sm" variant="outline" onClick={() => router.push('/brand/jadwal')} className="gap-1.5 font-semibold">
               <CalendarClock className="w-4 h-4" />
               <span>Jadwal</span>
             </Button>
