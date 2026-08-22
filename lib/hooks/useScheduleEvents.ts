@@ -227,14 +227,34 @@ async function fetchScheduleEvents(scope: FetchScope): Promise<ScheduleEvent[]> 
     })
   }
 
+  // videos.brand_id has no real foreign-key constraint to brands (unlike
+  // deals.brand_id/invoices.brand_id, which do) — it's a plain UUID
+  // column, always was. PostgREST can only auto-embed a related table
+  // over an actual FK, so `brands(...)` on this select fails outright
+  // ("Could not find a relationship between 'videos' and 'brands'"),
+  // taking down every event below it. Resolved with a small separate
+  // brand-name lookup instead of an embed.
   const videosQuery = supabase
     .from('videos')
-    .select('id, no_video, judul, tanggal_shooting, deadline_posting, shooting_session_id, deal_id, brand_id, brands(name, nama_brand)')
+    .select('id, no_video, judul, tanggal_shooting, deadline_posting, shooting_session_id, deal_id, brand_id')
     .not('status', 'eq', 'archived')
   const { data: videos, error: videosError } = scopedToOneBrand
     ? await videosQuery.eq('brand_id', scope.brandId as string)
     : await videosQuery.eq('workspace_id', scope.workspaceId as string)
   if (videosError) console.error('ScheduleEvents: failed to load videos:', videosError)
+
+  const videoBrandIds = Array.from(new Set((videos ?? []).map((v: any) => v.brand_id).filter(Boolean))) as string[]
+  const brandNameById = new Map<string, string>()
+  for (const [, b] of brandByDeal) brandNameById.set(b.brandId, b.brandName)
+  const missingBrandIds = videoBrandIds.filter((id) => !brandNameById.has(id))
+  if (missingBrandIds.length > 0) {
+    const { data: extraBrands, error: extraBrandsError } = await supabase
+      .from('brands')
+      .select('id, name, nama_brand')
+      .in('id', missingBrandIds)
+    if (extraBrandsError) console.error('ScheduleEvents: failed to load brand names for videos:', extraBrandsError)
+    for (const b of extraBrands ?? []) brandNameById.set(b.id, brandNameOf(b))
+  }
 
   const videoLabel = (v: any) => (v.no_video ? `${v.no_video} — ${v.judul}` : v.judul || 'Content')
 
@@ -260,7 +280,7 @@ async function fetchScheduleEvents(scope: FetchScope): Promise<ScheduleEvent[]> 
         label: `Shooting Content — ${videoLabel(v)}`,
         icon: '🎥',
         href: `/content/${v.id}`,
-        brandName: v.brands ? brandNameOf(v.brands) : undefined,
+        brandName: v.brand_id ? brandNameById.get(v.brand_id) : undefined,
       })
     }
     if (inRange(v.deadline_posting, scope)) {
@@ -278,7 +298,7 @@ async function fetchScheduleEvents(scope: FetchScope): Promise<ScheduleEvent[]> 
         label: `Deadline Content — ${videoLabel(v)}`,
         icon: '🔴',
         href: `/content/${v.id}`,
-        brandName: v.brands ? brandNameOf(v.brands) : undefined,
+        brandName: v.brand_id ? brandNameById.get(v.brand_id) : undefined,
       })
     }
   }
@@ -311,7 +331,7 @@ async function fetchScheduleEvents(scope: FetchScope): Promise<ScheduleEvent[]> 
         label: `Posting (${s.platform}) — ${v ? videoLabel(v) : 'Content'}`,
         icon: '📤',
         href: v ? `/content/${v.id}` : '/content',
-        brandName: v?.brands ? brandNameOf(v.brands) : undefined,
+        brandName: v?.brand_id ? brandNameById.get(v.brand_id) : undefined,
       })
     }
   }
@@ -342,7 +362,7 @@ async function fetchScheduleEvents(scope: FetchScope): Promise<ScheduleEvent[]> 
         label: `Sesi Shooting — ${linked.map(videoLabel).join(', ')}`,
         icon: '🎥',
         href: '/brand/shooting',
-        brandName: first?.brands ? brandNameOf(first.brands) : undefined,
+        brandName: first?.brand_id ? brandNameById.get(first.brand_id) : undefined,
       })
     }
   }
