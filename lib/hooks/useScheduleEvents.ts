@@ -171,7 +171,7 @@ async function fetchScheduleEvents(scope: FetchScope): Promise<ScheduleEvent[]> 
 
   const videosQuery = supabase
     .from('videos')
-    .select('id, no_video, judul, deadline_posting, shooting_session_id, deal_id, brand_id, brands(name, nama_brand)')
+    .select('id, no_video, judul, tanggal_shooting, deadline_posting, shooting_session_id, deal_id, brand_id, brands(name, nama_brand)')
     .not('status', 'eq', 'archived')
   const { data: videos, error: videosError } = scopedToOneBrand
     ? await videosQuery.eq('brand_id', scope.brandId as string)
@@ -181,6 +181,30 @@ async function fetchScheduleEvents(scope: FetchScope): Promise<ScheduleEvent[]> 
   const videoLabel = (v: any) => (v.no_video ? `${v.no_video} — ${v.judul}` : v.judul || 'Content')
 
   for (const v of videos ?? []) {
+    // Content's own recorded shoot date — independent of any Deliverable
+    // (shooting_date) or Shooting Session (session_date). Deliberately
+    // NOT merged/deduped against those: a Content row can have all three
+    // set to different dates (planned Deliverable date, actual Session
+    // date, and its own tanggal_shooting), and each represents a
+    // distinct fact that must stay individually visible.
+    if (inRange(v.tanggal_shooting, scope)) {
+      events.push({
+        id: `content_shooting-${v.id}`,
+        event_type: 'shooting',
+        date: v.tanggal_shooting,
+        source_type: 'content',
+        source_id: v.id,
+        brand_id: v.brand_id ?? null,
+        deal_id: v.deal_id ?? null,
+        deliverable_id: null,
+        content_id: v.id,
+        title: videoLabel(v),
+        label: `Shooting Content — ${videoLabel(v)}`,
+        icon: '🎥',
+        href: `/content/${v.id}`,
+        brandName: v.brands ? brandNameOf(v.brands) : undefined,
+      })
+    }
     if (inRange(v.deadline_posting, scope)) {
       events.push({
         id: `content_deadline-${v.id}`,
