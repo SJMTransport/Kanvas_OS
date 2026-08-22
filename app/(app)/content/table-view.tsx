@@ -20,6 +20,7 @@ import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
 import { getPlatformBadge } from '@/lib/utils/platform'
 import { getStatusBadgeClass, STATUS_CONFIG, STATUS_ORDER } from '@/lib/utils/status'
+import { computeContentLifecycleStage, isPublishingFullyDone, LIFECYCLE_CONFIG } from '@/lib/operations/rules'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -428,9 +429,27 @@ function SortableRow({ video, index, page, pageSize, isSelected, onToggleSelect,
         <CaptionCopyCell caption={video.caption_default} />
       </td>
       <td className="px-3.5 py-3.5">
-        <span className={getStatusBadgeClass(video.status as VideoStatus)}>
-          {STATUS_CONFIG[video.status as VideoStatus]?.label ?? video.status}
-        </span>
+        {(() => {
+          // Status column must reflect the SAME computed lifecycle stage
+          // shown on Content Detail (production_status/approval_status +
+          // real publishing completion) — not the raw legacy `videos.status`
+          // column, which only changes via a few non-UI write paths (auto-
+          // live trigger, Excel import, Kanban drag) and previously left
+          // this column stuck on "Ide" even after the lifecycle stepper on
+          // Content Detail was moved to Siap Tayang.
+          const schedules = video.video_platform_schedules ?? []
+          const stage = computeContentLifecycleStage(
+            video,
+            isPublishingFullyDone(schedules.map((s) => s.status)),
+            schedules.length > 0
+          )
+          const cfg = LIFECYCLE_CONFIG[stage]
+          return (
+            <span className={cn(cfg.badgeClass, 'border inline-flex items-center justify-center h-6 px-2.5 rounded-full text-[12px] font-medium leading-none whitespace-nowrap')}>
+              {cfg.label}
+            </span>
+          )
+        })()}
       </td>
       <td className="px-3 py-2.5">
         <div className="flex items-center gap-1">
