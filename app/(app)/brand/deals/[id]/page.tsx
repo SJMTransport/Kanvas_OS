@@ -29,6 +29,7 @@ import {
 } from '@/lib/utils/workflow'
 import { cn } from '@/lib/utils'
 import type { DealDeliverable, DealPayment, DealSchedule, DealBrief, DealSow } from '@/lib/types/brand'
+import { Breadcrumb } from '@/components/shared/Breadcrumb'
 import type { Quotation, Invoice } from '@/lib/types'
 import { computeFinancialStatus, isInvoiceOverdue, FINANCIAL_STATUS_CONFIG } from '@/lib/utils/financial'
 import { AddVideoSheet } from '@/app/(app)/content/add-video-sheet'
@@ -39,6 +40,7 @@ export default function DealDetailPage() {
   const queryClient = useQueryClient()
 
   const [saving, setSaving] = useState(false)
+  const [activeTab, setActiveTab] = useState('sow')
   const [addDeliverableOpen, setAddDeliverableOpen] = useState(false)
   const [addPaymentOpen, setAddPaymentOpen] = useState(false)
   const [addScheduleOpen, setAddScheduleOpen] = useState(false)
@@ -55,6 +57,7 @@ export default function DealDetailPage() {
   const [delUnit, setDelUnit] = useState('content')
   const [delShootingDate, setDelShootingDate] = useState('')
   const [delDeadline, setDelDeadline] = useState('')
+  const [delPostingDate, setDelPostingDate] = useState('')
   const [delDesc, setDelDesc] = useState('')
   const [delStatus, setDelStatus] = useState('planned')
   const [deleteDeliverableTarget, setDeleteDeliverableTarget] = useState<DealDeliverable & { contentCount: number } | null>(null)
@@ -354,6 +357,7 @@ export default function DealDetailPage() {
     setDelUnit('content')
     setDelShootingDate('')
     setDelDeadline('')
+    setDelPostingDate('')
     setDelDesc('')
     setDelStatus('planned')
   }
@@ -364,8 +368,9 @@ export default function DealDetailPage() {
     setDelPlatform(del.platform || 'tiktok')
     setDelQty(String(del.quantity ?? 1))
     setDelUnit(del.unit || 'content')
-    setDelShootingDate((del as any).shooting_date || '')
+    setDelShootingDate(del.shooting_date || '')
     setDelDeadline(del.deadline || '')
+    setDelPostingDate(del.posting_date || '')
     setDelDesc(del.description || '')
     setDelStatus(del.status || 'planned')
     setAddDeliverableOpen(true)
@@ -387,6 +392,7 @@ export default function DealDetailPage() {
           unit: delUnit,
           shooting_date: delShootingDate || null,
           deadline: delDeadline || null,
+          posting_date: delPostingDate || null,
           description: delDesc || null,
           status: delStatus,
           updated_at: new Date().toISOString(),
@@ -418,6 +424,7 @@ export default function DealDetailPage() {
           unit: delUnit,
           shooting_date: delShootingDate || null,
           deadline: delDeadline || null,
+          posting_date: delPostingDate || null,
           description: delDesc || null,
           status: 'planned',
         })
@@ -427,6 +434,7 @@ export default function DealDetailPage() {
 
       queryClient.invalidateQueries({ queryKey: ['deal-deliverables', id] })
       queryClient.invalidateQueries({ queryKey: ['deal-sow', id] })
+      queryClient.invalidateQueries({ queryKey: ['brand-schedule'], refetchType: 'all' })
       setAddDeliverableOpen(false)
       resetDeliverableForm()
     } catch (err) {
@@ -447,6 +455,7 @@ export default function DealDetailPage() {
       toast.success('Deliverable dihapus.')
       queryClient.invalidateQueries({ queryKey: ['deal-deliverables', id] })
       queryClient.invalidateQueries({ queryKey: ['deal-content-junctions', id] })
+      queryClient.invalidateQueries({ queryKey: ['brand-schedule'], refetchType: 'all' })
       setDeleteDeliverableTarget(null)
     } catch (err) {
       console.error('Failed to delete deliverable:', err)
@@ -798,6 +807,7 @@ export default function DealDetailPage() {
       if (error) throw error
       toast.success('Jadwal milestone ditambahkan!')
       queryClient.invalidateQueries({ queryKey: ['deal-schedules', id] })
+      queryClient.invalidateQueries({ queryKey: ['brand-schedule'], refetchType: 'all' })
       setAddScheduleOpen(false)
       setSchedTitle('')
     } catch (err) {
@@ -1013,6 +1023,20 @@ export default function DealDetailPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <Breadcrumb
+        segments={[
+          { label: 'Brand', href: '/brand' },
+          { label: brandName, href: `/brand/${deal.brand_id}` },
+          { label: dealTitleStr, onClick: () => setActiveTab('overview') },
+          ...(activeTab === 'sow'
+            ? [{ label: 'SOW & Deliverables', onClick: () => setAddDeliverableOpen(false) }]
+            : []),
+          ...(activeTab === 'sow' && addDeliverableOpen && delEditingId
+            ? [{ label: delName || 'Deliverable' }]
+            : []),
+        ]}
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border/80 pb-4">
         <div className="flex items-center gap-3">
@@ -1064,7 +1088,7 @@ export default function DealDetailPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="sow" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="w-full justify-start border-b border-border rounded-none bg-transparent p-0 space-x-6 h-auto mb-6">
           <TabsTrigger value="overview" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent rounded-none px-1 py-2.5 font-semibold text-xs text-text-muted data-[state=active]:text-accent">Overview</TabsTrigger>
           <TabsTrigger value="brief" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent rounded-none px-1 py-2.5 font-semibold text-xs text-text-muted data-[state=active]:text-accent">Brief</TabsTrigger>
@@ -1771,6 +1795,11 @@ export default function DealDetailPage() {
                 <Label className="text-xs font-semibold">Deadline Output</Label>
                 <Input type="date" value={delDeadline} onChange={(e) => setDelDeadline(e.target.value)} className="h-9 text-xs" />
               </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Tanggal Posting</Label>
+              <Input type="date" value={delPostingDate} onChange={(e) => setDelPostingDate(e.target.value)} className="h-9 text-xs" />
+              <p className="text-[10px] text-text-muted">Target tanggal tayang untuk deliverable ini — jadwal aktual per platform tetap diatur di Content (tab Distribusi).</p>
             </div>
 
             <div className="space-y-1.5">

@@ -136,6 +136,7 @@ export interface DealDeliverable {
   value?: number | null
   shooting_date?: string | null
   deadline?: string | null
+  posting_date?: string | null
   status: DeliverableStatus
   notes?: string | null
   created_at: string

@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 export type BrandScheduleCategory =
   | 'deliverable_shooting'
   | 'deliverable_deadline'
+  | 'deliverable_posting'
   | 'content_deadline'
   | 'publishing'
   | 'milestone'
@@ -37,7 +38,7 @@ export function useBrandSchedule(brandId: string | null) {
 
       if (dealIds.length > 0) {
         const [{ data: deliverables }, { data: milestones }] = await Promise.all([
-          supabase.from('deal_deliverables').select('id, deal_id, name, shooting_date, deadline').in('deal_id', dealIds),
+          supabase.from('deal_deliverables').select('id, deal_id, name, shooting_date, deadline, posting_date').in('deal_id', dealIds),
           supabase.from('deal_schedules').select('id, deal_id, title, date, type').in('deal_id', dealIds),
         ])
 
@@ -57,8 +58,18 @@ export function useBrandSchedule(brandId: string | null) {
               id: `deliverable_deadline-${d.id}`,
               category: 'deliverable_deadline',
               date: d.deadline,
-              icon: '🎯',
+              icon: '🔴',
               label: `Deadline — ${d.name}`,
+              href: `/brand/deals/${d.deal_id}`,
+            })
+          }
+          if (d.posting_date) {
+            items.push({
+              id: `deliverable_posting-${d.id}`,
+              category: 'deliverable_posting',
+              date: d.posting_date,
+              icon: '📤',
+              label: `Posting (Rencana) — ${d.name}`,
               href: `/brand/deals/${d.deal_id}`,
             })
           }
@@ -91,7 +102,7 @@ export function useBrandSchedule(brandId: string | null) {
             id: `content_deadline-${v.id}`,
             category: 'content_deadline',
             date: v.deadline_posting,
-            icon: '🎯',
+            icon: '🔴',
             label: `Deadline Content — ${videoLabel(v)}`,
             href: `/content/${v.id}`,
           })
@@ -111,8 +122,8 @@ export function useBrandSchedule(brandId: string | null) {
             id: `publishing-${s.id}`,
             category: 'publishing',
             date: s.tanggal_tayang,
-            icon: '📅',
-            label: `Publish (${s.platform}) — ${v ? videoLabel(v) : 'Content'}`,
+            icon: '📤',
+            label: `Posting (${s.platform}) — ${v ? videoLabel(v) : 'Content'}`,
             href: v ? `/content/${v.id}` : '/content',
           })
         }

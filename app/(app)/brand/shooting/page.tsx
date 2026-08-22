@@ -287,6 +287,7 @@ export default function ShootingSchedulePage() {
       queryClient.invalidateQueries({ queryKey: ['calendar-events'], refetchType: 'all' })
       queryClient.invalidateQueries({ queryKey: ['videos'], refetchType: 'all' })
       queryClient.invalidateQueries({ queryKey: ['deal-schedule-shooting-links'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['brand-schedule'], refetchType: 'all' })
       setSheetOpen(false)
     } catch (err) {
       console.error('Failed to save shooting session:', err)
@@ -309,6 +310,7 @@ export default function ShootingSchedulePage() {
       queryClient.invalidateQueries({ queryKey: ['shooting-sessions'], refetchType: 'all' })
       queryClient.invalidateQueries({ queryKey: ['shooting-videos'], refetchType: 'all' })
       queryClient.invalidateQueries({ queryKey: ['deal-schedule-shooting-links'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['brand-schedule'], refetchType: 'all' })
       setDeleteTarget(null)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Gagal menghapus sesi')

@@ -24,6 +24,7 @@ import { formatDate, formatRupiah } from '@/lib/utils/formatters'
 import { cn } from '@/lib/utils'
 import type { BrandContact } from '@/lib/types/brand'
 import { useBrandSchedule } from '@/lib/hooks/useBrandSchedule'
+import { Breadcrumb } from '@/components/shared/Breadcrumb'
 
 export default function BrandDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -389,6 +390,8 @@ export default function BrandDetailPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <Breadcrumb segments={[{ label: 'Brand', href: '/brand' }, { label: brandName }]} />
+
       {/* Page Header */}
       <div className="flex items-center justify-between border-b border-border/80 pb-4">
         <div className="flex items-center gap-3">
