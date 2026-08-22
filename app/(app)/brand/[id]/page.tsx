@@ -14,11 +14,12 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import {
   ArrowLeft, Plus, Loader2, Handshake, Video, DollarSign, Layers,
   User, Phone, Mail, CheckCircle2, ArrowRight, ExternalLink, Calendar,
-  Pencil, Trash2, AlertTriangle,
+  Pencil, Trash2, AlertTriangle, Check, ChevronDown,
 } from 'lucide-react'
 import { formatDate, formatRupiah } from '@/lib/utils/formatters'
 import { cn } from '@/lib/utils'
@@ -223,6 +224,47 @@ export default function BrandDetailPage() {
     }
   }
 
+  // Same 3-value business status already in brands.status's CHECK
+  // constraint (005_brand.sql: 'prospect'/'approach'/'negosiasi'/'deal'/
+  // 'aktif'/'selesai'/'cold') — the Brand list's PROSPECT_STATUSES set
+  // already treats all of the "not yet a client" values as one Prospek
+  // bucket, so writing the canonical 'prospect' here (rather than any of
+  // its synonyms) keeps this control consistent with that existing filter.
+  const BRAND_STATUS_OPTIONS: { value: string; label: string }[] = [
+    { value: 'aktif', label: 'Aktif' },
+    { value: 'prospect', label: 'Prospek' },
+    { value: 'selesai', label: 'Selesai' },
+  ]
+  const PROSPECT_STATUS_VALUES = new Set(['prospect', 'approach', 'negosiasi', 'cold'])
+  const currentStatusBucket = brand?.status === 'selesai' ? 'selesai' : PROSPECT_STATUS_VALUES.has(brand?.status) ? 'prospect' : 'aktif'
+  const [changingBrandStatus, setChangingBrandStatus] = useState(false)
+
+  async function handleChangeBrandStatus(newStatus: string, label: string) {
+    if (!brand || newStatus === currentStatusBucket) return
+    setChangingBrandStatus(true)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('brands')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select('id')
+      if (error) throw error
+      if (!data || data.length === 0) {
+        toast.error('Gagal menyimpan: kamu tidak memiliki izin untuk mengubah brand ini.')
+        return
+      }
+      toast.success(`Status Brand diubah menjadi ${label}`)
+      queryClient.invalidateQueries({ queryKey: ['brand-detail', id] })
+      queryClient.invalidateQueries({ queryKey: ['brands-list'], refetchType: 'all' })
+    } catch (err) {
+      console.error('Failed to change brand status:', err)
+      toast.error(err instanceof Error ? err.message : 'Gagal mengubah status brand')
+    } finally {
+      setChangingBrandStatus(false)
+    }
+  }
+
   function openEditBrand() {
     if (!brand) return
     setEditBrandName(brand.name || brand.nama_brand || '')
@@ -404,9 +446,24 @@ export default function BrandDetailPage() {
               <Badge variant="outline" className="text-[10px] font-normal capitalize">
                 {brand.type || brand.brand_type || 'Direct Brand'}
               </Badge>
-              <Badge variant="secondary" className="text-[10px] uppercase font-bold bg-emerald-100 text-emerald-800">
-                {brand.status || 'Aktif'}
-              </Badge>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button disabled={changingBrandStatus} className="inline-flex">
+                    <Badge variant="secondary" className="text-[10px] uppercase font-bold bg-emerald-100 text-emerald-800 gap-0.5 cursor-pointer hover:bg-emerald-200 transition-colors">
+                      {BRAND_STATUS_OPTIONS.find((o) => o.value === currentStatusBucket)?.label || 'Aktif'}
+                      <ChevronDown className="w-3 h-3" />
+                    </Badge>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-40">
+                  {BRAND_STATUS_OPTIONS.map((opt) => (
+                    <DropdownMenuItem key={opt.value} onClick={() => handleChangeBrandStatus(opt.value, opt.label)} className="text-xs gap-2">
+                      <Check className={cn('w-3.5 h-3.5', currentStatusBucket === opt.value ? 'opacity-100' : 'opacity-0')} />
+                      {opt.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <p className="text-xs text-text-muted mt-0.5">{brandIndustry} {brand.website && `• ${brand.website}`}</p>
           </div>
