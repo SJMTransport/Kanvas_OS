@@ -20,7 +20,7 @@ import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
 import { getPlatformBadge } from '@/lib/utils/platform'
 import { getStatusBadgeClass, STATUS_CONFIG, STATUS_ORDER } from '@/lib/utils/status'
-import { computeContentLifecycleStage, isPublishingFullyDone, LIFECYCLE_CONFIG } from '@/lib/operations/rules'
+import { computeContentLifecycleStage, isPublishingDueByDate, LIFECYCLE_CONFIG } from '@/lib/operations/rules'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -440,7 +440,7 @@ function SortableRow({ video, index, page, pageSize, isSelected, onToggleSelect,
           const schedules = video.video_platform_schedules ?? []
           const stage = computeContentLifecycleStage(
             video,
-            isPublishingFullyDone(schedules.map((s) => s.status)),
+            isPublishingDueByDate(schedules),
             schedules.length > 0
           )
           const cfg = LIFECYCLE_CONFIG[stage]

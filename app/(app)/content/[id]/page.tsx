@@ -32,7 +32,7 @@ import {
 } from '@/lib/utils/workflow'
 import {
   computeContentLifecycleStage,
-  isPublishingFullyDone,
+  isPublishingDueByDate,
   LIFECYCLE_CONFIG,
   LIFECYCLE_ORDER,
 } from '@/lib/operations/rules'
@@ -1366,14 +1366,13 @@ function ContentBrandTab({ video }: { video: VideoWithSchedules }) {
     queryKey: ['content-schedule-statuses', video.id],
     queryFn: async () => {
       const supabase = createClient()
-      const { data, error } = await supabase.from('video_platform_schedules').select('status').eq('video_id', video.id)
+      const { data, error } = await supabase.from('video_platform_schedules').select('status, tanggal_tayang').eq('video_id', video.id)
       if (error) { console.error('Failed to load schedule statuses:', error); return [] }
       return data ?? []
     },
   })
-  const scheduleStatuses = scheduleRows.map((s: any) => s.status)
-  const isFullyPublished = isPublishingFullyDone(scheduleStatuses)
-  const hasActiveSchedule = scheduleStatuses.length > 0
+  const isFullyPublished = isPublishingDueByDate(scheduleRows)
+  const hasActiveSchedule = scheduleRows.length > 0
 
   // Phase 5 refinement — Payment status is computed, never user-entered.
   // Same centralized financial rule Deal Detail already uses (Phase 3.5).
@@ -1993,16 +1992,17 @@ export default function ContentDetailPage() {
     return map
   }, [perfRecords])
 
-  // Same shared schedule-completion signal used across Calendar/Action
-  // Center/Content Detail (isPublishingFullyDone) — never derived from
-  // legacy videos.status. Shares its query key with ContentBrandTab's own
-  // fetch, so react-query dedupes the network call.
+  // Date-based "is this Live" signal for the lifecycle badge (isPublishingDueByDate)
+  // — deliberately different from Action Center/Calendar's isPublishingFullyDone,
+  // which stays status-based for deadline-hiding/overdue detection. Shares
+  // its query key with ContentBrandTab's own fetch, so react-query dedupes
+  // the network call.
   const { data: headerScheduleRows = [] } = useQuery({
     queryKey: ['content-schedule-statuses', id],
     enabled: !!id,
     queryFn: async () => {
       const supabase = createClient()
-      const { data, error } = await supabase.from('video_platform_schedules').select('status').eq('video_id', id)
+      const { data, error } = await supabase.from('video_platform_schedules').select('status, tanggal_tayang').eq('video_id', id)
       if (error) { console.error('Failed to load schedule statuses:', error); return [] }
       return data ?? []
     },
@@ -2051,7 +2051,7 @@ export default function ContentDetailPage() {
 
   const lifecycleStage = computeContentLifecycleStage(
     { status: video.status, production_status: video.production_status, approval_status: video.approval_status },
-    isPublishingFullyDone(headerScheduleRows.map((s: any) => s.status)),
+    isPublishingDueByDate(headerScheduleRows as any),
     headerScheduleRows.length > 0
   )
 

@@ -67,6 +67,23 @@ export function isPublishingFullyDone(scheduleStatuses: string[] | undefined): b
   return scheduleStatuses.every((s) => s === 'posted')
 }
 
+/** Product decision: for the DISPLAYED lifecycle stage (Content Detail's
+ * LifecycleIndicator, the Content table's Status column), "Live" means the
+ * scheduled tanggal_tayang has already arrived — regardless of whether
+ * every platform was manually marked 'posted'. This is deliberately
+ * DIFFERENT from isPublishingFullyDone above, which stays status-based and
+ * keeps governing Calendar's deadline-hiding and Action Center's overdue
+ * detection (those answer "did we actually confirm this got posted",
+ * where a forgotten manual mark-as-posted should keep surfacing as an
+ * action item — a date passing silently isn't enough there). Only use
+ * this for display purposes; never for hiding a deadline or an action
+ * item. */
+export function isPublishingDueByDate(schedules: { tanggal_tayang: string }[] | undefined): boolean {
+  if (!schedules || schedules.length === 0) return false
+  const today = new Date().toISOString().split('T')[0]
+  return schedules.every((s) => s.tanggal_tayang && s.tanggal_tayang <= today)
+}
+
 function todayStart() {
   return new Date(new Date().toDateString())
 }
