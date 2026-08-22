@@ -21,7 +21,6 @@ import { cn } from '@/lib/utils'
 import { Plus, Loader2, Handshake, ExternalLink, ArrowRight, Building2, User, Phone, Mail, Layers, CalendarClock } from 'lucide-react'
 import { PageContainer, PageHeader } from '@/components/layout/page-header'
 import { PageToolbar, SearchInput } from '@/components/layout/page-toolbar'
-import { SegmentedTabs, type TabOption } from '@/components/ui/segmented-tabs'
 import { ContentIdentity } from '@/components/content/ContentIdentity'
 import { formatRupiah, formatDate } from '@/lib/utils/formatters'
 import type { BrandType } from '@/lib/types/brand'
@@ -33,7 +32,7 @@ import type { BrandType } from '@/lib/types/brand'
 // represents exactly the "future follow-up" distinction requested.
 const PROSPECT_STATUSES = new Set(['prospect', 'approach', 'negosiasi', 'cold'])
 
-type BrandViewTab = 'active' | 'prospect' | 'deliverables'
+type BrandStatusFilter = 'active' | 'prospect' | 'completed'
 
 const schema = z.object({
   name: z.string().min(1, 'Nama brand wajib diisi'),
@@ -69,7 +68,8 @@ export default function BrandPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
-  const [viewTab, setViewTab] = useState<BrandViewTab>('active')
+  const [statusFilter, setStatusFilter] = useState<BrandStatusFilter>('active')
+  const [showDeliverables, setShowDeliverables] = useState(false)
 
   const { register, handleSubmit, control, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema) as any,
@@ -160,7 +160,7 @@ export default function BrandPage() {
   // scoping path (never filter client-side over an unscoped query).
   const { data: allDeliverables = [], isLoading: deliverablesLoading } = useQuery({
     queryKey: ['brand-all-deliverables', workspaceId],
-    enabled: !!workspaceId && viewTab === 'deliverables',
+    enabled: !!workspaceId && showDeliverables,
     queryFn: async () => {
       const supabase = createClient()
       const { data, error } = await supabase
@@ -173,8 +173,12 @@ export default function BrandPage() {
     },
   })
 
-  const activeBrands = brands.filter((b) => !PROSPECT_STATUSES.has(b.status))
+  // brands.status already includes 'selesai' in its own CHECK constraint
+  // (005_brand.sql) — reused as-is, just given its own bucket here rather
+  // than silently falling into "Aktif".
+  const completedBrands = brands.filter((b) => b.status === 'selesai')
   const prospectBrands = brands.filter((b) => PROSPECT_STATUSES.has(b.status))
+  const activeBrands = brands.filter((b) => !PROSPECT_STATUSES.has(b.status) && b.status !== 'selesai')
 
   async function onSubmit(data: FormData) {
     if (!workspaceId) return
@@ -246,17 +250,17 @@ export default function BrandPage() {
     }
   }
 
-  const tabBrands = viewTab === 'prospect' ? prospectBrands : activeBrands
+  const tabBrands = statusFilter === 'prospect' ? prospectBrands : statusFilter === 'completed' ? completedBrands : activeBrands
   const filteredBrands = tabBrands.filter((b) => {
     if (!search.trim()) return true
     const q = search.toLowerCase()
     return b.name.toLowerCase().includes(q) || (b.industry && b.industry.toLowerCase().includes(q))
   })
 
-  const viewOptions: TabOption<BrandViewTab>[] = [
-    { value: 'active', label: `Brand Aktif (${activeBrands.length})` },
+  const statusOptions: { value: BrandStatusFilter; label: string }[] = [
+    { value: 'active', label: `Aktif (${activeBrands.length})` },
     { value: 'prospect', label: `Prospek (${prospectBrands.length})` },
-    { value: 'deliverables', label: 'Semua Deliverable' },
+    { value: 'completed', label: `Selesai (${completedBrands.length})` },
   ]
 
   return (
@@ -269,9 +273,27 @@ export default function BrandPage() {
 
       <PageToolbar
         left={
-          <div className="flex items-center gap-3">
-            <SegmentedTabs options={viewOptions} value={viewTab} onChange={setViewTab} />
-            {viewTab !== 'deliverables' && (
+          <div className="flex items-center gap-2">
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as BrandStatusFilter)}>
+              <SelectTrigger className="h-9 text-xs font-semibold w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {statusOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              variant={showDeliverables ? 'secondary' : 'outline'}
+              onClick={() => setShowDeliverables((v) => !v)}
+              className="gap-1.5 font-semibold text-xs h-9"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Semua Deliverable</span>
+            </Button>
+            {!showDeliverables && (
               <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari nama brand, industri..." />
             )}
           </div>
@@ -280,7 +302,7 @@ export default function BrandPage() {
           <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" onClick={() => router.push('/brand/shooting')} className="gap-1.5 font-semibold">
               <CalendarClock className="w-4 h-4" />
-              <span>Jadwal Shooting</span>
+              <span>Jadwal</span>
             </Button>
             <Button size="sm" onClick={() => setSheetOpen(true)} className="bg-accent hover:bg-accent/90 gap-1.5 font-semibold">
               <Plus className="w-4 h-4" />
@@ -290,7 +312,7 @@ export default function BrandPage() {
         }
       />
 
-      {viewTab === 'deliverables' ? (
+      {showDeliverables ? (
         <div className="flex-1 bg-white border border-border rounded-xl shadow-xs overflow-hidden flex flex-col">
           <div className="flex-1 overflow-auto">
             <table className="w-full text-left border-collapse min-w-[760px]">
