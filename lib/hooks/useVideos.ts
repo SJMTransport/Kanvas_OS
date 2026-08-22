@@ -65,7 +65,7 @@ export function useVideos(opts: UseVideosOptions = {}) {
       if (platform && platform.length > 0) {
         q = q.in('video_platform_schedules.platform', platform)
       }
-      if (search) q = q.ilike('judul', `%${search}%`)
+      if (search) q = q.or(`judul.ilike.%${search}%,no_video.ilike.%${search}%`)
       if (tema && tema.length > 0) {
         q = q.ov('temas', tema)
       }
