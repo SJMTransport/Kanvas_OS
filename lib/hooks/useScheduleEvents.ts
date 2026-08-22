@@ -14,13 +14,14 @@ import { createClient } from '@/lib/supabase/client'
 // this function reflects it automatically.
 //
 // Content Calendar (lib/hooks/useCalendarEvents.ts) is intentionally NOT
-// merged into this engine yet — that's Phase 2. This file is written so
-// that a future Phase 2 can add Content Calendar's categories (deal
-// start/end, invoice/payment due, approval aging) as more event_types
-// without changing the shape already relied on by Brand Schedule/Dashboard.
+// merged into this engine — it has its own drag-to-reschedule/approval-aging
+// concerns this engine doesn't need. invoice_due/payment_due (deal_payments,
+// invoices) were added on top of the original 4 categories (shooting/
+// deadline/posting/milestone) the same additive way — no schema change, no
+// new fetch layer, just more event_type branches over existing tables.
 
-export type ScheduleEventType = 'shooting' | 'deadline' | 'posting' | 'milestone'
-export type ScheduleSourceType = 'deliverable' | 'shooting_session' | 'platform_schedule' | 'milestone' | 'content'
+export type ScheduleEventType = 'shooting' | 'deadline' | 'posting' | 'milestone' | 'payment_due' | 'invoice_due'
+export type ScheduleSourceType = 'deliverable' | 'shooting_session' | 'platform_schedule' | 'milestone' | 'content' | 'payment' | 'invoice'
 
 export interface ScheduleEvent {
   id: string
@@ -167,6 +168,63 @@ async function fetchScheduleEvents(scope: FetchScope): Promise<ScheduleEvent[]> 
         brandName: b?.brandName,
       })
     }
+
+    const { data: payments, error: payErr } = await supabase
+      .from('deal_payments')
+      .select('id, deal_id, amount, payment_type, due_date, status')
+      .in('deal_id', dealIds)
+    if (payErr) console.error('ScheduleEvents: failed to load deal_payments:', payErr)
+
+    for (const p of payments ?? []) {
+      if (!inRange(p.due_date, scope)) continue
+      const b = brandByDeal.get(p.deal_id)
+      events.push({
+        id: `payment_due-${p.id}`,
+        event_type: 'payment_due',
+        date: p.due_date,
+        source_type: 'payment',
+        source_id: p.id,
+        brand_id: b?.brandId ?? null,
+        deal_id: p.deal_id,
+        deliverable_id: null,
+        content_id: null,
+        title: `${p.payment_type?.toUpperCase() || 'Payment'} — ${b?.brandName || 'Brand'}`,
+        label: `Payment (${p.payment_type}) — ${b?.brandName || 'Brand'}`,
+        icon: '💰',
+        href: `/brand/deals/${p.deal_id}`,
+        brandName: b?.brandName,
+      })
+    }
+  }
+
+  const invoicesQuery = supabase
+    .from('invoices')
+    .select('id, invoice_number, total, due_date, status, deal_id, brand_id, brands(name, nama_brand)')
+  const { data: invoices, error: invErr } = scopedToOneBrand
+    ? await invoicesQuery.eq('brand_id', scope.brandId as string)
+    : await invoicesQuery.eq('workspace_id', scope.workspaceId as string)
+  if (invErr) console.error('ScheduleEvents: failed to load invoices:', invErr)
+
+  for (const inv of invoices ?? []) {
+    if (!inRange(inv.due_date, scope)) continue
+    if (inv.status === 'paid' || inv.status === 'cancelled') continue
+    const brandName = inv.brands ? brandNameOf(inv.brands) : undefined
+    events.push({
+      id: `invoice_due-${inv.id}`,
+      event_type: 'invoice_due',
+      date: inv.due_date,
+      source_type: 'invoice',
+      source_id: inv.id,
+      brand_id: inv.brand_id ?? null,
+      deal_id: inv.deal_id ?? null,
+      deliverable_id: null,
+      content_id: null,
+      title: `Invoice ${inv.invoice_number} — ${brandName || 'Brand'}`,
+      label: `Invoice Due (${inv.invoice_number}) — ${brandName || 'Brand'}`,
+      icon: '🧾',
+      href: inv.deal_id ? `/brand/deals/${inv.deal_id}` : (inv.brand_id ? `/brand/${inv.brand_id}` : '/brand'),
+      brandName,
+    })
   }
 
   const videosQuery = supabase

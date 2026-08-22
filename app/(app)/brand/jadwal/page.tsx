@@ -40,6 +40,8 @@ const EVENT_TYPE_ORDER: Record<ScheduleEvent['event_type'], number> = {
   deadline: 1,
   posting: 2,
   milestone: 3,
+  payment_due: 4,
+  invoice_due: 5,
 }
 
 export default function BrandJadwalPage() {
