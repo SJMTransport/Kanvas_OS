@@ -10,7 +10,28 @@ import { id as localeId } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { getPlatformChipClass } from '@/lib/utils/platform'
+import type { Platform } from '@/lib/types'
 import type { ScheduleEvent } from '@/lib/hooks/useScheduleEvents'
+
+const VALID_PLATFORMS = new Set(['tiktok', 'instagram', 'youtube', 'facebook'])
+
+// A posting event with a known platform + video number reads better as a
+// small platform-colored "No. Video" chip than a generic emoji — it's the
+// most frequent event type by far, and no two emoji clearly distinguish
+// "posted to Instagram" from "posted to YouTube" the way a color does.
+// Every other event type (shooting/deadline/milestone/payment/invoice)
+// keeps its icon — there's no comparable per-item identity to show instead.
+export function EventIndicator({ e }: { e: ScheduleEvent }) {
+  if (e.event_type === 'posting' && e.videoNo && e.platform && VALID_PLATFORMS.has(e.platform)) {
+    return (
+      <span className={cn('text-[9px] font-bold px-1 py-0.5 rounded leading-none whitespace-nowrap', getPlatformChipClass(e.platform as Platform))}>
+        {e.videoNo}
+      </span>
+    )
+  }
+  return <span className="text-[10px] leading-none">{e.icon}</span>
+}
 
 // Shared month-grid preview for the Schedule Engine (ScheduleEvent[]).
 // Used by both /brand/jadwal ("Kalender" view) and the Dashboard ("Jadwal
@@ -104,7 +125,7 @@ export function ScheduleCalendarView({ events, onEventClick, activeDate: control
                 dayEvents.length > 0 && (
                   <div className="flex flex-wrap gap-0.5">
                     {dayEvents.slice(0, MAX_DOTS).map((e) => (
-                      <span key={e.id} className="text-[10px] leading-none">{e.icon}</span>
+                      <EventIndicator key={e.id} e={e} />
                     ))}
                     {dayEvents.length > MAX_DOTS && (
                       <span className="text-[9px] text-text-muted leading-none">+{dayEvents.length - MAX_DOTS}</span>
@@ -120,7 +141,7 @@ export function ScheduleCalendarView({ events, onEventClick, activeDate: control
                       title={`${e.brandName ?? ''} — ${e.label}`}
                       className="w-full flex items-center gap-1 text-left text-[10px] px-1.5 py-0.5 rounded-md bg-subtle/60 hover:bg-accent-light hover:text-accent transition-colors truncate"
                     >
-                      <span className="shrink-0">{e.icon}</span>
+                      <span className="shrink-0"><EventIndicator e={e} /></span>
                       <span className="truncate">{e.brandName ? `${e.brandName} — ` : ''}{e.title}</span>
                     </button>
                   ))}

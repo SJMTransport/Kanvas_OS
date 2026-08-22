@@ -21,7 +21,7 @@ import { ActionCenter } from '@/components/dashboard/action-center'
 import { ContentIdentity } from '@/components/content/ContentIdentity'
 import type { ActionItem } from '@/lib/operations/rules'
 import type { ScheduleEvent } from '@/lib/hooks/useScheduleEvents'
-import { ScheduleCalendarView } from '@/components/schedule/ScheduleCalendarView'
+import { ScheduleCalendarView, EventIndicator } from '@/components/schedule/ScheduleCalendarView'
 import { cn } from '@/lib/utils'
 
 const STATUS_MAP: Record<string, string> = {
@@ -267,7 +267,7 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
                           href={e.href}
                           className="flex items-center gap-2.5 py-2 hover:bg-subtle/60 rounded-lg px-1.5 -mx-1.5 transition-colors"
                         >
-                          <span className="text-base shrink-0">{e.icon}</span>
+                          <span className="shrink-0"><EventIndicator e={e} /></span>
                           <span className="text-xs font-medium text-text-primary flex-1 min-w-0 truncate">{e.label}</span>
                           {e.brandName && <span className="text-[10px] text-text-muted shrink-0">{e.brandName}</span>}
                         </Link>

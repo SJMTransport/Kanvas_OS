@@ -38,6 +38,10 @@ export interface ScheduleEvent {
   icon: string
   href: string
   brandName?: string
+  /** Only set for posting/platform_schedule events — lets the UI show a
+   * platform-colored "No. Video" chip instead of a generic icon. */
+  platform?: string
+  videoNo?: string | null
 }
 
 function brandNameOf(b: any): string {
@@ -372,6 +376,8 @@ async function fetchScheduleEvents(scope: FetchScope): Promise<ScheduleEvent[]> 
       icon: '📤',
       href: v ? `/content/${v.id}` : '/content',
       brandName: v?.brand_id ? brandNameById.get(v.brand_id) : undefined,
+      platform: s.platform,
+      videoNo: v?.no_video ?? null,
     })
   }
 
