@@ -1,10 +1,12 @@
 'use client'
 
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
 import { useActionCenter } from '@/lib/hooks/useActionCenter'
 import { useWorkspaceScheduleEvents } from '@/lib/hooks/useScheduleEvents'
+import { startOfMonth, endOfMonth, format } from 'date-fns'
 import { DashboardClient } from './dashboard-client'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
@@ -15,14 +17,16 @@ export default function DashboardPage() {
   const { data: actionItems = [], isLoading: actionItemsLoading } = useActionCenter(workspaceId)
 
   // Shared Schedule Engine (Phase 1) — same aggregation Brand Schedule
-  // uses (lib/hooks/useScheduleEvents.ts), scoped to a 7-day window so the
-  // dashboard can show upcoming Shooting/Deadline/Milestone/planned-Posting
-  // items without duplicating the "Jadwal Hari Ini" posting-schedule query
-  // below (that one stays as-is — see todaySchedules).
-  const todayStr = new Date().toISOString().split('T')[0]
-  const weekEndStr = new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  // uses (lib/hooks/useScheduleEvents.ts). Phase 4: scoped to the MONTH
+  // currently shown in the Dashboard's calendar preview (not a fixed
+  // 7-day window anymore) so navigating months actually fetches that
+  // month's events instead of showing an empty grid. "Jadwal Hari Ini"
+  // below is untouched — separate, pre-existing query.
+  const [scheduleActiveDate, setScheduleActiveDate] = useState(new Date())
+  const scheduleMonthStart = format(startOfMonth(scheduleActiveDate), 'yyyy-MM-dd')
+  const scheduleMonthEnd = format(endOfMonth(scheduleActiveDate), 'yyyy-MM-dd')
   const { data: scheduleEvents = [], isLoading: scheduleEventsLoading, isError: scheduleEventsError } =
-    useWorkspaceScheduleEvents(workspaceId, todayStr, weekEndStr)
+    useWorkspaceScheduleEvents(workspaceId, scheduleMonthStart, scheduleMonthEnd)
 
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['dashboard', workspaceId],
@@ -126,6 +130,8 @@ export default function DashboardPage() {
       scheduleEvents={scheduleEvents}
       scheduleEventsLoading={scheduleEventsLoading}
       scheduleEventsError={scheduleEventsError}
+      scheduleActiveDate={scheduleActiveDate}
+      onScheduleActiveDateChange={setScheduleActiveDate}
     />
   )
 }

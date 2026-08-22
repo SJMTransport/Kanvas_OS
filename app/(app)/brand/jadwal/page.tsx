@@ -9,7 +9,7 @@ import { PageContainer, PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SegmentedTabs, type TabOption } from '@/components/ui/segmented-tabs'
-import { ScheduleCalendarView } from './schedule-calendar-view'
+import { ScheduleCalendarView } from '@/components/schedule/ScheduleCalendarView'
 import { formatDate } from '@/lib/utils/formatters'
 import { ArrowLeft, CalendarClock, CalendarDays, Users, CalendarRange, ListTodo } from 'lucide-react'
 
