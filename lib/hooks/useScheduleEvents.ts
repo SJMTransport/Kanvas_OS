@@ -70,7 +70,11 @@ async function fetchScheduleEvents(scope: FetchScope): Promise<ScheduleEvent[]> 
   const { data: deals, error: dealsError } = scopedToOneBrand
     ? await dealsQuery.eq('brand_id', scope.brandId as string)
     : await dealsQuery.eq('workspace_id', scope.workspaceId as string)
-  if (dealsError) throw dealsError
+  // Each source below is independent — one failing (e.g. a column/table
+  // from a not-yet-applied migration) must not blank out categories that
+  // don't depend on it. Log and degrade that one category to empty,
+  // exactly like this aggregation behaved before this file existed.
+  if (dealsError) console.error('ScheduleEvents: failed to load deals:', dealsError)
 
   const dealIds = (deals ?? []).map((d: any) => d.id)
   const brandByDeal = new Map<string, { brandId: string; brandName: string }>(
@@ -82,8 +86,8 @@ async function fetchScheduleEvents(scope: FetchScope): Promise<ScheduleEvent[]> 
       supabase.from('deal_deliverables').select('id, deal_id, name, shooting_date, deadline, posting_date').in('deal_id', dealIds),
       supabase.from('deal_schedules').select('id, deal_id, title, date, type').in('deal_id', dealIds),
     ])
-    if (delivErr) throw delivErr
-    if (msErr) throw msErr
+    if (delivErr) console.error('ScheduleEvents: failed to load deal_deliverables (shooting_date/posting_date require migrations 038/039):', delivErr)
+    if (msErr) console.error('ScheduleEvents: failed to load deal_schedules (milestones):', msErr)
 
     for (const d of deliverables ?? []) {
       const b = brandByDeal.get(d.deal_id)
@@ -172,7 +176,7 @@ async function fetchScheduleEvents(scope: FetchScope): Promise<ScheduleEvent[]> 
   const { data: videos, error: videosError } = scopedToOneBrand
     ? await videosQuery.eq('brand_id', scope.brandId as string)
     : await videosQuery.eq('workspace_id', scope.workspaceId as string)
-  if (videosError) throw videosError
+  if (videosError) console.error('ScheduleEvents: failed to load videos:', videosError)
 
   const videoLabel = (v: any) => (v.no_video ? `${v.no_video} — ${v.judul}` : v.judul || 'Content')
 
@@ -206,7 +210,7 @@ async function fetchScheduleEvents(scope: FetchScope): Promise<ScheduleEvent[]> 
     if (scope.startDate) schedulesQuery = schedulesQuery.gte('tanggal_tayang', scope.startDate)
     if (scope.endDate) schedulesQuery = schedulesQuery.lte('tanggal_tayang', scope.endDate)
     const { data: schedules, error: schedulesError } = await schedulesQuery
-    if (schedulesError) throw schedulesError
+    if (schedulesError) console.error('ScheduleEvents: failed to load video_platform_schedules:', schedulesError)
 
     for (const s of schedules ?? []) {
       if (!s.tanggal_tayang) continue
@@ -236,7 +240,7 @@ async function fetchScheduleEvents(scope: FetchScope): Promise<ScheduleEvent[]> 
       .from('shooting_sessions')
       .select('id, session_date')
       .in('id', sessionIds)
-    if (sessionsError) throw sessionsError
+    if (sessionsError) console.error('ScheduleEvents: failed to load shooting_sessions (requires migration 036):', sessionsError)
 
     for (const s of sessions ?? []) {
       if (!inRange(s.session_date, scope)) continue
