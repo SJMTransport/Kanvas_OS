@@ -30,7 +30,17 @@ export function WorkspaceSwitcher({ collapsed = false }: { collapsed?: boolean }
       if (!data) return
       const wsList = data.map((m: { role: string; workspaces: unknown }) => m.workspaces as unknown as Workspace)
       setWorkspaces(wsList)
-      if (!currentWorkspace && wsList.length > 0) {
+      // Read the CURRENT store value here, not the `currentWorkspace`
+      // closed over when this effect was created. zustand's `persist`
+      // rehydrates from localStorage asynchronously; by the time this
+      // Supabase call resolves, the persisted workspace has usually
+      // already loaded into the store, but the `currentWorkspace`
+      // variable captured by this effect's closure (empty dep array)
+      // never sees that update. That stale `null` made this branch
+      // silently override the user's actual selection with wsList[0]
+      // (whichever workspace happens to sort first) on every reload.
+      const persisted = useWorkspaceStore.getState().currentWorkspace
+      if (!persisted && wsList.length > 0) {
         setCurrentWorkspace(wsList[0])
         setRole(data[0].role as 'owner' | 'manager' | 'editor')
       }
