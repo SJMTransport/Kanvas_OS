@@ -411,10 +411,17 @@ function ScriptBlockCard({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
-      textareaRef.current.style.height = Math.max(48, textareaRef.current.scrollHeight) + 'px'
-    }
+    const el = textareaRef.current
+    if (!el) return
+    // Collapsing to 'auto' before measuring briefly shrinks the textarea,
+    // which shifts everything below it and made the browser jump the
+    // page's scroll position on every keystroke (most noticeable at the
+    // bottom of a long script). Preserve the actual scroll position
+    // across that momentary resize so typing never moves the viewport.
+    const scrollY = window.scrollY
+    el.style.height = 'auto'
+    el.style.height = Math.max(48, el.scrollHeight) + 'px'
+    window.scrollTo({ top: scrollY })
   }, [block.content])
 
   return (
@@ -453,11 +460,6 @@ function ScriptBlockCard({
             placeholder={PLACEHOLDERS[block.type] || 'Tulis di sini...'}
             rows={1}
             className="w-full px-3 py-2 text-xs text-text-primary resize-none border-none outline-none leading-relaxed bg-transparent min-h-[48px]"
-            onInput={(e) => {
-              const t = e.target as HTMLTextAreaElement
-              t.style.height = 'auto'
-              t.style.height = Math.max(48, t.scrollHeight) + 'px'
-            }}
           />
         </div>
         <button
