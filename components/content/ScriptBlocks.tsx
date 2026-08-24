@@ -410,6 +410,14 @@ function ScriptBlockCard({
   const words = wordCount(block.content)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // Growing without limit made a long section's textarea (e.g. a 500+
+  // word Body) taller than the viewport itself — the browser then kept
+  // auto-scrolling the whole page to follow the caret as it grew, which
+  // read as "typing keeps getting shoved to the bottom". Capped here so
+  // a long block scrolls WITHIN its own box past this height instead of
+  // growing the page indefinitely.
+  const MAX_HEIGHT = 480
+
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
@@ -420,7 +428,9 @@ function ScriptBlockCard({
     // across that momentary resize so typing never moves the viewport.
     const scrollY = window.scrollY
     el.style.height = 'auto'
-    el.style.height = Math.max(48, el.scrollHeight) + 'px'
+    const next = Math.max(48, el.scrollHeight)
+    el.style.height = Math.min(next, MAX_HEIGHT) + 'px'
+    el.style.overflowY = next > MAX_HEIGHT ? 'auto' : 'hidden'
     window.scrollTo({ top: scrollY })
   }, [block.content])
 
