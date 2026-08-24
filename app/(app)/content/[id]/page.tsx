@@ -954,8 +954,16 @@ function DistributionTab({
 // ─── Script Tab ──────────────────────────────────────────────────────────────
 
 function ScriptTab({ video }: { video: VideoWithSchedules }) {
-  const queryClient = useQueryClient()
-
+  // No invalidateQueries here on purpose. ScriptBlocks already holds its
+  // own local `blocks` state that reflects every keystroke immediately —
+  // nothing on this page reads video.script_blocks anywhere else, so
+  // there is nothing stale to refresh. Invalidating ['video-detail', ...]
+  // on every ~800ms debounced autosave forced this whole page's `video`
+  // object to a new reference mid-typing, which re-rendered everything
+  // above the Script tab and made the browser scroll the page during
+  // that reconciliation — exactly the "jumps while I'm typing" bug
+  // reported. The write itself still happens; the cache just catches up
+  // next time this query is naturally refetched (tab revisit, etc.).
   async function handleSave(blocks: ScriptBlock[]) {
     const supabase = createClient()
     const { error } = await supabase
@@ -963,7 +971,6 @@ function ScriptTab({ video }: { video: VideoWithSchedules }) {
       .update({ script_blocks: blocks, updated_at: new Date().toISOString() })
       .eq('id', video.id)
     if (error) toast.error(error.message)
-    else queryClient.invalidateQueries({ queryKey: ['video-detail', video.id] })
   }
 
   return (
