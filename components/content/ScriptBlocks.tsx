@@ -418,20 +418,27 @@ function ScriptBlockCard({
   // growing the page indefinitely.
   const MAX_HEIGHT = 480
 
+  // The browser auto-scrolls the page to keep the caret visible as part
+  // of natively handling the keystroke — that happens BEFORE React's
+  // onChange/effect ever run, so reading window.scrollY inside the
+  // effect below only ever sees the page already jumped (restoring to
+  // that value was a no-op, which is why the previous fix didn't help).
+  // Capture the scroll position in onBeforeInput, which fires before the
+  // browser applies the edit, so we have the true "before" position to
+  // restore to.
+  const preEditScrollY = useRef<number | null>(null)
+
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
-    // Collapsing to 'auto' before measuring briefly shrinks the textarea,
-    // which shifts everything below it and made the browser jump the
-    // page's scroll position on every keystroke (most noticeable at the
-    // bottom of a long script). Preserve the actual scroll position
-    // across that momentary resize so typing never moves the viewport.
-    const scrollY = window.scrollY
     el.style.height = 'auto'
     const next = Math.max(48, el.scrollHeight)
     el.style.height = Math.min(next, MAX_HEIGHT) + 'px'
     el.style.overflowY = next > MAX_HEIGHT ? 'auto' : 'hidden'
-    window.scrollTo({ top: scrollY })
+    if (preEditScrollY.current !== null) {
+      window.scrollTo({ top: preEditScrollY.current })
+      preEditScrollY.current = null
+    }
   }, [block.content])
 
   return (
@@ -467,6 +474,8 @@ function ScriptBlockCard({
             ref={textareaRef}
             value={block.content}
             onChange={(e) => onUpdate(block.id, { content: e.target.value })}
+            onBeforeInput={() => { preEditScrollY.current = window.scrollY }}
+            onKeyDown={() => { preEditScrollY.current = window.scrollY }}
             placeholder={PLACEHOLDERS[block.type] || 'Tulis di sini...'}
             rows={1}
             className="w-full px-3 py-2 text-xs text-text-primary resize-none border-none outline-none leading-relaxed bg-transparent min-h-[48px]"
