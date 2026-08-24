@@ -80,10 +80,18 @@ export function useVideos(opts: UseVideosOptions = {}) {
       if (sortBy === 'no_video') {
         const { data } = await q
         const list = ((data ?? []) as unknown as VideoWithSchedules[])
+        // Unnumbered content (no_video is null or the placeholder
+        // 'VID-000') always sorts to the very end, regardless of
+        // direction — it isn't "before VID-1", it just hasn't been
+        // numbered yet.
+        const isUnnumbered = (v: string | null | undefined) => !v || v === 'VID-000'
         list.sort((a, b) => {
-          const numA = a.no_video ?? ''
-          const numB = b.no_video ?? ''
-          const cmp = numA.localeCompare(numB, undefined, { numeric: true, sensitivity: 'base' })
+          const aUn = isUnnumbered(a.no_video)
+          const bUn = isUnnumbered(b.no_video)
+          if (aUn && bUn) return 0
+          if (aUn) return 1
+          if (bUn) return -1
+          const cmp = (a.no_video as string).localeCompare(b.no_video as string, undefined, { numeric: true, sensitivity: 'base' })
           return sortDir === 'asc' ? cmp : -cmp
         })
         const from = page * pageSize
