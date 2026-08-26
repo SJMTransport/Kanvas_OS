@@ -315,6 +315,14 @@ export default function IdeaPage() {
 
                     <WorkspaceTableCell>
                       <div className="flex items-center gap-1 flex-wrap">
+                        {(card.board_ids ?? []).map((bid) => {
+                          const board = boards.find((b) => b.id === bid)
+                          return board ? (
+                            <Badge key={bid} variant="outline" className="h-5 rounded-full px-2 text-[10px] font-medium bg-[#F7FAF9] text-[#52504A] border-[#E8EEEC]">
+                              {board.name}
+                            </Badge>
+                          ) : null
+                        })}
                         {(card.tags ?? []).slice(0, 3).map((t) => (
                           <TagChip key={t} name={t} color={tagColor(workspaceTags, t)} />
                         ))}
