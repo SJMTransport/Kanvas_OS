@@ -466,18 +466,19 @@ function DistributionTab({
         is_story: p === 'instagram' ? form.is_story : false,
       }
 
+      // Only ever UPDATE the one row being explicitly edited (editingId).
+      // Every other add — a brand new "+ Jadwal"/"+ Tanggal Baru" for a
+      // platform, or a cross-platform multipost pick — must INSERT a new
+      // row. Looking up "existing" schedule for the platform and updating
+      // it here used to silently overwrite an already-scheduled date
+      // whenever a platform already had one, instead of adding another.
       let error
       if (editingId && p === platform) {
         ({ error } = await supabase.from('video_platform_schedules').update(pPayload).eq('id', editingId))
       } else {
-        const existing = (schedules ?? []).find((s: { platform: string }) => s.platform === p)
-        if (existing) {
-          ({ error } = await supabase.from('video_platform_schedules').update(pPayload).eq('id', existing.id))
-        } else {
-          ({ error } = await supabase.from('video_platform_schedules').insert({
-            video_id: video.id, platform: p, status: 'scheduled', ...pPayload,
-          }))
-        }
+        ({ error } = await supabase.from('video_platform_schedules').insert({
+          video_id: video.id, platform: p, status: 'scheduled', ...pPayload,
+        }))
       }
       if (error) { toast.error(`Gagal menyimpan untuk ${p}: ${error.message}`); return }
     }
