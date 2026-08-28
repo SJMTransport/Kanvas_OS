@@ -9,9 +9,11 @@ import { PageContainer, PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SegmentedTabs, type TabOption } from '@/components/ui/segmented-tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ScheduleCalendarView } from '@/components/schedule/ScheduleCalendarView'
 import { formatDate } from '@/lib/utils/formatters'
 import { ArrowLeft, CalendarClock, CalendarDays, Users, CalendarRange, ListTodo } from 'lucide-react'
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, isWithinInterval, parseISO } from 'date-fns'
 
 // Consolidated, read-only Brand Schedule — the "Jadwal" action from the
 // main Brand page. Aggregates Shooting / Deadline / Posting / Milestone
@@ -26,12 +28,27 @@ import { ArrowLeft, CalendarClock, CalendarDays, Users, CalendarRange, ListTodo 
 // client-side re-grouping of already-fetched events.
 
 type ViewMode = 'per_brand' | 'kalender' | 'agenda'
+type PeriodFilter = 'week' | 'month' | 'year' | 'all'
 
 const VIEW_OPTIONS: TabOption<ViewMode>[] = [
   { value: 'per_brand', label: 'Per Brand', icon: Users },
   { value: 'kalender', label: 'Kalender', icon: CalendarRange },
   { value: 'agenda', label: 'Agenda', icon: ListTodo },
 ]
+
+const PERIOD_OPTIONS: { value: PeriodFilter; label: string }[] = [
+  { value: 'week', label: 'Minggu Ini' },
+  { value: 'month', label: 'Bulan Ini' },
+  { value: 'year', label: 'Tahun Ini' },
+  { value: 'all', label: 'Semua' },
+]
+
+function periodRange(period: PeriodFilter, now: Date) {
+  if (period === 'week') return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) }
+  if (period === 'month') return { start: startOfMonth(now), end: endOfMonth(now) }
+  if (period === 'year') return { start: startOfYear(now), end: endOfYear(now) }
+  return null
+}
 
 // Suggested display order within the same date/brand — matches the icon
 // order already established across Brand Schedule (🎥 → 🔴 → 📤 → 📌).
@@ -48,7 +65,27 @@ export default function BrandJadwalPage() {
   const { workspaceId } = useWorkspace()
   const router = useRouter()
   const [viewMode, setViewMode] = useState<ViewMode>('per_brand')
-  const { data: items = [], isLoading } = useAllBrandsSchedule(workspaceId)
+  const [period, setPeriod] = useState<PeriodFilter>('month')
+  const { data: allItems = [], isLoading } = useAllBrandsSchedule(workspaceId)
+
+  // Aggregating across every brand's shooting/deadline/posting/milestone
+  // events with no time bound meant this list only ever grew — including
+  // rows with garbage placeholder dates (e.g. null tanggal_tayang parsed
+  // as 1900/1999) that were otherwise invisible amid hundreds of real
+  // entries. Defaulting to "Bulan Ini" keeps the view scoped to what's
+  // actually relevant right now; "Semua" is still available.
+  const items = useMemo(() => {
+    const range = periodRange(period, new Date())
+    if (!range) return allItems
+    return allItems.filter((item) => {
+      if (!item.date) return false
+      try {
+        return isWithinInterval(parseISO(item.date), range)
+      } catch {
+        return false
+      }
+    })
+  }, [allItems, period])
 
   function openEvent(e: ScheduleEvent) {
     if (e.href) router.push(e.href)
@@ -86,10 +123,18 @@ export default function BrandJadwalPage() {
 
       <div className="flex items-center justify-between flex-wrap gap-3">
         <SegmentedTabs options={VIEW_OPTIONS} value={viewMode} onChange={setViewMode} />
-        <Button size="sm" variant="outline" onClick={() => router.push('/brand/shooting')} className="gap-1.5 font-semibold">
-          <CalendarClock className="w-4 h-4" />
-          <span>Kelola Sesi Shooting</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Select value={period} onValueChange={(v) => setPeriod(v as PeriodFilter)}>
+            <SelectTrigger className="h-9 text-xs w-32 rounded-[10px] border-border bg-white"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {PERIOD_OPTIONS.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Button size="sm" variant="outline" onClick={() => router.push('/brand/shooting')} className="gap-1.5 font-semibold">
+            <CalendarClock className="w-4 h-4" />
+            <span>Kelola Sesi Shooting</span>
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -98,7 +143,11 @@ export default function BrandJadwalPage() {
         <div className="bg-white border border-border rounded-xl p-12 text-center text-text-muted">
           <CalendarDays className="w-10 h-10 mx-auto mb-2 text-border" />
           <p className="text-sm font-semibold">Belum ada jadwal</p>
-          <p className="text-xs mt-1">Tanggal Shooting/Deadline/Posting Deliverable, Milestone SOW, dan Sesi Shooting akan muncul di sini.</p>
+          <p className="text-xs mt-1">
+            {allItems.length > 0
+              ? 'Tidak ada jadwal pada periode ini — coba ganti filter periode.'
+              : 'Tanggal Shooting/Deadline/Posting Deliverable, Milestone SOW, dan Sesi Shooting akan muncul di sini.'}
+          </p>
         </div>
       ) : viewMode === 'per_brand' ? (
         <div className="space-y-4">
