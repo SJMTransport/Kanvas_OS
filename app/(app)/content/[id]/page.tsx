@@ -955,6 +955,8 @@ function DistributionTab({
 // ─── Script Tab ──────────────────────────────────────────────────────────────
 
 function ScriptTab({ video }: { video: VideoWithSchedules }) {
+  const queryClient = useQueryClient()
+
   // No invalidateQueries here on purpose. ScriptBlocks already holds its
   // own local `blocks` state that reflects every keystroke immediately —
   // nothing on this page reads video.script_blocks anywhere else, so
@@ -965,13 +967,26 @@ function ScriptTab({ video }: { video: VideoWithSchedules }) {
   // that reconciliation — exactly the "jumps while I'm typing" bug
   // reported. The write itself still happens; the cache just catches up
   // next time this query is naturally refetched (tab revisit, etc.).
+  //
+  // The one exception: the first time a script actually gets content
+  // while the video is still at "Ide", the stage auto-advances to
+  // "Scripting" — that's a one-time transition (video.status !== 'ide'
+  // on every save after), so invalidating here doesn't repeat on every
+  // autosave tick and doesn't reintroduce the scroll-jump bug.
   async function handleSave(blocks: ScriptBlock[]) {
     const supabase = createClient()
-    const { error } = await supabase
-      .from('videos')
-      .update({ script_blocks: blocks, updated_at: new Date().toISOString() })
-      .eq('id', video.id)
-    if (error) toast.error(error.message)
+    const hasContent = blocks.some((b) => b.content?.trim())
+    const shouldAdvanceStatus = video.status === 'ide' && hasContent
+    const updates: Record<string, unknown> = { script_blocks: blocks, updated_at: new Date().toISOString() }
+    if (shouldAdvanceStatus) updates.status = 'scripting'
+
+    const { error } = await supabase.from('videos').update(updates).eq('id', video.id)
+    if (error) { toast.error(error.message); return }
+
+    if (shouldAdvanceStatus) {
+      queryClient.invalidateQueries({ queryKey: ['videos'] })
+      queryClient.invalidateQueries({ queryKey: ['video-detail', video.id] })
+    }
   }
 
   return (
