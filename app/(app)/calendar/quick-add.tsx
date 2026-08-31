@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useWorkspace } from '@/lib/hooks/useWorkspace'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,7 @@ import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Switch } from '@/components/ui/switch'
 import type { Platform } from '@/lib/types'
 
 const PLATFORMS: Platform[] = ['tiktok', 'instagram', 'youtube', 'facebook']
@@ -30,6 +31,7 @@ export function QuickAdd({ defaultDate, onSuccess, onCancel }: Props) {
   const [time, setTime] = useState('09:00')
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
+  const [markAsScheduled, setMarkAsScheduled] = useState(false)
 
   const { data: videos } = useQuery({
     queryKey: ['videos-search', workspaceId, search],
@@ -43,6 +45,28 @@ export function QuickAdd({ defaultDate, onSuccess, onCancel }: Props) {
     },
     enabled: !!workspaceId,
   })
+
+  const { data: existingSchedules } = useQuery({
+    queryKey: ['video-scheduled-platforms', videoId],
+    queryFn: async () => {
+      if (!videoId) return []
+      const supabase = createClient()
+      const { data } = await supabase.from('video_platform_schedules').select('platform').eq('video_id', videoId)
+      return (data ?? []).map((s: { platform: string }) => s.platform as Platform)
+    },
+    enabled: !!videoId,
+  })
+
+  const scheduledPlatforms = existingSchedules ?? []
+  const allScheduled = !!videoId && scheduledPlatforms.length >= PLATFORMS.length
+
+  // Switch away from a platform that becomes unavailable once a video is selected
+  useEffect(() => {
+    if (videoId && scheduledPlatforms.includes(platform)) {
+      const firstAvailable = PLATFORMS.find((p) => !scheduledPlatforms.includes(p))
+      if (firstAvailable) setPlatform(firstAvailable)
+    }
+  }, [videoId, JSON.stringify(scheduledPlatforms)])
 
   async function handleSave() {
     if (!videoId || !platform || !date) {
@@ -61,10 +85,16 @@ export function QuickAdd({ defaultDate, onSuccess, onCancel }: Props) {
       })
       if (error) throw error
 
-      // Update video status to scheduled
-      await supabase.from('videos').update({ status: 'scheduled' }).eq('id', videoId)
+      // Only update video status to scheduled if markAsScheduled is checked
+      if (markAsScheduled) {
+        await supabase.from('videos').update({ status: 'scheduled' }).eq('id', videoId)
+      }
 
       queryClient.invalidateQueries({ queryKey: ['schedules'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['action-center'], refetchType: 'all' })
+      queryClient.invalidateQueries({ queryKey: ['schedule-events'], refetchType: 'all' })
       toast.success('Jadwal berhasil ditambahkan!')
       onSuccess()
     } catch (err) {
@@ -82,15 +112,19 @@ export function QuickAdd({ defaultDate, onSuccess, onCancel }: Props) {
         <Input
           placeholder="Ketik judul video..."
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setVideoId('') }}
+          onChange={(e) => { setSearch(e.target.value); setVideoId(''); setMarkAsScheduled(false) }}
         />
         {videos && videos.length > 0 && !videoId && (
           <div className="border border-border rounded-md bg-white shadow-sm max-h-40 overflow-y-auto">
-            {videos.map((v) => (
+            {videos.map((v: { id: string; judul: string; status: string }) => (
               <button
                 key={v.id}
                 className="w-full text-left px-3 py-2 text-sm hover:bg-subtle transition-colors"
-                onClick={() => { setVideoId(v.id); setSearch(v.judul) }}
+                onClick={() => {
+                  setVideoId(v.id)
+                  setSearch(v.judul)
+                  setMarkAsScheduled(v.status === 'scheduled' || v.status === 'live')
+                }}
               >
                 <span className="font-medium">{v.judul}</span>
                 <span className="text-text-muted ml-2 text-xs">{v.status}</span>
@@ -100,17 +134,29 @@ export function QuickAdd({ defaultDate, onSuccess, onCancel }: Props) {
         )}
       </div>
 
+      {allScheduled && (
+        <p className="text-xs text-warning bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+          Semua platform sudah memiliki jadwal untuk video ini. Buka detail video untuk mengubah jadwal yang ada.
+        </p>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label>Platform</Label>
-          <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)}>
+          <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)} disabled={allScheduled}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {PLATFORMS.map((p) => (
-                <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>
-              ))}
+              {PLATFORMS.map((p) => {
+                const isScheduled = scheduledPlatforms.includes(p)
+                return (
+                  <SelectItem key={p} value={p} disabled={isScheduled}>
+                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                    {isScheduled ? ' — Sudah dijadwalkan' : ''}
+                  </SelectItem>
+                )
+              })}
             </SelectContent>
           </Select>
         </div>
@@ -125,8 +171,26 @@ export function QuickAdd({ defaultDate, onSuccess, onCancel }: Props) {
         <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
       </div>
 
+      {videoId && (
+        <div className="flex items-center justify-between border border-border rounded-lg p-3 bg-surface">
+          <div className="space-y-0.5 pr-2">
+            <Label htmlFor="mark-scheduled" className="text-xs font-semibold text-text-primary cursor-pointer">
+              Tandai Siap Tayang
+            </Label>
+            <p className="text-[10px] text-text-muted leading-tight">
+              Ubah status video menjadi "Scheduled" (Siap Posting)
+            </p>
+          </div>
+          <Switch
+            id="mark-scheduled"
+            checked={markAsScheduled}
+            onCheckedChange={setMarkAsScheduled}
+          />
+        </div>
+      )}
+
       <div className="flex gap-2 pt-1">
-        <Button className="flex-1" onClick={handleSave} disabled={saving || !videoId}>
+        <Button className="flex-1" onClick={handleSave} disabled={saving || !videoId || allScheduled}>
           {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
           Simpan Jadwal
         </Button>

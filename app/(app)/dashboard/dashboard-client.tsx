@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { formatRupiah } from '@/lib/utils/formatters'
@@ -15,6 +16,12 @@ import { formatDistanceToNow, format, differenceInDays, isToday, isPast } from '
 import { id as localeId } from 'date-fns/locale'
 import type { Platform } from '@/lib/types'
 import type { RecentVideo } from './page'
+import { PageContainer, PageHeader } from '@/components/layout/page-header'
+import { ActionCenter } from '@/components/dashboard/action-center'
+import { ContentIdentity } from '@/components/content/ContentIdentity'
+import type { ActionItem } from '@/lib/operations/rules'
+import type { ScheduleEvent } from '@/lib/hooks/useScheduleEvents'
+import { ScheduleCalendarView, EventIndicator } from '@/components/schedule/ScheduleCalendarView'
 import { cn } from '@/lib/utils'
 
 const STATUS_MAP: Record<string, string> = {
@@ -32,7 +39,7 @@ interface Schedule {
   platform: Platform
   jam_post: string | null
   tanggal_tayang: string
-  videos: { id: string; judul: string; thumbnail_url: string | null; status: string } | null
+  videos: { id: string; judul: string; no_video?: string | null; thumbnail_url: string | null; status: string } | null
 }
 
 interface Followup {
@@ -47,8 +54,8 @@ interface OverdueInvoice {
   id: string
   invoice_number: string
   total: number
-  due_date: string
-  brands: { nama_brand: string } | null
+  due_date: string | null
+  brands: { nama_brand: string } | { nama_brand: string }[] | null
 }
 
 interface Props {
@@ -59,6 +66,47 @@ interface Props {
   followups: Followup[]
   overdueInvoices: OverdueInvoice[]
   recentVideos: RecentVideo[]
+  pilarVideos?: string[]
+  actionItems?: ActionItem[]
+  actionItemsLoading?: boolean
+  scheduleEvents?: ScheduleEvent[]
+  scheduleEventsLoading?: boolean
+  scheduleEventsError?: boolean
+  scheduleActiveDate?: Date
+  onScheduleActiveDateChange?: (date: Date) => void
+}
+
+function safeDate(value: string | null | undefined): Date | null {
+  if (!value) return null
+  const d = new Date(value)
+  return isNaN(d.getTime()) ? null : d
+}
+
+function safeDistanceToNow(value: string | null | undefined): string {
+  const d = safeDate(value)
+  if (!d) return '-'
+  try {
+    return formatDistanceToNow(d, { addSuffix: true, locale: localeId })
+  } catch {
+    return '-'
+  }
+}
+
+function safeDaysAgo(value: string | null | undefined): number {
+  const d = safeDate(value)
+  if (!d) return 0
+  try {
+    return differenceInDays(new Date(), d)
+  } catch {
+    return 0
+  }
+}
+
+// Supabase can return a to-one FK join as either an object or a single-item array
+// depending on relationship metadata — normalize defensively either way.
+function firstOf<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null
+  return Array.isArray(value) ? (value[0] ?? null) : value
 }
 
 function getGreeting() {
@@ -76,22 +124,42 @@ function getGreetingEmoji() {
   return '🌙'
 }
 
-export function DashboardClient({ userName, role, todaySchedules, pipeline, followups, overdueInvoices, recentVideos }: Props) {
+export function DashboardClient({ userName, role, todaySchedules, pipeline, followups, overdueInvoices, recentVideos, pilarVideos = [], actionItems = [], actionItemsLoading, scheduleEvents = [], scheduleEventsLoading, scheduleEventsError, scheduleActiveDate, onScheduleActiveDateChange }: Props) {
   const router = useRouter()
-  const firstName = userName.split(' ')[0]
+  const [selectedScheduleDate, setSelectedScheduleDate] = useState<string | null>(null)
+  const firstName = (userName || 'Kreator').split(' ')[0]
+
+  // Calculate content pillar distribution
+  const pillarsCount: Record<string, number> = {
+    'Edukasi': 0,
+    'Hiburan': 0,
+    'Promosi': 0,
+    'Inspirasi': 0,
+    'Behind the Scenes': 0
+  }
+  let totalPillarsCount = 0
+  pilarVideos.forEach(p => {
+    if (p in pillarsCount) {
+      pillarsCount[p]++
+      totalPillarsCount++
+    }
+  })
+
+  const pilarPercentages = Object.entries(pillarsCount).map(([name, count]) => {
+    const percentage = totalPillarsCount > 0 ? Math.round((count / totalPillarsCount) * 100) : 0
+    return { name, count, percentage }
+  }).sort((a, b) => b.count - a.count)
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-8">
-
+    <PageContainer className="space-y-6">
       {/* Section 1 — Greeting */}
-      <div>
-        <h1 className="font-heading text-2xl font-bold text-text-primary">
-          {getGreeting()}, {firstName} {getGreetingEmoji()}
-        </h1>
-        <p className="text-text-secondary text-sm mt-0.5">
-          {format(new Date(), 'EEEE, d MMMM yyyy', { locale: localeId })}
-        </p>
-      </div>
+      <PageHeader
+        title={`${getGreeting()}, ${firstName} ${getGreetingEmoji()}`}
+        subtitle={format(new Date(), 'EEEE, d MMMM yyyy', { locale: localeId })}
+      />
+
+      {/* Section 1.5 — Action Center: "what needs my attention right now" */}
+      <ActionCenter items={actionItems} isLoading={actionItemsLoading} />
 
       {/* Section 2 — Today's Schedule */}
       <div>
@@ -135,11 +203,80 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
                     )}
                   </div>
                   <p className="text-xs font-medium text-text-primary line-clamp-2 leading-tight">
-                    {s.videos?.judul ?? 'Video'}
+                    <ContentIdentity videoNo={s.videos?.no_video} judul={s.videos?.judul} emptyPlaceholder="Video" />
                   </p>
                 </div>
               </Link>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Section 2.5 — Jadwal Bulan Ini: a compact calendar PREVIEW of the
+          shared Schedule Engine (same ScheduleEvent[] / same query used by
+          Brand -> Jadwal's Kalender view — no second data source). Kept
+          separate from "Jadwal Hari Ini" above, which stays untouched as
+          a quick-glance, thumbnail-driven action row for today's actual
+          postings; this section is the month-level overview across all
+          4 event types (Shooting/Deadline/Posting/Milestone). */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-heading font-semibold text-text-primary flex items-center gap-2">
+            <CalendarCheck className="w-4 h-4 text-accent" />
+            Jadwal Bulan Ini
+          </h2>
+          <Link href="/brand/jadwal" className="text-xs text-accent hover:underline flex items-center gap-0.5">
+            Jadwal Brand <ChevronRight className="w-3 h-3" />
+          </Link>
+        </div>
+        {scheduleEventsLoading ? (
+          <div className="bg-surface rounded-xl border border-border p-4 space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-4 bg-subtle rounded animate-pulse" />
+            ))}
+          </div>
+        ) : scheduleEventsError ? (
+          <div className="flex flex-col items-center justify-center py-8 bg-surface rounded-xl border border-border">
+            <AlertCircle className="w-8 h-8 text-error mb-2" />
+            <p className="text-sm text-text-muted">Gagal memuat jadwal bulan ini.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <ScheduleCalendarView
+              events={scheduleEvents}
+              onEventClick={(e) => e.href && router.push(e.href)}
+              activeDate={scheduleActiveDate}
+              onActiveDateChange={onScheduleActiveDateChange}
+              onDayClick={(dateStr) => setSelectedScheduleDate((d) => (d === dateStr ? null : dateStr))}
+              compact
+            />
+            {selectedScheduleDate && (
+              <div className="bg-white border border-border rounded-xl p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-text-muted mb-2">
+                  {format(new Date(selectedScheduleDate), 'EEEE, d MMMM yyyy', { locale: localeId })}
+                </p>
+                {(() => {
+                  const dayEvents = scheduleEvents.filter((e) => e.date === selectedScheduleDate)
+                  return dayEvents.length === 0 ? (
+                    <p className="text-xs text-text-muted">Tidak ada jadwal pada tanggal ini.</p>
+                  ) : (
+                    <div className="divide-y divide-border/60">
+                      {dayEvents.map((e) => (
+                        <Link
+                          key={e.id}
+                          href={e.href}
+                          className="flex items-center gap-2.5 py-2 hover:bg-subtle/60 rounded-lg px-1.5 -mx-1.5 transition-colors"
+                        >
+                          <span className="shrink-0"><EventIndicator e={e} /></span>
+                          <span className="text-xs font-medium text-text-primary flex-1 min-w-0 truncate">{e.label}</span>
+                          {e.brandName && <span className="text-[10px] text-text-muted shrink-0">{e.brandName}</span>}
+                        </Link>
+                      ))}
+                    </div>
+                  )
+                })()}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -154,8 +291,8 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
           {[
             { label: 'Total Video', value: pipeline.total, icon: Video, href: '/content' },
             { label: 'Terjadwal', value: pipeline.scheduled, icon: CalendarCheck, href: '/content?status=scheduled' },
-            { label: 'Live Bulan Ini', value: pipeline.live, icon: Sparkles, href: '/content?status=live' },
-            { label: 'Draft', value: pipeline.draft, icon: FileEdit, href: '/content?status=draft' },
+            { label: 'Live Bulan Ini', value: pipeline.live, icon: Sparkles, href: '/content?status=live&month=current' },
+            { label: 'Draft', value: pipeline.draft, icon: FileEdit, href: '/content?status=ide,scripting,produksi,editing' },
           ].map((stat) => {
             const Icon = stat.icon
             return (
@@ -176,6 +313,54 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
         </div>
       </div>
 
+      {/* Section 3.5 — Distribusi Pilar Konten */}
+      <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
+        <h2 className="font-heading font-semibold text-text-primary mb-4 flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-accent" />
+          Distribusi Pilar Konten
+        </h2>
+        {totalPillarsCount === 0 ? (
+          <p className="text-xs text-text-muted italic py-2">Belum ada data pilar konten. Silakan tentukan pilar konten pada detail perencanaan video Anda.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3.5">
+              {pilarPercentages.map((item) => {
+                const colors: Record<string, string> = {
+                  'Edukasi': 'bg-blue-500',
+                  'Hiburan': 'bg-purple-500',
+                  'Promosi': 'bg-rose-500',
+                  'Inspirasi': 'bg-teal-500',
+                  'Behind the Scenes': 'bg-emerald-500',
+                }
+                const color = colors[item.name] || 'bg-teal-500'
+                return (
+                  <div key={item.name} className="space-y-1">
+                    <div className="flex justify-between text-xs font-medium">
+                      <span className="text-text-primary">{item.name}</span>
+                      <span className="text-text-muted">{item.count} video ({item.percentage}%)</span>
+                    </div>
+                    <div className="w-full bg-subtle h-2.5 rounded-full overflow-hidden">
+                      <div
+                        className={cn("h-full rounded-full transition-all duration-500", color)}
+                        style={{ width: `${item.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            {/* Pie Chart Mock Visualization */}
+            <div className="flex items-center justify-center p-4 bg-subtle rounded-xl border border-border/40">
+              <div className="text-center space-y-2">
+                <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Top Pilar Bulan Ini</p>
+                <p className="text-2xl font-bold text-accent font-heading">{pilarPercentages[0]?.name ?? '-'}</p>
+                <p className="text-xs text-text-secondary">Pilar ini menyusun {pilarPercentages[0]?.percentage ?? 0}% dari total pustaka konten Anda</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Section 4 — Follow-up Reminder */}
         <div>
@@ -194,18 +379,16 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
           ) : (
             <div className="bg-white border border-border rounded-xl divide-y divide-border">
               {followups.map((f) => {
-                const daysAgo = f.next_followup_date
-                  ? differenceInDays(new Date(), new Date(f.next_followup_date))
-                  : 0
+                const daysAgo = safeDaysAgo(f.next_followup_date)
                 return (
                   <div key={f.id} className="flex items-center gap-3 p-3">
                     <Avatar className="w-8 h-8 shrink-0">
                       <AvatarFallback className="bg-accent-light text-accent text-xs font-bold">
-                        {f.nama_brand.slice(0, 2).toUpperCase()}
+                        {(f.nama_brand ?? '??').slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-text-primary truncate">{f.nama_brand}</p>
+                      <p className="text-sm font-medium text-text-primary truncate">{f.nama_brand ?? 'Tanpa nama'}</p>
                       <p className="text-xs text-text-muted">
                         {BRAND_STATUS_LABEL[f.status] ?? f.status} •{' '}
                         <span className={cn(daysAgo > 0 ? 'text-error' : 'text-warning')}>
@@ -237,7 +420,8 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
               </h2>
               <div className="bg-white border border-error/30 rounded-xl divide-y divide-border">
                 {overdueInvoices.map((inv) => {
-                  const daysAgo = differenceInDays(new Date(), new Date(inv.due_date))
+                  const daysAgo = safeDaysAgo(inv.due_date)
+                  const brand = firstOf(inv.brands)
                   return (
                     <Link
                       key={inv.id}
@@ -248,7 +432,7 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-text-primary">{inv.invoice_number}</p>
                         <p className="text-xs text-text-muted">
-                          {inv.brands?.nama_brand} · {daysAgo} hari lalu
+                          {brand?.nama_brand ?? 'Brand'} · {daysAgo} hari lalu
                         </p>
                       </div>
                       <span className="text-sm font-semibold text-error shrink-0">
@@ -282,16 +466,16 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
                     <div className="w-2 h-2 rounded-full bg-accent mt-1.5 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-text-primary">
-                        <span className="font-medium">{v.users?.full_name ?? 'Seseorang'}</span>
+                        <span className="font-medium">{firstOf(v.users)?.full_name ?? 'Seseorang'}</span>
                         {' '}mengupdate{' '}
-                        <span className="font-medium">"{v.judul}"</span>
+                        <span className="font-medium">"<ContentIdentity videoNo={v.no_video} judul={v.judul} />"</span>
                       </p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
                           {STATUS_MAP[v.status] ?? v.status}
                         </Badge>
                         <span className="text-[11px] text-text-muted">
-                          {formatDistanceToNow(new Date(v.updated_at), { addSuffix: true, locale: localeId })}
+                          {safeDistanceToNow(v.updated_at)}
                         </span>
                       </div>
                     </div>
@@ -302,6 +486,6 @@ export function DashboardClient({ userName, role, todaySchedules, pipeline, foll
           </div>
         </div>
       </div>
-    </div>
+    </PageContainer>
   )
 }

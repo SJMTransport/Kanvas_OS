@@ -1,46 +1,50 @@
 import {
-  LayoutDashboard, CalendarDays, Video, BarChart2,
-  Handshake, Image, Settings, type LucideIcon
+  LayoutDashboard, Video, Handshake, Image, Settings, Lightbulb, FolderOpen,
+  type LucideIcon,
 } from 'lucide-react'
+
+export interface NavChild {
+  label: string
+  href: string
+  soon?: boolean
+}
 
 export interface NavItem {
   label: string
   href?: string
   icon: LucideIcon
-  children?: { label: string; href: string }[]
+  soon?: boolean
+  children?: NavChild[]
 }
 
+// Streamlined, 5-destination top-level navigation:
+// 1. Dashboard  (/dashboard)
+// 2. Konten     (/content)  -- views: Tabel, Kanban, Kalender, Performa
+// 3. Karya      (/works)    -- projects / campaigns / endeavors
+// 4. Vault      (/incubator/idea) -- Ide, Referensi, Creator, Shot List
+// 5. Brand      (/brand)    -- Client CRM, Deals, Proposals, Invoices
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Kalender', href: '/calendar', icon: CalendarDays },
+  { label: 'Konten', href: '/content', icon: Video },
+  { label: 'Karya', href: '/works', icon: FolderOpen },
   {
-    label: 'Content',
-    icon: Video,
+    label: 'Vault',
+    icon: Lightbulb,
     children: [
-      { label: 'Video', href: '/content' },
-      { label: 'Kanban', href: '/content/kanban' },
-      { label: 'Ideas', href: '/content/ideas' },
-      { label: 'Research', href: '/content/research' },
+      { label: 'Ide', href: '/incubator/idea' },
+      { label: 'Referensi', href: '/incubator/saved' },
+      { label: 'Creator', href: '/incubator/creator' },
+      { label: 'Shot List', href: '/incubator/shot-list' },
     ],
   },
-  { label: 'Performa', href: '/performance', icon: BarChart2 },
-  {
-    label: 'Brand',
-    icon: Handshake,
-    children: [
-      { label: 'Pipeline', href: '/brand' },
-      { label: 'Quotation', href: '/brand/quotation' },
-      { label: 'Deals', href: '/brand/deals' },
-      { label: 'Invoice', href: '/brand/invoice' },
-    ],
-  },
-  { label: 'Aset', href: '/aset', icon: Image },
+  { label: 'Brand', href: '/brand', icon: Handshake },
+  { label: 'Aset', href: '/aset', icon: Image, soon: true },
   { label: 'Settings', href: '/settings', icon: Settings },
 ]
 
 export const BOTTOM_NAV: NavItem[] = [
   { label: 'Home', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Kalender', href: '/calendar', icon: CalendarDays },
-  { label: 'Content', href: '/content', icon: Video },
-  { label: 'Performa', href: '/performance', icon: BarChart2 },
+  { label: 'Konten', href: '/content', icon: Video },
+  { label: 'Karya', href: '/works', icon: FolderOpen },
+  { label: 'Vault', href: '/incubator/idea', icon: Lightbulb },
 ]

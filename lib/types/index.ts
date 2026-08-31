@@ -1,3 +1,5 @@
+import type { ProductionStatus, ApprovalStatus, PublishingStatus } from './brand'
+
 export type Platform = 'tiktok' | 'instagram' | 'youtube' | 'facebook'
 export type WorkspaceRole = 'owner' | 'manager' | 'editor'
 export type VideoStatus = 'ide' | 'scripting' | 'produksi' | 'editing' | 'scheduled' | 'live' | 'archived'
@@ -47,6 +49,8 @@ export interface SocialAccount {
   created_at: string
 }
 
+export type ContentType = 'video' | 'foto'
+
 export interface Video {
   id: string
   workspace_id: string
@@ -57,6 +61,7 @@ export interface Video {
   judul: string
   format: string | null
   tema: string | null
+  temas: string[] | null
   nama_alat: string | null
   storage_bahan: string | null
   storage_video: string | null
@@ -64,11 +69,19 @@ export interface Video {
   deadline_posting: string | null
   is_endorsement: boolean
   brand_id: string | null
+  deal_id?: string | null
   is_video_request: boolean
   google_drive_link: string | null
   caption_default: string | null
   thumbnail_url: string | null
+  content_type: ContentType
+  image_urls: string[] | null
   status: VideoStatus
+  production_status?: ProductionStatus | string
+  approval_status?: ApprovalStatus | string
+  publishing_status?: PublishingStatus | string
+  approval_waiting_since?: string | null
+  pilar_konten: string | null
   created_at: string
   updated_at: string
 }
@@ -83,6 +96,8 @@ export interface VideoPlatformSchedule {
   status: ScheduleStatus
   url_post: string | null
   caption_override: string | null
+  media_url?: string | null
+  is_story?: boolean | null
   created_at: string
   updated_at: string
 }
@@ -201,7 +216,21 @@ export interface BrandFollowup {
   catatan: string
   next_action: string | null
   next_date: string | null
+  opportunity_id: string | null
   created_at: string
+}
+
+export type OpportunityStage = 'baru' | 'dihubungi' | 'follow_up' | 'proposal' | 'menunggu_respons' | 'berhasil' | 'tidak_jadi'
+
+export interface BrandOpportunity {
+  id: string
+  brand_id: string
+  name: string
+  stage: OpportunityStage
+  estimated_value: number | null
+  notes: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface QuotationItem {
@@ -216,6 +245,9 @@ export interface Quotation {
   id: string
   workspace_id: string
   brand_id: string
+  // Added by migration 035 (Phase 3.5) — nullable, a quotation can predate
+  // a formally created Deal.
+  deal_id?: string | null
   quotation_number: string
   tanggal: string
   expired_date: string | null
@@ -257,6 +289,9 @@ export interface Invoice {
   workspace_id: string
   brand_id: string
   deal_id: string | null
+  // Added by migration 035 (Phase 3.5) — nullable, plenty of legitimate
+  // invoices are created directly against a Deal with no quotation at all.
+  quotation_id?: string | null
   invoice_number: string
   type: InvoiceType
   tanggal: string
@@ -275,3 +310,5 @@ export interface Invoice {
   created_at: string
   updated_at: string
 }
+
+export * from './brand'

@@ -4,33 +4,36 @@ import { Sidebar } from '@/components/layout/sidebar'
 import { Topbar } from '@/components/layout/topbar'
 import { BottomNav } from '@/components/layout/bottom-nav'
 import { AppMain } from '@/components/layout/app-main'
+import { QuickCaptureButton } from '@/components/incubator/QuickCaptureButton'
 import { Toaster } from 'sonner'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  try {
+    const supabase = await createClient()
+    // getSession reads from cookie — no network call, fast
+    const { data: { session } } = await supabase.auth.getSession()
 
-  if (!user) redirect('/login')
+    if (!session) redirect('/login')
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('full_name, avatar_url, email')
-    .eq('id', user.id)
-    .single()
+    const user = session.user
+    // user_metadata has name+avatar from Google OAuth; fall back to email
+    const userData = {
+      email: user.email ?? '',
+      full_name: (user.user_metadata?.full_name as string | null) ?? null,
+      avatar_url: (user.user_metadata?.avatar_url as string | null) ?? null,
+    }
 
-  const userData = {
-    email: user.email ?? '',
-    full_name: profile?.full_name ?? null,
-    avatar_url: profile?.avatar_url ?? null,
+    return (
+      <div className="min-h-screen bg-surface">
+        <Sidebar />
+        <Topbar user={userData} />
+        <AppMain>{children}</AppMain>
+        <BottomNav />
+        <QuickCaptureButton />
+        <Toaster richColors position="top-right" />
+      </div>
+    )
+  } catch {
+    redirect('/login')
   }
-
-  return (
-    <div className="min-h-screen bg-surface">
-      <Sidebar />
-      <Topbar user={userData} />
-      <AppMain>{children}</AppMain>
-      <BottomNav />
-      <Toaster richColors position="top-right" />
-    </div>
-  )
 }

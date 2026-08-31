@@ -4,14 +4,14 @@ import { startOfWeek, addDays, format, isToday } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { getPlatformChipClass } from '@/lib/utils/platform'
-import type { ScheduleEvent } from './types'
+import { CALENDAR_CATEGORY_CONFIG, type CalendarEvent } from './types'
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i)
 
 interface Props {
   activeDate: Date
-  events: ScheduleEvent[]
-  onEventClick: (event: ScheduleEvent) => void
+  events: CalendarEvent[]
+  onEventClick: (event: CalendarEvent) => void
 }
 
 export function WeekView({ activeDate, events, onEventClick }: Props) {
@@ -21,9 +21,9 @@ export function WeekView({ activeDate, events, onEventClick }: Props) {
   function getEventsForDayHour(date: Date, hour: number) {
     const dateStr = format(date, 'yyyy-MM-dd')
     return events.filter((e) => {
-      if (e.tanggal_tayang !== dateStr) return false
-      if (!e.jam_post) return hour === 0
-      const eventHour = parseInt(e.jam_post.split(':')[0])
+      if (e.date !== dateStr) return false
+      if (!e.time) return hour === 0
+      const eventHour = parseInt(e.time.split(':')[0])
       return eventHour === hour
     })
   }
@@ -62,19 +62,24 @@ export function WeekView({ activeDate, events, onEventClick }: Props) {
               const dayEvents = getEventsForDayHour(day, hour)
               return (
                 <div key={day.toISOString()} className="border-l border-border/50 p-0.5 space-y-0.5">
-                  {dayEvents.map((ev) => (
-                    <button
-                      key={ev.id}
-                      className={cn(
-                        'w-full text-left text-[10px] px-1.5 py-1 rounded truncate hover:opacity-80 transition-opacity',
-                        getPlatformChipClass(ev.platform)
-                      )}
-                      onClick={() => onEventClick(ev)}
-                    >
-                      {ev.jam_post && <span className="opacity-70 mr-1">{ev.jam_post.slice(0, 5)}</span>}
-                      {ev.videos?.judul ?? 'Video'}
-                    </button>
-                  ))}
+                  {dayEvents.map((ev) => {
+                    const cfg = CALENDAR_CATEGORY_CONFIG[ev.category]
+                    return (
+                      <button
+                        key={ev.id}
+                        className={cn(
+                          'w-full text-left text-[10px] px-1.5 py-1 rounded truncate hover:opacity-80 transition-opacity border',
+                          ev.category === 'publishing' ? getPlatformChipClass(ev.raw.platform) : cfg.badgeClass,
+                          ev.severity === 'overdue' && 'ring-1 ring-rose-400'
+                        )}
+                        onClick={() => onEventClick(ev)}
+                        title={`${cfg.label} · ${ev.title}`}
+                      >
+                        {ev.time && <span className="opacity-70 mr-1">{ev.time.slice(0, 5)}</span>}
+                        {ev.title}
+                      </button>
+                    )
+                  })}
                 </div>
               )
             })}
