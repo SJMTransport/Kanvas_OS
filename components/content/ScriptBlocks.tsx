@@ -205,14 +205,14 @@ export function ScriptBlocks({ videoId, videoTitle, initialBlocks, onSave }: Scr
 
   return (
     <div className="py-4">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
         <span className="text-sm text-text-muted">
           {durationText(totalWords)}
           {totalWords > 0 && <span className="ml-2">· {totalWords} kata</span>}
           {saveStatus === 'saving' && <span className="ml-3">Menyimpan...</span>}
           {saveStatus === 'saved' && <span className="ml-3 text-success">✓ Tersimpan</span>}
         </span>
-        <div className="flex gap-2.5 items-center">
+        <div className="flex flex-wrap gap-2.5 items-center">
           <button
             onClick={() => setAiWriterOpen(true)}
             className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md border border-accent bg-accent-light text-accent hover:bg-accent hover:text-white transition-colors"
@@ -442,13 +442,13 @@ function ScriptBlockCard({
   }, [block.content])
 
   return (
-    <div className="flex items-start gap-4 py-3 border-b border-border/50 last:border-b-0 group">
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-start gap-2 sm:gap-4 py-3 border-b border-border/50 last:border-b-0 group">
       {/* Sisi Kiri: Label & Meta Info */}
-      <div className="w-40 shrink-0 space-y-1">
+      <div className="sm:w-40 shrink-0 space-y-1">
         <div className="flex items-center gap-1">
           <button
             {...dragHandleProps}
-            className="cursor-grab active:cursor-grabbing text-text-muted hover:text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity p-0.5 touch-none"
+            className="cursor-grab active:cursor-grabbing text-text-muted hover:text-text-secondary sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-0.5 touch-none"
             title="Tarik untuk urutkan"
           >
             <GripVertical className="w-3.5 h-3.5" />
@@ -460,6 +460,13 @@ function ScriptBlockCard({
             className="flex-1 bg-transparent font-semibold text-xs text-text-primary border-none outline-none focus:bg-white focus:px-1 rounded transition-all truncate"
             title="Klik untuk ubah nama section"
           />
+          <button
+            onClick={() => onDelete(block.id)}
+            className="sm:hidden text-text-muted hover:text-error transition-all p-1 rounded hover:bg-subtle shrink-0"
+            title="Hapus section"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
         </div>
         <div className="pl-5 flex flex-col text-[10px] text-text-muted">
           <span>{words} kata</span>
@@ -469,7 +476,7 @@ function ScriptBlockCard({
 
       {/* Sisi Kanan: Input Script & Tombol Aksi */}
       <div className="flex-1 flex items-start gap-2">
-        <div className="flex-1 border border-border/80 hover:border-border rounded-lg bg-white shadow-sm overflow-hidden focus-within:ring-1 focus-within:ring-accent/30 focus-within:border-accent transition-all">
+        <div className="flex-1 min-w-0 border border-border/80 hover:border-border rounded-lg bg-white shadow-sm overflow-hidden focus-within:ring-1 focus-within:ring-accent/30 focus-within:border-accent transition-all">
           <textarea
             ref={textareaRef}
             value={block.content}
@@ -483,7 +490,7 @@ function ScriptBlockCard({
         </div>
         <button
           onClick={() => onDelete(block.id)}
-          className="text-text-muted hover:text-error opacity-0 group-hover:opacity-100 transition-all p-1.5 rounded hover:bg-subtle shrink-0 mt-1"
+          className="hidden sm:inline-flex text-text-muted hover:text-error opacity-0 group-hover:opacity-100 transition-all p-1.5 rounded hover:bg-subtle shrink-0 mt-1"
           title="Hapus section"
         >
           <Trash2 className="w-3.5 h-3.5" />
